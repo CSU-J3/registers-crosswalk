@@ -1,0 +1,41 @@
+# registers-crosswalk
+
+A thin resolution layer **above** three separate registers — Connected-Procurement (CP),
+Sovereign-Connections (Sovereign), and Vested-Interests (VI). It resolves the *same real-world actor*
+across them and holds the one canonical managed-account determination rule they all cite.
+
+It exists so cross-register identity lives in one place **without merging the registers** — the
+anti-bleed separation (`vi_` / `cp_` / `SC-` prefixes, distinct scopes) stays intact.
+
+## What it stores — and never stores
+
+Per actor: a stable minted id (`xr_holder_NNNN` / `xr_org_NNNN`), a canonical name, public registrar
+ids (`external_ids[]`: CIK/UEI), and **references into each register by that register's own local id**,
+each tagged `identity` (the local id *is* the actor) or `record_mention` (the local id is a record
+that *mentions* the actor).
+
+It **never** copies a register's data — no revenue, holdings, filings, edges, or transactions. The
+crosswalk points; consumers dereference `local_id` against the source register.
+
+## Layout
+
+    docs/crosswalk-spec.md                 # the schema, ref rules, anti-bleed contract
+    docs/managed-account-determination.md  # canonical shared truth (QBT vs managed_direct)
+    data/holders/  data/orgs/              # xr_holder_NNNN / xr_org_NNNN nodes
+    src/registers_crosswalk/               # pydantic models + registry + validate
+    tests/
+    hooks/pre-commit                       # local cross-repo existence check (CI can't read siblings)
+
+## Run
+
+    pip install -e ".[dev]"
+    ruff check . && ruff format --check .
+    pytest -q
+    python -m registers_crosswalk.validate     # loads + prints the resolved graph
+
+## The cross-repo hook
+
+CI validates each node in isolation but cannot confirm a `local_id` exists in CP/Sovereign/VI (they
+are separate repos). `hooks/pre-commit` does that against sibling working copies on disk. Install:
+
+    cp hooks/pre-commit .git/hooks/pre-commit    # then chmod +x on POSIX

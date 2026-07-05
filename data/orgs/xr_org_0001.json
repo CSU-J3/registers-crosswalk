@@ -1,0 +1,22 @@
+{
+  "xr_id": "xr_org_0001",
+  "kind": "org",
+  "canonical_name": "Palantir Technologies Inc.",
+  "external_ids": [
+    {
+      "scheme": "cik",
+      "value": "0001321655",
+      "source_url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001321655"
+    }
+  ],
+  "registers": [
+    {
+      "register": "vi",
+      "local_id": "vi_recipient_0002",
+      "ref_type": "identity",
+      "display_label": "recipient (VI counted conflict vi_conflict_0002)"
+    }
+  ],
+  "merged_into": null,
+  "notes": "CIK carried in external_ids, never as the primary key. VI is currently the only axis carrying Palantir; CP/Sovereign refs attach here if it later surfaces on those axes."
+}

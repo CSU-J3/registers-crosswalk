@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_holder_0001",
+  "kind": "holder",
+  "canonical_name": "Donald J. Trump",
+  "external_ids": [],
+  "registers": [
+    {
+      "register": "vi",
+      "local_id": "vi_official_0001",
+      "ref_type": "identity",
+      "display_label": "covered official (President; is_principal)"
+    },
+    {
+      "register": "cp",
+      "local_id": "cp_person_0003",
+      "ref_type": "identity",
+      "display_label": "filer of cp_filing_0003; not a named-family member, derived relationships excluded_from_total",
+      "note": "CP scopes named-family members of the administration, not the President himself; cp_person_0003 exists only as the 2021 Termination 278 filer to schema-test the trust beneficial-interest pattern."
+    },
+    {
+      "register": "sovereign",
+      "local_id": "SC-007",
+      "ref_type": "record_mention",
+      "display_label": "Trump-family beneficial interest (World Liberty Financial)",
+      "note": "Sovereign has no per-person identity record; the interest surfaces inside record SC-007."
+    }
+  ],
+  "merged_into": null,
+  "notes": "Same holder resolved across all three axes. The registers characterize him differently by design (VI covered official, CP excluded filer-anchor, Sovereign record subject); the crosswalk records the identity link, not a merged status."
+}

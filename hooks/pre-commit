@@ -1,0 +1,4 @@
+#!/bin/sh
+# Local cross-repo reference check. CI cannot read the sibling repos, so this runs here.
+# Install:  cp hooks/pre-commit .git/hooks/pre-commit   (then: chmod +x .git/hooks/pre-commit)
+python hooks/check_refs.py || exit 1

@@ -21,6 +21,7 @@ crosswalk points; consumers dereference `local_id` against the source register.
 
     docs/crosswalk-spec.md                 # the schema, ref rules, anti-bleed contract
     docs/managed-account-determination.md  # canonical shared truth (QBT vs managed_direct)
+    docs/operations.md                     # runbook: SIBLING_REPOS_TOKEN, resolver deps, chores
     data/holders/  data/orgs/              # xr_holder_NNNN / xr_org_NNNN nodes
     src/registers_crosswalk/               # pydantic models + registry + validate
     tests/

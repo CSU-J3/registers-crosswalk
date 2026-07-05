@@ -1,0 +1,62 @@
+name: cross-repo-refs
+# Committed-state cross-register integrity: fetch each sibling register by URL and assert every
+# crosswalk local_id exists on that register's main (committed state, not a working tree). This is
+# the authoritative existence check; hooks/check_refs.py is the fast local working-tree mirror.
+#
+# Requires a repo secret SIBLING_REPOS_TOKEN: a PAT (fine-grained, resource owner CSU-J3, repos =
+# Vested-Interests + Connected-Procurement + Sovereign-Connections, Contents: read) so the private
+# siblings can be checked out. Without it, the sibling checkout steps fail on auth.
+#
+# To pin instead of tracking main, replace `ref: main` with a commit SHA per sibling.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  cross-repo-refs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+
+      - name: Fetch Vested-Interests (committed main)
+        uses: actions/checkout@v4
+        with:
+          repository: CSU-J3/Vested-Interests
+          ref: main
+          path: _siblings/vi
+          token: ${{ secrets.SIBLING_REPOS_TOKEN }}
+          sparse-checkout: |
+            data/officials
+            data/recipients
+            data/conflicts
+
+      - name: Fetch Connected-Procurement (committed main)
+        uses: actions/checkout@v4
+        with:
+          repository: CSU-J3/Connected-Procurement
+          ref: main
+          path: _siblings/cp
+          token: ${{ secrets.SIBLING_REPOS_TOKEN }}
+          sparse-checkout: |
+            data/persons
+            data/entities
+            data/filings
+
+      - name: Fetch Sovereign-Connections (committed main)
+        uses: actions/checkout@v4
+        with:
+          repository: CSU-J3/Sovereign-Connections
+          ref: main
+          path: _siblings/sov
+          token: ${{ secrets.SIBLING_REPOS_TOKEN }}
+          sparse-checkout: |
+            web/data
+
+      - name: Assert crosswalk refs exist on sibling committed main
+        run: >
+          python -m registers_crosswalk.xref_ci
+          --vi _siblings/vi --cp _siblings/cp --sovereign _siblings/sov

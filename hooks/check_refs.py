@@ -1,83 +1,43 @@
 #!/usr/bin/env python3
-"""Local cross-repo reference check (not runnable in CI — the siblings are separate repos).
+"""Local pre-commit reference check (fast, working-tree based).
 
-Confirms every registers[].local_id resolves to a real record in the sibling register's working copy
-on disk. Siblings are expected as directories next to this repo:
-  ../Vested-Interests  ../Connected-Procurement  ../Sovereign-Connections
-If a sibling is absent, its refs are skipped with a warning rather than failing the commit.
+Confirms each registers[].local_id resolves in the sibling register's WORKING COPY on disk
+(../Vested-Interests, ../Connected-Procurement, ../Sovereign-Connections). Absent siblings are
+skipped. This is the fast local layer; the authoritative committed-state check runs in CI
+(.github/workflows/cross-repo.yml). Both callers share one register->location mapping in
+registers_crosswalk.refresolve — this hook only supplies working-tree roots.
 """
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "src"))
+
+from registers_crosswalk.refresolve import check_refs  # noqa: E402
+
 PROJECTS = REPO.parent
-VI = PROJECTS / "Vested-Interests"
-CP = PROJECTS / "Connected-Procurement"
-SOV = PROJECTS / "Sovereign-Connections"
-
-
-def _any_exists(*paths: Path) -> bool:
-    return any(p.exists() for p in paths)
-
-
-def resolves(register: str, ref_type: str, local_id: str) -> bool | None:
-    """True/False if checkable; None if the sibling repo is absent (skip)."""
-    if register == "vi":
-        if not VI.exists():
-            return None
-        if ref_type == "identity":
-            return _any_exists(
-                VI / "data" / "officials" / f"{local_id}.json",
-                VI / "data" / "recipients" / f"{local_id}.json",
-            )
-        return (VI / "data" / "conflicts" / f"{local_id}.json").exists()
-    if register == "cp":
-        if not CP.exists():
-            return None
-        if ref_type == "identity":
-            return _any_exists(
-                CP / "data" / "persons" / f"{local_id}.json",
-                CP / "data" / "entities" / f"{local_id}.json",
-            )
-        return (CP / "data" / "filings" / f"{local_id}.json").exists()
-    if register == "sovereign":
-        if not SOV.exists():
-            return None
-        records = SOV / "web" / "data" / "records.json"
-        return records.exists() and f'"{local_id}"' in records.read_text(encoding="utf-8")
-    return False
+CANDIDATES = {
+    "vi": PROJECTS / "Vested-Interests",
+    "cp": PROJECTS / "Connected-Procurement",
+    "sovereign": PROJECTS / "Sovereign-Connections",
+}
 
 
 def main() -> int:
-    problems: list[str] = []
-    skipped: set[str] = set()
-    for sub in ("holders", "orgs"):
-        d = REPO / "data" / sub
-        if not d.exists():
-            continue
-        for p in sorted(d.glob("*.json")):
-            node = json.loads(p.read_text(encoding="utf-8"))
-            for ref in node.get("registers", []):
-                ok = resolves(ref["register"], ref["ref_type"], ref["local_id"])
-                if ok is None:
-                    skipped.add(ref["register"])
-                elif not ok:
-                    problems.append(
-                        f"{node['xr_id']}: {ref['register']}:{ref['local_id']} "
-                        f"({ref['ref_type']}) not found in sibling repo"
-                    )
-    for reg in sorted(skipped):
-        print(f"pre-commit: sibling repo for {reg!r} not on disk; skipped its refs")
+    roots = {reg: p for reg, p in CANDIDATES.items() if p.exists()}
+    for reg in CANDIDATES:
+        if reg not in roots:
+            print(f"pre-commit: sibling repo for {reg!r} not on disk; skipped its refs")
+    problems = check_refs(REPO / "data", roots)
     if problems:
-        print("pre-commit: dangling cross-register refs:")
-        for pr in problems:
-            print(f"  - {pr}")
+        print("pre-commit: dangling cross-register refs (working tree):")
+        for p in problems:
+            print(f"  - {p}")
         return 1
-    print("pre-commit: all checkable cross-register refs resolve")
+    print("pre-commit: all checkable cross-register refs resolve (working tree)")
     return 0
 
 

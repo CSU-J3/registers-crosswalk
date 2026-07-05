@@ -33,9 +33,18 @@ crosswalk points; consumers dereference `local_id` against the source register.
     pytest -q
     python -m registers_crosswalk.validate     # loads + prints the resolved graph
 
-## The cross-repo hook
+## Cross-repo reference integrity (two layers)
 
-CI validates each node in isolation but cannot confirm a `local_id` exists in CP/Sovereign/VI (they
-are separate repos). `hooks/pre-commit` does that against sibling working copies on disk. Install:
+A `local_id` points into a separate repo, so existence is checked two ways:
 
-    cp hooks/pre-commit .git/hooks/pre-commit    # then chmod +x on POSIX
+1. **Pre-commit (local, fast)** — `hooks/pre-commit` runs `hooks/check_refs.py` against the sibling
+   **working copies** on disk (`../Vested-Interests`, `../Connected-Procurement`,
+   `../Sovereign-Connections`); absent siblings are skipped. Install:
+
+       cp hooks/pre-commit .git/hooks/pre-commit    # then chmod +x on POSIX
+
+2. **CI (authoritative, committed state)** — `.github/workflows/cross-repo.yml` fetches each sibling
+   by URL at `main` (committed state, not a working tree) and asserts every `local_id` exists via
+   `python -m registers_crosswalk.xref_ci`. It requires a repo secret **`SIBLING_REPOS_TOKEN`** (a
+   fine-grained PAT, owner `CSU-J3`, the three sibling repos, Contents: read) to reach the private
+   siblings. Pin a sibling by replacing `ref: main` with a commit SHA in the workflow.

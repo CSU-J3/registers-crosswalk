@@ -87,8 +87,12 @@ There is deliberately no `(sovereign, identity)` row (see above).
 5. `merged_into` (when set) resolves to a real `xr_id` in the data.
 6. no duplicate `(register, local_id)` across nodes — one actor per local id.
 
-**Not** in CI: existence of a `local_id` inside the sibling repo (CI can't read separate repos). That
-is `hooks/pre-commit`, run against sibling working copies on disk.
+Cross-repo existence is checked in two layers: `hooks/pre-commit` resolves each `local_id` against the
+sibling **working copies** on disk (fast, skip-if-absent), and `.github/workflows/cross-repo.yml`
+fetches each sibling at `main` and resolves against **committed state** (authoritative; requires the
+`SIBLING_REPOS_TOKEN` secret to reach the private repos). The CI resolver's rules live in
+`registers_crosswalk.refresolve`; the pre-commit hook mirrors the same register→location mapping and
+must be kept in sync if a register grows a new identity namespace.
 
 ## Supersession
 

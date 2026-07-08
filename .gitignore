@@ -9,3 +9,7 @@ dist/
 
 # Local working notes, not repo artifacts (same as the sibling registers)
 docs/handoffs/
+
+# Sibling register checkouts (fetched in CI, symlinked locally). Read, never vendored — this line is
+# the guard that keeps a sibling read from ever being committed into the crosswalk tree.
+_siblings/

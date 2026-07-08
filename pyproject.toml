@@ -24,3 +24,4 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["integration: runs real resolvers against sibling checkouts"]

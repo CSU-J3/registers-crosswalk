@@ -60,3 +60,56 @@ jobs:
         run: >
           python -m registers_crosswalk.xref_ci
           --vi _siblings/vi --cp _siblings/cp --sovereign _siblings/sov
+
+  # Independent of cross-repo-refs (own green/red): run the real resolvers through join() against the
+  # fetched siblings. Sparse-checkouts here are widened to the paths the resolvers READ (holdings for
+  # vi), not just the existence-check paths above, or the reads return None and read as drift. The
+  # sovereign checkout lands at _siblings/sovereign to match the test's XR_SIBLINGS_DIR subdirs.
+  join-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch Vested-Interests (committed main)
+        uses: actions/checkout@v4
+        with:
+          repository: CSU-J3/Vested-Interests
+          ref: main
+          path: _siblings/vi
+          token: ${{ secrets.SIBLING_REPOS_TOKEN }}
+          sparse-checkout: |
+            data/conflicts
+            data/recipients
+            data/holdings
+
+      - name: Fetch Connected-Procurement (committed main)
+        uses: actions/checkout@v4
+        with:
+          repository: CSU-J3/Connected-Procurement
+          ref: main
+          path: _siblings/cp
+          token: ${{ secrets.SIBLING_REPOS_TOKEN }}
+          sparse-checkout: |
+            data/persons
+            data/filings
+
+      - name: Fetch Sovereign-Connections (committed main)
+        uses: actions/checkout@v4
+        with:
+          repository: CSU-J3/Sovereign-Connections
+          ref: main
+          path: _siblings/sovereign
+          token: ${{ secrets.SIBLING_REPOS_TOKEN }}
+          sparse-checkout: |
+            web/data
+
+      - run: pip install -e ".[dev]"
+
+      - name: Run JOIN integration gate against committed siblings
+        env:
+          XR_SIBLINGS_DIR: _siblings
+          XR_SOURCE_STATE: committed
+        run: pytest -m integration -q

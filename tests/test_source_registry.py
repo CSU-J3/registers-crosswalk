@@ -252,3 +252,57 @@ def test_a_cited_source_with_an_archive_loads(tmp_path):
         archives=[{"service": "wayback", "url": "https://web.archive.org/web/1/x"}],
     )
     assert len(Crosswalk(tmp_path).sources) == 1
+
+
+# ------------------------------------------- the shared pre-write / load-time invariant check
+
+
+def _source_obj(xr_id="xr_src_0001", **over):
+    from registers_crosswalk.models import Source
+
+    base = {
+        "xr_id": xr_id,
+        "kind": "source",
+        "citation": "11 C.F.R. Part 114",
+        "title": "11 CFR Part 114",
+        "canonical_url": ECFR_URL.format("2026-09-14"),
+        "fetcher": "ecfr",
+        "point_in_time": "2026-09-14",
+        "artifact": dict(ARTIFACT),
+        "grade": dict(GRADE),
+    }
+    base.update(over)
+    return Source.model_validate(base)
+
+
+def test_pre_write_check_rejects_cited_without_archive():
+    # `pin add` runs this exact function over "existing sources plus the new one" before writing,
+    # which is why the write path cannot produce a file the read path rejects.
+    from registers_crosswalk.registry import check_source_invariants
+
+    new = _source_obj(
+        cited_in=[{"register": "vi", "local_id": "vi_conflict_0001", "ref_type": "record_mention"}]
+    )
+    with pytest.raises(ValueError, match="xr_src_0001 is cited but has no archive copy"):
+        check_source_invariants({new.xr_id: new})
+
+
+def test_pre_write_check_rejects_a_duplicate_against_existing_sources():
+    from registers_crosswalk.registry import check_source_invariants
+
+    existing = _source_obj("xr_src_0001")
+    new = _source_obj("xr_src_0002")  # same canonical_url and point_in_time
+    with pytest.raises(ValueError, match="is pinned by both xr_src_0001 and xr_src_0002"):
+        check_source_invariants({existing.xr_id: existing, new.xr_id: new})
+
+
+def test_pre_write_check_passes_a_clean_addition():
+    from registers_crosswalk.registry import check_source_invariants
+
+    existing = _source_obj("xr_src_0001")
+    new = _source_obj(
+        "xr_src_0002",
+        canonical_url=ECFR_URL.format("2026-03-01"),
+        point_in_time="2026-03-01",
+    )
+    check_source_invariants({existing.xr_id: existing, new.xr_id: new})

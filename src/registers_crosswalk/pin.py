@@ -39,7 +39,13 @@ from .models import (
     XrModel,
     check_public_url,
 )
-from .registry import DATA_DIR, Crosswalk, check_source_invariants, normalize_citation
+from .registry import (
+    DATA_DIR,
+    Crosswalk,
+    check_source_invariants,
+    duplicate_of,
+    normalize_citation,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -471,6 +477,20 @@ def _cmd_add(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) ->
     module = fetchers.get(args.fetcher)
     spec = module.spec_from_args(args, fetch=fetch)
     xw = Crosswalk(data_dir)
+
+    # Cheap early exit on the one refusal we can reach without doing any work: re-pinning a
+    # document version we already hold. Placed before pin() and before the archive step so a
+    # duplicate `add` costs no document fetch and — more to the point — sends no Save Page Now
+    # request to archive.org for a URL that is already pinned. It shares duplicate_of() with the
+    # authoritative check below, so it is a shortcut, not a second opinion.
+    already = duplicate_of(xw.sources, spec.canonical_url, spec.point_in_time)
+    if already is not None:
+        print(
+            f"{spec.canonical_url} at point_in_time {spec.point_in_time} is already pinned "
+            f"as {already}",
+            file=sys.stderr,
+        )
+        return 1
 
     xr_id = next_source_id(data_dir)
     path = _sources_dir(data_dir) / f"{xr_id}.json"

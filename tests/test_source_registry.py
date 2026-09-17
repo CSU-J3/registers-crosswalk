@@ -306,3 +306,38 @@ def test_pre_write_check_passes_a_clean_addition():
         point_in_time="2026-03-01",
     )
     check_source_invariants({existing.xr_id: existing, new.xr_id: new})
+
+
+def test_duplicate_of_and_the_invariant_agree_on_a_constructed_pair():
+    # The two callers of the duplicate rule must never disagree: whatever duplicate_of() finds,
+    # check_source_invariants() must refuse, and whatever it clears must load.
+    from registers_crosswalk.registry import check_source_invariants, duplicate_of
+
+    first = _source_obj("xr_src_0001")
+    dupe = _source_obj("xr_src_0002")  # same canonical_url, same point_in_time
+    distinct = _source_obj(
+        "xr_src_0003",
+        canonical_url=ECFR_URL.format("2026-03-01"),
+        point_in_time="2026-03-01",
+    )
+    existing = {first.xr_id: first}
+
+    # agree that `dupe` is a duplicate of `first`
+    assert duplicate_of(existing, dupe.canonical_url, dupe.point_in_time) == "xr_src_0001"
+    with pytest.raises(ValueError, match="is pinned by both"):
+        check_source_invariants({**existing, dupe.xr_id: dupe})
+
+    # ...and agree that `distinct` is not
+    assert duplicate_of(existing, distinct.canonical_url, distinct.point_in_time) is None
+    check_source_invariants({**existing, distinct.xr_id: distinct})
+
+
+def test_duplicate_of_distinguishes_point_in_time():
+    from registers_crosswalk.registry import duplicate_of
+
+    pinned = _source_obj("xr_src_0001")
+    sources = {pinned.xr_id: pinned}
+    assert duplicate_of(sources, pinned.canonical_url, date(2026, 9, 14)) == "xr_src_0001"
+    assert duplicate_of(sources, pinned.canonical_url, date(2026, 3, 1)) is None
+    assert duplicate_of(sources, pinned.canonical_url, None) is None
+    assert duplicate_of({}, pinned.canonical_url, date(2026, 9, 14)) is None

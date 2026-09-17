@@ -11,6 +11,23 @@ def main() -> int:
     for node in xw.nodes.values():
         refs = ", ".join(f"{r.register}:{r.local_id}({r.ref_type})" for r in node.registers)
         print(f"  {node.xr_id}  {node.canonical_name}  [{refs}]")
+    unverified = [s for s in xw.sources.values() if not s.fetcher_verified]
+    unarchived = [s for s in xw.sources.values() if not s.archives]
+    print(
+        f"ok: {len(xw.sources)} source(s), {len(unverified)} unverified-fetcher, "
+        f"{len(unarchived)} unarchived"
+    )
+    for source in xw.sources.values():
+        pit = source.point_in_time.isoformat() if source.point_in_time else "-"
+        # The marker rides on the line rather than in a footnote: a record whose fetcher was never
+        # exercised should be impossible to read past.
+        flag = "  [unverified fetcher]" if not source.fetcher_verified else ""
+        if not source.archives:
+            flag += "  [unarchived]"
+        print(
+            f"  {source.xr_id}  {source.grade.code()}  {source.citation}  "
+            f"{pit}  {source.artifact.sha256[:12]}{flag}"
+        )
     return 0
 
 

@@ -74,6 +74,128 @@ To lift this **when Sovereign mints stable per-entity keys**, change three files
    `_FILE_DIRS`/`_IN_FILE` entry in `refresolve.py`;
 3. add the new file/dir to the Sovereign sparse-checkout in `cross-repo.yml`.
 
+## Source API keys (and why none of them may enter a stored URL)
+
+Pinning documents needs four optional credentials. All four are read from the **environment** at
+fetch time; in CI they are repo secrets wired into `.github/workflows/sources-drift.yml`.
+
+| env var | needed for | where to get it |
+|---|---|---|
+| `GOVINFO_API_KEY` | `govinfo` metadata **and** re-fetching the stored PDF | api.data.gov |
+| `OPENFEC_API_KEY` | `openfec` legal search (the metadata call only) | api.data.gov — the same key works for both |
+| `COURTLISTENER_TOKEN` | `courtlistener` cluster/opinion API | courtlistener.com account |
+| `WAYBACK_ACCESS_KEY` + `WAYBACK_SECRET_KEY` | authenticated Save Page Now (SPN2) | archive.org account |
+
+**A key never enters a stored URL.** This repo is public, so an `?api_key=...` interpolated into a
+`canonical_url` would be a committed secret — published the moment it is pushed, and live until
+someone notices and rotates it. So the fetchers store the key-free content URL (govinfo's
+`download.pdfLink`, OpenFEC's joined `fec.gov` URL) and re-attach the key from the environment on
+each request. This is enforced three ways, not just documented: `Source` refuses a `canonical_url`
+matching `(?i)(api_key|access_key|token)=`, `pin()` refuses one before it makes any request, and a
+test asserts no file under `data/sources/` contains a key.
+
+If a key does leak into a stored URL: rotate it first (assume it is burned), then fix the fetcher,
+then re-pin. Deleting the file is not enough — it is in the git history.
+
+Local use: export the keys in your shell, or keep them in an untracked `.env` you source. Never put
+a key on a command line you'll push, and never paste one into a PR or chat.
+
+## `fetcher_verified`: the convention for flipping it
+
+Each fetcher module carries `VERIFIED` / `VERIFIED_AT`, stamped onto every record it mints. The
+rule, and it is the whole point of the field:
+
+- **A fetcher ships `False`.** A claim in a handoff, a spec, or a docstring is not a verification.
+  Only a run is.
+- **It flips to `True` individually, on a live `add` through that fetcher in this tree**, dated the
+  day it ran. One fetcher at a time — exercising `ecfr` says nothing about `openfec`.
+- **Any edit to a fetcher's `spec()` or its parsing resets it to `False`** until someone runs it
+  live again. This includes changing a URL template, a field name read out of a response, a date
+  parse, or a fallback. The flag records "this code path has been run against the real API", and
+  the moment the code path changes, the old run no longer covers it.
+
+`manual` is `True` by a different route: a human types every field, so there is no mapping that can
+be silently wrong. That says nothing about whether they typed the *right* thing — no flag can carry
+that.
+
+`validate` counts unverified records and tags each line. Nothing blocks on the flag; it exists so a
+reader can never mistake an unexercised parse for a checked one.
+
+## Source drift: what red means
+
+`.github/workflows/sources-drift.yml` runs `python -m registers_crosswalk.pin check` weekly
+(Mondays 12:00 UTC) and on `workflow_dispatch`. By default it checks the **latest pin per citation**
+(superseded pins and `merged_into` losers are skipped); `--all` forces every pin.
+
+**Exit code → cause.**
+- **0 — clean.** Every checked pin still matches. Nothing to do.
+- **1 — the check ran and found a problem with the document.** Either the drift key changed
+  (`DRIFT`), the eCFR part was amended since the pin (`AMENDED`), or the document no longer states
+  what we parse out of it (`ERROR` — uscode dropped its currency line, an API changed shape). All
+  three are real findings about the world, and all three need a human to look and re-pin.
+- **2 — the check could not run: an API key isn't set** (`KEY_MISSING`). A configuration problem
+  on our side, not a finding. The failing line names the env var. Fix the secret and re-run; until
+  then you know nothing about those sources.
+- **3 — the check could not run: the transport failed** (`FETCH_FAILED`) — timeout, non-2xx, DNS,
+  connection refused. Also not a finding. Usually transient, so re-run before investigating; if it
+  persists, a 404 on a canonical URL means the document moved, which *is* a finding.
+
+**Why 3 is separate from 1**, and the rule to keep: a dead endpoint must never be reported as a
+changed document. They demand opposite responses — one is "wait and retry", the other is "read the
+new text and re-pin" — and a checker that conflates them teaches you to ignore both. In the code
+this is the split between `except OSError` (every urllib transport error subclasses it) and
+everything else. When a run mixes statuses, the precedence is **2 > 3 > 1 > 0**: fix the
+environment, then the network, and only then read the drift answers, which are not trustworthy
+until every source was actually reachable.
+
+Each line is one of six statuses, and they mean genuinely different things:
+
+- **`OK`** — the document still matches what was pinned. Nothing to do.
+- **`AMENDED`** (eCFR only) — the bytes at the point-in-time URL are unchanged, *but the part has
+  been substantively amended since the pin*. This is the status that matters most and the one a
+  pure hash check would miss entirely: the eCFR point-in-time URL keeps returning the old text
+  forever, so a green hash proves nothing about whether the law changed. Action: pin the new `as_of`
+  and set `--supersedes` to the old id. Do **not** edit the old pin — an argument that cited the
+  old text still cites the old text.
+- **`DRIFT`** — the drift key changed. For a PDF or an XML snapshot that is alarming: a document
+  that was supposed to be immutable was replaced, so go look at what changed before re-pinning. For
+  an HTML page pinned through `manual`, it is usually just noise (see below).
+- **`KEY_MISSING`** — the check could not run because an API key isn't set. The run fails on
+  purpose: a check that quietly skipped the sources it couldn't reach would report green while
+  telling you nothing.
+- **`FETCH_FAILED`** — the document could not be reached at all: timeout, non-2xx, DNS failure,
+  connection refused. Exit 3, never exit 1, because this says nothing about whether the document
+  changed. Re-run first; a 404 that persists means the document moved, which *is* a finding.
+- **`ERROR`** — the fetch worked but the parse blew up: a page that no longer states its currency
+  date, an API that changed shape. Exit 1, because the document really did change under us — just
+  not in a way the drift key could measure.
+
+**HTML sources are noisy.** A page pinned through `manual` has its raw hash as its drift key, so a
+nav change, a cookie banner or a rotating build id reads as DRIFT. That is the honest answer for a
+page with no version axis, but before pinning HTML check whether the same document exists as a PDF
+or in eCFR / GovInfo / the Federal Register, and pin it there instead. `uscode` is the one HTML
+fetcher that dodges this: its drift key is the "laws in effect on" date the page states, so markup
+churn is ignored and only an actual advance of the text reports drift.
+
+## Scheduled workflows go dark on a quiet repo
+
+**GitHub disables a `schedule:` trigger after 60 days with no repository activity.** It does not
+fail; it simply stops running, and `sources-drift` reports nothing rather than reporting green.
+This repo is exactly the kind that goes quiet — the crosswalk is small and stable, and a two-month
+lull between commits is normal — so the drift check is genuinely at risk of switching itself off
+in the period you most need it.
+
+- **Symptom.** No `sources-drift` runs in the Actions tab for weeks, with no red. Absence of red is
+  the tell; there is no notification.
+- **Restart.** The workflow carries `workflow_dispatch`, so run it by hand — Actions →
+  *sources-drift* → *Run workflow*, or `gh workflow run sources-drift.yml --repo
+  CSU-J3/registers-crosswalk`. GitHub also emails the repo admin before disabling, and a manual run
+  or any commit resets the 60-day clock.
+- **Check it is still armed.** `gh workflow list --repo CSU-J3/registers-crosswalk` shows the
+  workflow's state; anything other than `active` means the schedule is off.
+- Treat a long quiet spell as a reason to dispatch the job manually, not as evidence that nothing
+  drifted.
+
 ## Tracked chores
 
 - **Node 20 → newer action majors.** `actions/checkout@v4` and `actions/setup-python@v5` currently

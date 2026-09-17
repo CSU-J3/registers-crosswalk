@@ -99,8 +99,116 @@ must be kept in sync if a register grows a new identity namespace.
 Ported from CP: on a merge the losing node stays with `merged_into` → the winner; the winner absorbs
 the loser's `external_ids` and `registers`. Soft-supersede, never delete — preserve the audit trail.
 
+## Sources — the same real-world *document*
+
+The crosswalk resolves a fourth kind of thing: not an actor but a **document**. A statute,
+regulation, Federal Register notice, court opinion, filing or agency statement gets one minted id
+(`xr_src_NNNN`), one canonical URL, one sha256, one point-in-time date, one Admiralty grade and one
+archive copy. Registers and the New Gray ledgers cite the `xr_src` id instead of pasting URLs, so a
+source cited in VI, in Sovereign and in a feature article resolves to one hash.
+
+**The anti-vendoring rule carries over unchanged, and it is the design constraint.** A source node
+stores facts about the document *as an object*: where it lives, when it was fetched, what its bytes
+hash to, who published it, when. It **never** stores the document's content — no bytes, no quotes,
+no summary of what it says. Blobs live in the consuming project (New Gray's `pins/`) or in the
+archive copy; the node's hash verifies either. `pin()` refuses a `--blob-dir` that resolves inside
+this repo, so the rule is enforced and not merely stated.
+
+```
+Source
+  xr_id           xr_src_NNNN                      (must agree with kind)
+  kind            "source"
+  citation        str                              (as the document cites itself)
+  title           str
+  publisher       str | null
+  canonical_url   str                              (http(s), and NEVER carrying an API key)
+  fetcher         "ecfr" | "federalregister" | "govinfo" | "uscode" | "openfec"
+                  | "courtlistener" | "manual"
+  fetcher_verified bool                            (default FALSE — see below)
+  verified_at     date | null                      (set iff fetcher_verified)
+  point_in_time   date | null                      (eCFR "as of"; OLRC "laws in effect on")
+  published_at    date | null                      (FR publication; opinion decision; statement)
+  artifact        Artifact
+  grade           Grade
+  archives[]      ArchiveCopy
+  cited_in[]      CitationRef
+  supersedes      xr_src_NNNN | null               (an earlier pin of the SAME citation)
+  merged_into     xr_src_NNNN | null               (duplicate resolution; same as Node)
+  notes           str | null
+
+Artifact
+  sha256          str                              (64 lowercase hex)
+  byte_length     int
+  media_type      str                              (from Content-Type, parameters dropped)
+  fetched_at      datetime                         (timezone-aware, normalized to UTC)
+  drift_key       "sha256" | "currency_date"
+  drift_value     str                              (the hash again, or the parsed currency date)
+
+Grade             Admiralty: reliability A-F, credibility 1-6; `.code()` → "A1"
+ArchiveCopy       service "wayback" | "perma" | "govinfo"; url; captured_at | null
+CitationRef       register; local_id; ref_type (fixed "record_mention"); note | null
+```
+
+### `supersedes` vs `merged_into`
+
+Two different failures, deliberately not one field:
+
+- **`supersedes`** — the earlier pin was *right then*. 11 CFR Part 114 as of 2026-03-01 is a real
+  document with a real hash; it is simply no longer current. Both pins stay valid and both stay
+  reachable: `resolve_source(citation, as_of=...)` is how you reach the older text.
+- **`merged_into`** — the loser was *wrong*: a duplicate, a bad URL, a mis-keyed citation. Same
+  semantics as `Node.merged_into`. Losers are excluded from resolution at every `as_of`.
+
+### ID scheme
+
+`xr_src_NNNN`, minted here, zero-padded, monotonic, in the **same namespace** as `xr_holder_` /
+`xr_org_` — an xr id identifies one thing, whatever kind it is. A source id can never land on a
+`Node` (and vice versa) because each model requires its own prefix.
+
+### `fetcher_verified` — has this fetcher ever been run for real?
+
+A property of the **fetcher**, stamped from its module onto every record it mints, never retyped
+per record. `false` means that fetcher's field mapping has not been exercised against the live API,
+so a silent mapping error could be sitting in the record — a date read from the wrong key, a URL
+built off an assumed base. It is **orthogonal to `grade`**: the Supreme Court is an A1 source
+whether or not our CourtListener parse has ever been run, and conflating the two is how an
+unverified parse acquires the authority of a verified source.
+
+The default is `false`, so a new fetcher is untrusted until someone runs it. `verified_at` must be
+set exactly when `fetcher_verified` is true — a bare claim with no date is unauditable, and a date
+with no claim is a date about nothing. `courtlistener` ships `false` per decision 9. `manual` ships
+`true` by a different route: a human typed every field, so there is no mapping that could be
+silently wrong (which says nothing about whether they typed the *right* thing — no flag carries
+that). `validate` prints the count and marks each such line.
+
+### `cited_in` — which register records cite this document
+
+`ref_type` is fixed to `record_mention`: a document is cited *by* a record, and is never a
+register's identity record. Because that is a `Literal`, a sovereign `identity` ref is rejected by
+the type itself — no `MENTION_ONLY_REGISTERS` interaction is involved. The `local_id` is validated
+against the same `REGISTER_ID_PATTERNS` table the actor refs use.
+
+### Source invariants (added to the list above)
+
+7. `xr_id` matches `xr_src_\d{4}` and agrees with `kind`; `supersedes`/`merged_into` are `xr_src_`
+   ids that resolve to known sources.
+8. no two sources share a `(canonical_url, point_in_time)` — that is the same bytes pinned twice.
+9. `canonical_url` is http(s) and carries **no** API key. This repo is public, so a key
+   interpolated into a stored URL would be a committed secret; fetchers store the key-free content
+   URL and re-attach the key from the environment at fetch time.
+10. the one-actor-per-`local_id` invariant does **not** apply to `cited_in`. Many documents may
+    cite one record, and that is normal.
+
+`cited_in` refs join the existing two reference-integrity layers for free (`iter_node_refs` yields
+them after the node refs, so the pre-commit hook and `cross-repo.yml` both cover them), and a third
+layer is added for the documents themselves: `.github/workflows/sources-drift.yml` re-fetches each
+pinned document weekly and compares its drift key.
+
 ## Seed nodes
 
 - `xr_holder_0001` Donald J. Trump → vi_official_0001 (identity), cp_person_0003 (identity, CP
   filer-anchor / not named-family / excluded_from_total), SC-007 (record_mention).
 - `xr_org_0001` Palantir Technologies Inc. → external CIK 0001321655; vi_recipient_0002 (identity).
+
+`data/sources/` ships empty (`.gitkeep` only): nothing can be pinned offline from a fixture without
+inventing a hash, and hashes are never invented.

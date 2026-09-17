@@ -1,0 +1,36 @@
+name: sources-drift
+# The third reference-integrity layer. hooks/check_refs.py asserts local ids exist in the sibling
+# WORKING TREE; cross-repo.yml asserts they exist in COMMITTED state; this job asserts the pinned
+# DOCUMENTS still hash the same at their canonical URLs — the only layer that reaches outside the
+# four repos, and the only one that can go red because the world changed rather than because we did.
+#
+# Weekly, not per-push: a pin drifts on the publisher's schedule, not ours, and re-fetching every
+# pinned document on every commit would be rude to the services and slow.
+#
+# GOVINFO_API_KEY / OPENFEC_API_KEY are optional repo secrets. Without them `check` exits 2 for the
+# fetchers that need one and this job FAILS — deliberately. A drift check that silently skipped the
+# sources it couldn't reach would report green while telling you nothing, so there is no
+# continue-on-error here. If you have no govinfo/openfec pins yet, the exit-2 path never triggers.
+on:
+  schedule:
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+jobs:
+  sources-drift:
+    runs-on: ubuntu-latest
+    # Every fetch has its own 60s timeout, but a long pin list against a slow service still adds
+    # up, and a hung request would otherwise burn the full 6h default.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+
+      - name: Re-fetch pinned documents and compare
+        env:
+          GOVINFO_API_KEY: ${{ secrets.GOVINFO_API_KEY }}
+          OPENFEC_API_KEY: ${{ secrets.OPENFEC_API_KEY }}
+          COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
+        run: python -m registers_crosswalk.pin check

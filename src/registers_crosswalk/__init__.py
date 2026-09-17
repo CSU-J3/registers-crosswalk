@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .models import ExternalId, Node, RegisterRef
+from .models import Artifact, ExternalId, Grade, Node, RegisterRef, Source
 from .registry import Crosswalk
 
-__all__ = ["Crosswalk", "ExternalId", "Node", "RegisterRef"]
+__all__ = ["Artifact", "Crosswalk", "ExternalId", "Grade", "Node", "RegisterRef", "Source"]

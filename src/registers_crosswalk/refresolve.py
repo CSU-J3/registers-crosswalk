@@ -36,7 +36,13 @@ def resolve_ref(register: str, ref_type: str, local_id: str, root: Path) -> bool
 
 
 def iter_node_refs(data_dir: Path) -> Iterator[tuple[str, str, str, str]]:
-    """Yield (xr_id, register, ref_type, local_id) for every ref in every node."""
+    """Yield (xr_id, register, ref_type, local_id) for every ref the crosswalk holds.
+
+    Actor nodes first (registers[]), then source pins (cited_in[]) — one stream, so both callers
+    (hooks/check_refs.py on the working tree, xref_ci on committed state) gain source coverage with
+    no edit of their own. cited_in refs are always record_mention, and record_mention rules already
+    exist for all three registers, so no new _FILE_DIRS/_IN_FILE entry is needed.
+    """
     for sub in ("holders", "orgs"):
         d = data_dir / sub
         if not d.is_dir():
@@ -45,6 +51,12 @@ def iter_node_refs(data_dir: Path) -> Iterator[tuple[str, str, str, str]]:
             node = json.loads(p.read_text(encoding="utf-8"))
             for ref in node.get("registers", []):
                 yield node["xr_id"], ref["register"], ref["ref_type"], ref["local_id"]
+    sources = data_dir / "sources"
+    if sources.is_dir():
+        for p in sorted(sources.glob("*.json")):
+            source = json.loads(p.read_text(encoding="utf-8"))
+            for ref in source.get("cited_in", []):
+                yield source["xr_id"], ref["register"], ref["ref_type"], ref["local_id"]
 
 
 def check_refs(data_dir: Path, roots: dict[str, Path]) -> list[str]:

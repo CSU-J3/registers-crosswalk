@@ -5,12 +5,18 @@ from typing import Annotated
 
 from pydantic import AfterValidator
 
-_XR_ID = re.compile(r"^xr_(holder|org)_\d{4}$")
+_XR_ID = re.compile(r"^xr_(holder|org|src)_\d{4}$")
+
+# Source (document) ids share the one xr namespace but never ride on a Node: Node._check
+# requires xr_id to start with "xr_{kind}_" and kind is Literal["holder", "org"], so widening
+# _XR_ID above cannot let an xr_src_ id onto a Node. Exported for models.Source and for
+# register consumers that cite a pinned document by id.
+SRC_ID = re.compile(r"^xr_src_\d{4}$")
 
 
 def _xr_id(v: str) -> str:
     if not _XR_ID.match(v):
-        raise ValueError(f"invalid xr id: {v!r} (want xr_holder_NNNN or xr_org_NNNN)")
+        raise ValueError(f"invalid xr id: {v!r} (want xr_holder_NNNN, xr_org_NNNN, or xr_src_NNNN)")
     return v
 
 

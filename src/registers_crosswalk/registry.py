@@ -21,6 +21,23 @@ def normalize_citation(citation: str) -> str:
     return _SPACE.sub(" ", _PUNCT.sub("", citation)).strip().casefold()
 
 
+def duplicate_of(
+    sources: Mapping[str, Source], canonical_url: str, point_in_time: date | None
+) -> str | None:
+    """The xr_id already pinning this exact document version, or None.
+
+    The single definition of "same document version": one URL at one point_in_time is one set of
+    bytes, so a second pin of it is a duplicate rather than a new version. Both callers go through
+    here — `pin add` to refuse before it fetches or archives anything, and
+    `check_source_invariants` to enforce the rule on load — so the cheap early check and the
+    authoritative one cannot drift apart.
+    """
+    for source in sources.values():
+        if source.canonical_url == canonical_url and source.point_in_time == point_in_time:
+            return source.xr_id
+    return None
+
+
 def check_source_invariants(
     sources: Mapping[str, Source], nodes: Mapping[str, Node] | None = None
 ) -> None:
@@ -49,17 +66,18 @@ def check_source_invariants(
         # that proves something changed and cannot say what it said.
         if source.cited_in and not source.archives:
             raise ValueError(f"{source.xr_id} is cited but has no archive copy")
-    # One pin per (document, version): the same URL at the same point_in_time is the same bytes,
-    # so a second pin of it is a duplicate, not a new version.
-    pinned: dict[tuple[str, date | None], str] = {}
+    # One pin per (document, version), decided by duplicate_of so this rule has exactly one
+    # definition. Each record is tested against the ones already accepted; the wording differs
+    # from `add`'s because at load time neither record is "the new one", so both get named.
+    accepted: dict[str, Source] = {}
     for source in sources.values():
-        key = (source.canonical_url, source.point_in_time)
-        if key in pinned:
+        other = duplicate_of(accepted, source.canonical_url, source.point_in_time)
+        if other is not None:
             raise ValueError(
                 f"{source.canonical_url} at point_in_time {source.point_in_time} is pinned "
-                f"by both {pinned[key]} and {source.xr_id}"
+                f"by both {other} and {source.xr_id}"
             )
-        pinned[key] = source.xr_id
+        accepted[source.xr_id] = source
 
 
 class Crosswalk:

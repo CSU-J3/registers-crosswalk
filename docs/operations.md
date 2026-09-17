@@ -137,9 +137,13 @@ Consequences worth knowing:
   its own failure mode, and performing it silently would hide that from you.
 - **`--archive` is a requirement, not a courtesy.** If the capture fails, nothing is written and
   the message names the archive step. Re-run when the service is back.
-- **A duplicate `(canonical_url, point_in_time)` is caught here too**, by the shared check rather
-  than an early short-circuit. The cost is one wasted fetch on a duplicate `add`; the benefit is
-  that the CLI and the loader can never disagree about what a duplicate is.
+- **A duplicate `(canonical_url, point_in_time)` is caught twice**, and deliberately so. An early
+  `registry.duplicate_of` call runs right after the crosswalk loads, before the document is
+  fetched and before anything is sent to archive.org, so re-pinning a version we already hold
+  costs nothing and does not ask a third party to capture a URL that is already pinned. The full
+  `check_source_invariants` still runs before the write. Both go through the same
+  `duplicate_of()`, so the shortcut cannot disagree with the authority — it is one rule read
+  twice, not two rules.
 - A refused `add` may still have written the content-addressed blob to `--blob-dir`. That file
   lives outside this repo, is named by its own hash, and is rewritten identically on the retry.
 

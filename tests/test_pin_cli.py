@@ -84,8 +84,7 @@ def test_add_prints_the_ledger_entry(tmp_path, capsys):
 def test_add_refuses_a_duplicate_url_at_the_same_point_in_time(tmp_path, capsys):
     assert _add(tmp_path) == 0
     assert _add(tmp_path) == 1
-    # the message is the INVARIANT's, not a second copy of the rule living in the CLI
-    assert "is pinned by both xr_src_0001 and xr_src_0002" in capsys.readouterr().err
+    assert "is already pinned as xr_src_0001" in capsys.readouterr().err
     assert _sources(tmp_path) == ["xr_src_0001.json"]
 
 
@@ -395,12 +394,31 @@ def test_add_succeeds_when_citing_with_a_working_archive(tmp_path):
     assert written["archives"][0]["url"] == ARCHIVED.url
 
 
-def test_duplicate_is_caught_by_the_pre_write_invariant_check(tmp_path, capsys):
-    assert _add(tmp_path) == 0
+def test_duplicate_costs_no_fetch_and_no_archive(tmp_path, capsys):
+    # The early duplicate_of() check earns its keep here: re-pinning a version we already hold
+    # must not download the document again, and must not send a Save Page Now request to
+    # archive.org for a URL that is already pinned.
+    calls = {"fetch": 0, "archive": 0}
+
+    def counting_fetch(url, headers=None):
+        calls["fetch"] += 1
+        return BODY, "application/pdf"
+
+    def counting_archive(url):
+        calls["archive"] += 1
+        return ARCHIVED
+
+    assert (
+        _add(tmp_path, extra=["--archive"], fetch=counting_fetch, archive_fn=counting_archive) == 0
+    )
+    assert calls == {"fetch": 1, "archive": 1}
     capsys.readouterr()
-    # Same URL, same point_in_time: refused by the SAME check Crosswalk runs on load.
-    assert _add(tmp_path) == 1
-    assert "is pinned by both xr_src_0001 and xr_src_0002" in capsys.readouterr().err
+
+    assert (
+        _add(tmp_path, extra=["--archive"], fetch=counting_fetch, archive_fn=counting_archive) == 1
+    )
+    assert calls == {"fetch": 1, "archive": 1}  # unchanged: nothing was requested
+    assert "is already pinned as xr_src_0001" in capsys.readouterr().err
     assert _sources(tmp_path) == ["xr_src_0001.json"]
 
 

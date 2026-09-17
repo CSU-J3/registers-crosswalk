@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
 
@@ -18,6 +19,47 @@ def normalize_citation(citation: str) -> str:
     """Fold the punctuation styles the same citation is written in, so "11 CFR Part 114" and
     "11 C.F.R. Part 114" match. Applied to BOTH sides of a comparison, never stored."""
     return _SPACE.sub(" ", _PUNCT.sub("", citation)).strip().casefold()
+
+
+def check_source_invariants(
+    sources: Mapping[str, Source], nodes: Mapping[str, Node] | None = None
+) -> None:
+    """Every cross-record rule the LOAD path enforces on sources. Raises ValueError on the first.
+
+    Module-level, and taking the mappings explicitly, so `pin add` can run a would-be record
+    through exactly these rules against "existing sources plus this one" BEFORE writing it. One
+    implementation, one set of messages: that is what makes it impossible for the write path to
+    produce a file the read path then refuses.
+    """
+    nodes = nodes or {}
+    for source in sources.values():
+        # Nodes and sources share one xr_ namespace.
+        if source.xr_id in nodes:
+            raise ValueError(f"duplicate xr_id {source.xr_id!r} (also a node)")
+        # Source links resolve within the source namespace.
+        for field in ("supersedes", "merged_into"):
+            other = getattr(source, field)
+            if other is not None and other not in sources:
+                raise ValueError(
+                    f"{source.xr_id} {field} {other!r} which is not a known source xr_id"
+                )
+        # A cited document must be recoverable. Once a register record points at a source, the
+        # canonical URL is no longer the only reader of it — an argument now depends on that text,
+        # and if the publisher replaces it with nothing archived, the citation degrades to a hash
+        # that proves something changed and cannot say what it said.
+        if source.cited_in and not source.archives:
+            raise ValueError(f"{source.xr_id} is cited but has no archive copy")
+    # One pin per (document, version): the same URL at the same point_in_time is the same bytes,
+    # so a second pin of it is a duplicate, not a new version.
+    pinned: dict[tuple[str, date | None], str] = {}
+    for source in sources.values():
+        key = (source.canonical_url, source.point_in_time)
+        if key in pinned:
+            raise ValueError(
+                f"{source.canonical_url} at point_in_time {source.point_in_time} is pinned "
+                f"by both {pinned[key]} and {source.xr_id}"
+            )
+        pinned[key] = source.xr_id
 
 
 class Crosswalk:
@@ -68,33 +110,7 @@ class Crosswalk:
                         f"{seen[key]} and {node.xr_id}"
                     )
                 seen[key] = node.xr_id
-        # Source links resolve within the source namespace.
-        for source in self.sources.values():
-            for field in ("supersedes", "merged_into"):
-                other = getattr(source, field)
-                if other is not None and other not in self.sources:
-                    raise ValueError(
-                        f"{source.xr_id} {field} {other!r} which is not a known source xr_id"
-                    )
-        # A cited document must be recoverable. Once a register record points at a source, the
-        # canonical URL is no longer the only reader of it — an argument now depends on that text,
-        # and if the publisher replaces it with nothing archived, the citation degrades to a hash
-        # that proves something changed and cannot say what it said. Dormant while cited_in is
-        # empty; it binds the moment a record cites a pin.
-        for source in self.sources.values():
-            if source.cited_in and not source.archives:
-                raise ValueError(f"{source.xr_id} is cited but has no archive copy")
-        # One pin per (document, version): the same URL at the same point_in_time is the same
-        # bytes, so a second pin of it is a duplicate, not a new version.
-        pinned: dict[tuple[str, date | None], str] = {}
-        for source in self.sources.values():
-            key = (source.canonical_url, source.point_in_time)
-            if key in pinned:
-                raise ValueError(
-                    f"{source.canonical_url} at point_in_time {source.point_in_time} is pinned "
-                    f"by both {pinned[key]} and {source.xr_id}"
-                )
-            pinned[key] = source.xr_id
+        check_source_invariants(self.sources, self.nodes)
 
     def resolve(self, register: str, local_id: str) -> Node | None:
         """Return the node an external (register, local_id) reference resolves to, or None."""

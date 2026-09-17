@@ -48,7 +48,9 @@ consuming project.
         --cited-in vi:vi_conflict_0001
 
 Fetches the document once, hashes it, writes `data/sources/xr_src_NNNN.json`, and prints the ledger
-entry to paste into a New Gray source-links file. `--blob-dir PATH` also writes the bytes to
+entry to paste into a New Gray source-links file. `--cited-in` requires `--archive`: a source a
+register record depends on has to stay recoverable, and `add` refuses to write a record that the
+read path would reject. `--blob-dir PATH` also writes the bytes to
 `PATH/<sha256><ext>` — **outside this repo**, which is enforced, not merely asked. Other fetchers:
 `federalregister`, `govinfo`, `uscode`, `openfec`, `courtlistener`, `manual`.
 

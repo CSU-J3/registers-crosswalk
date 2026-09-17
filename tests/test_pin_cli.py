@@ -2,7 +2,19 @@ import json
 
 import pytest
 
+from registers_crosswalk.models import ArchiveCopy
 from registers_crosswalk.pin import main, sha256_hex
+
+ARCHIVED = ArchiveCopy(service="wayback", url="https://web.archive.org/web/1/x")
+
+
+def _ok_archive(url):
+    return ARCHIVED
+
+
+def _failing_archive(url):
+    return None  # archive() never raises; it returns None on any failure
+
 
 BODY = b"a document"
 URL = "https://www.fec.gov/files/legal/aos/2023-01/2023-01.pdf"
@@ -15,7 +27,14 @@ def _fetch(body=BODY, media_type="application/pdf"):
     return fetch
 
 
-def _add(tmp_path, url=URL, citation="FEC Advisory Opinion 2023-01", extra=(), fetch=None):
+def _add(
+    tmp_path,
+    url=URL,
+    citation="FEC Advisory Opinion 2023-01",
+    extra=(),
+    fetch=None,
+    archive_fn=_ok_archive,
+):
     argv = [
         "--data-dir",
         str(tmp_path),
@@ -33,7 +52,7 @@ def _add(tmp_path, url=URL, citation="FEC Advisory Opinion 2023-01", extra=(), f
         "2023-05-11",
         *extra,
     ]
-    return main(argv, fetch=fetch or _fetch())
+    return main(argv, fetch=fetch or _fetch(), archive_fn=archive_fn)
 
 
 def _sources(tmp_path):
@@ -65,7 +84,8 @@ def test_add_prints_the_ledger_entry(tmp_path, capsys):
 def test_add_refuses_a_duplicate_url_at_the_same_point_in_time(tmp_path, capsys):
     assert _add(tmp_path) == 0
     assert _add(tmp_path) == 1
-    assert "already pinned as xr_src_0001" in capsys.readouterr().err
+    # the message is the INVARIANT's, not a second copy of the rule living in the CLI
+    assert "is pinned by both xr_src_0001 and xr_src_0002" in capsys.readouterr().err
     assert _sources(tmp_path) == ["xr_src_0001.json"]
 
 
@@ -77,6 +97,7 @@ def test_add_records_citations_and_supersession(tmp_path):
             url=URL.replace("2023-01", "2023-02"),
             citation="AO 2023-02",
             extra=[
+                "--archive",
                 "--cited-in",
                 "vi:vi_conflict_0001",
                 "--cited-in",
@@ -91,6 +112,7 @@ def test_add_records_citations_and_supersession(tmp_path):
     assert written["supersedes"] == "xr_src_0001"
     assert [c["local_id"] for c in written["cited_in"]] == ["vi_conflict_0001", "SC-007"]
     assert {c["ref_type"] for c in written["cited_in"]} == {"record_mention"}
+    assert written["archives"][0]["url"] == ARCHIVED.url
 
 
 def test_add_rejects_a_malformed_citation_ref(tmp_path):
@@ -331,3 +353,61 @@ def test_the_archive_distinction_does_not_move_the_exit_code(tmp_path, capsys):
     capsys.readouterr()
     archived_code = main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"changed"))
     assert unarchived_code == archived_code == 1
+
+
+# ------------------------------- add must never write a record the read path rejects
+
+
+def test_add_refuses_cited_in_without_archive(tmp_path, capsys):
+    assert _add(tmp_path, extra=["--cited-in", "vi:vi_conflict_0001"]) == 1
+    assert "cited sources must carry an archive copy; pass --archive" in capsys.readouterr().err
+    assert not (tmp_path / "sources").exists()
+
+
+def test_add_refuses_cited_in_without_archive_before_fetching(tmp_path):
+    # Refused up front: the fetch never happens, because no answer it could give would help.
+    def boom(url, headers=None):
+        raise AssertionError("must not fetch")
+
+    assert _add(tmp_path, extra=["--cited-in", "vi:vi_conflict_0001"], fetch=boom) == 1
+
+
+def test_cited_in_does_not_imply_archive(tmp_path, capsys):
+    # The refusal is the point. Silently archiving on the caller's behalf would hide a step that
+    # has its own failure mode.
+    _add(tmp_path, extra=["--cited-in", "vi:vi_conflict_0001"], archive_fn=_ok_archive)
+    assert not (tmp_path / "sources").exists()
+    assert "pass --archive" in capsys.readouterr().err
+
+
+def test_add_writes_nothing_when_the_archive_step_fails(tmp_path, capsys):
+    assert _add(tmp_path, extra=["--archive"], archive_fn=_failing_archive) == 1
+    err = capsys.readouterr().err
+    assert "archive step failed" in err
+    assert URL in err  # names what could not be archived
+    assert not (tmp_path / "sources").exists()
+
+
+def test_add_succeeds_when_citing_with_a_working_archive(tmp_path):
+    assert _add(tmp_path, extra=["--archive", "--cited-in", "vi:vi_conflict_0001"]) == 0
+    written = json.loads((tmp_path / "sources/xr_src_0001.json").read_text(encoding="utf-8"))
+    assert written["cited_in"][0]["local_id"] == "vi_conflict_0001"
+    assert written["archives"][0]["url"] == ARCHIVED.url
+
+
+def test_duplicate_is_caught_by_the_pre_write_invariant_check(tmp_path, capsys):
+    assert _add(tmp_path) == 0
+    capsys.readouterr()
+    # Same URL, same point_in_time: refused by the SAME check Crosswalk runs on load.
+    assert _add(tmp_path) == 1
+    assert "is pinned by both xr_src_0001 and xr_src_0002" in capsys.readouterr().err
+    assert _sources(tmp_path) == ["xr_src_0001.json"]
+
+
+def test_everything_add_writes_can_be_read_back(tmp_path, capsys):
+    # The property the pre-write check exists to guarantee, asserted end to end.
+    _add(tmp_path, extra=["--archive", "--cited-in", "vi:vi_conflict_0001"])
+    _add(tmp_path, url=URL.replace("2023-01", "2023-02"), citation="AO 2023-02")
+    capsys.readouterr()
+    assert main(["--data-dir", str(tmp_path), "ledger"], fetch=_fetch()) == 0
+    assert main(["--data-dir", str(tmp_path), "check"], fetch=_fetch()) == 0

@@ -91,8 +91,9 @@ fetch time; in CI they are repo secrets wired into `.github/workflows/sources-dr
 someone notices and rotates it. So the fetchers store the key-free content URL (govinfo's
 `download.pdfLink`, OpenFEC's joined `fec.gov` URL) and re-attach the key from the environment on
 each request. This is enforced three ways, not just documented: `Source` refuses a `canonical_url`
-matching `(?i)(api_key|access_key|token)=`, `pin()` refuses one before it makes any request, and a
-test asserts no file under `data/sources/` contains a key.
+whose query carries a credential parameter (`api_key`, `access_key`, `token`, `key`, `sig`,
+`signature`, `secret`, or any `x-amz-*` — so an S3 presigned URL is refused too), `pin()` refuses
+one before it makes any request, and a test asserts no file under `data/sources/` contains a key.
 
 If a key does leak into a stored URL: rotate it first (assume it is burned), then fix the fetcher,
 then re-pin. Deleting the file is not enough — it is in the git history.
@@ -120,6 +121,27 @@ that.
 
 `validate` counts unverified records and tags each line. Nothing blocks on the flag; it exists so a
 reader can never mistake an unexercised parse for a checked one.
+
+## `add` cannot write a record that fails to load
+
+Before writing, `pin add` runs the would-be record through
+`registry.check_source_invariants` — the same function `Crosswalk` applies on load — against every
+existing source plus the new one. On failure it prints the invariant's own message, writes nothing,
+and exits non-zero. One rule, one implementation, one message: there is no second copy of the
+checks inside the CLI that could drift from the authoritative set.
+
+Consequences worth knowing:
+
+- **`--cited-in` requires `--archive`**, and is refused up front with `cited sources must carry an
+  archive copy; pass --archive`. It does *not* imply `--archive`: archiving is a separate act with
+  its own failure mode, and performing it silently would hide that from you.
+- **`--archive` is a requirement, not a courtesy.** If the capture fails, nothing is written and
+  the message names the archive step. Re-run when the service is back.
+- **A duplicate `(canonical_url, point_in_time)` is caught here too**, by the shared check rather
+  than an early short-circuit. The cost is one wasted fetch on a duplicate `add`; the benefit is
+  that the CLI and the loader can never disagree about what a duplicate is.
+- A refused `add` may still have written the content-addressed blob to `--blob-dir`. That file
+  lives outside this repo, is named by its own hash, and is rewritten identically on the retry.
 
 ## Source drift: what red means
 

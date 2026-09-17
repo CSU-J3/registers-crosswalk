@@ -39,7 +39,7 @@ from .models import (
     XrModel,
     check_public_url,
 )
-from .registry import DATA_DIR, Crosswalk, normalize_citation
+from .registry import DATA_DIR, Crosswalk, check_source_invariants, normalize_citation
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -49,6 +49,8 @@ FetchFn = Callable[[str, Mapping[str, str] | None], tuple[bytes, str]]
 # archive() needs RESPONSE HEADERS rather than a body (Wayback answers in Content-Location), so it
 # gets its own injection point of a different shape. Same rule, different signature.
 HeadersFn = Callable[[str, Mapping[str, str] | None], Mapping[str, str]]
+# The CLI's archiving step, injected for the same reason: tests stay offline.
+ArchiveFn = Callable[[str], "ArchiveCopy | None"]
 
 _UA = "registers-crosswalk/0.1 (+https://github.com/CSU-J3/registers-crosswalk)"
 # eCFR's versioner returns 406 without an Accept-Encoding the client will take (verified
@@ -454,25 +456,21 @@ def _latest_per_citation(xw: Crosswalk) -> list[Source]:
     return sorted(wanted.values(), key=lambda s: s.xr_id)
 
 
-def _cmd_add(args: argparse.Namespace, fetch: FetchFn) -> int:
+def _cmd_add(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
     from . import fetchers
 
     data_dir: Path = args.data_dir
+    # Refused before any network call: the load path requires a cited source to carry an archive,
+    # so this combination could only ever produce a record that cannot be read back. --cited-in
+    # does NOT imply --archive — archiving is a separate act with its own failure mode, and
+    # silently performing it on the caller's behalf would hide that.
+    if args.cited_in and not args.archive:
+        print("cited sources must carry an archive copy; pass --archive", file=sys.stderr)
+        return 1
+
     module = fetchers.get(args.fetcher)
     spec = module.spec_from_args(args, fetch=fetch)
-
     xw = Crosswalk(data_dir)
-    for existing in xw.sources.values():
-        if (existing.canonical_url, existing.point_in_time) == (
-            spec.canonical_url,
-            spec.point_in_time,
-        ):
-            print(
-                f"refusing: {spec.canonical_url} at point_in_time {spec.point_in_time} is "
-                f"already pinned as {existing.xr_id}",
-                file=sys.stderr,
-            )
-            return 1
 
     xr_id = next_source_id(data_dir)
     path = _sources_dir(data_dir) / f"{xr_id}.json"
@@ -481,13 +479,20 @@ def _cmd_add(args: argparse.Namespace, fetch: FetchFn) -> int:
         return 1
 
     source = pin(spec, next_id=xr_id, fetch=fetch, blob_dir=args.blob_dir)
-    archives = []
+
+    archives: list[ArchiveCopy] = []
     if args.archive:
-        copy = archive(source.canonical_url)
+        copy = archive_fn(source.canonical_url)
         if copy is None:
-            print("archive: no capture (the pin does not depend on it)", file=sys.stderr)
-        else:
-            archives = [copy]
+            # --archive is a requirement, not a courtesy: the caller asked for a recoverable pin
+            # and we could not make one, so there is nothing worth writing.
+            print(
+                f"archive step failed: no capture returned for {source.canonical_url}; "
+                "nothing written",
+                file=sys.stderr,
+            )
+            return 1
+        archives = [copy]
     # pin() builds the document facts; the crosswalk facts (who cites it, what it replaces) are the
     # caller's. Re-validate the assembled node rather than trusting model_copy, which skips it.
     source = Source.model_validate(
@@ -496,6 +501,17 @@ def _cmd_add(args: argparse.Namespace, fetch: FetchFn) -> int:
         ).model_dump()
     )
 
+    # The read path is the authority. Run the would-be record through exactly the invariants
+    # Crosswalk applies on load — against every existing source plus this one — so `add` can never
+    # leave behind a file that the next validate/check/ledger refuses to load. This is also where
+    # a duplicate (canonical_url, point_in_time) is caught: one rule, one implementation, one
+    # message, rather than a second copy of the check that can drift from the first.
+    try:
+        check_source_invariants({**xw.sources, source.xr_id: source}, xw.nodes)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(source.model_dump_json(indent=2) + "\n", encoding="utf-8")
     print(f"wrote {path}")
@@ -503,7 +519,8 @@ def _cmd_add(args: argparse.Namespace, fetch: FetchFn) -> int:
     return 0
 
 
-def _cmd_check(args: argparse.Namespace, fetch: FetchFn) -> int:
+def _cmd_check(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
+    del archive_fn  # check never archives
     xw = Crosswalk(args.data_dir)
     if args.only:
         source = xw.sources.get(args.only)
@@ -533,8 +550,8 @@ def _cmd_check(args: argparse.Namespace, fetch: FetchFn) -> int:
     return max((_EXIT_CODES[r.status] for r in reports), default=0, key=_EXIT_RANK.get)
 
 
-def _cmd_ledger(args: argparse.Namespace, fetch: FetchFn) -> int:
-    del fetch  # offline command; it only reads what is already pinned
+def _cmd_ledger(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
+    del fetch, archive_fn  # offline command; it only reads what is already pinned
     xw = Crosswalk(args.data_dir)
     sources = sorted(xw.sources.values(), key=lambda s: s.xr_id)
     if args.since is not None:
@@ -601,9 +618,14 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None, *, fetch: FetchFn = default_fetch) -> int:
+def main(
+    argv: list[str] | None = None,
+    *,
+    fetch: FetchFn = default_fetch,
+    archive_fn: ArchiveFn = archive,
+) -> int:
     args = _build_parser().parse_args(argv)
-    return args.handler(args, fetch)
+    return args.handler(args, fetch, archive_fn)
 
 
 if __name__ == "__main__":

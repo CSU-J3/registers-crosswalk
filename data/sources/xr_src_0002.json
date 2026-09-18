@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0002",
+  "kind": "source",
+  "citation": "5 CFR 2634 subpart D",
+  "title": "5 CFR 2634 subpart D, as of 2026-09-15",
+  "publisher": "Office of the Federal Register",
+  "canonical_url": "https://www.ecfr.gov/api/versioner/v1/full/2026-09-15/title-5.xml?part=2634&subpart=D",
+  "fetcher": "ecfr",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-18",
+  "point_in_time": "2026-09-15",
+  "published_at": null,
+  "artifact": {
+    "sha256": "cc186d5e92058058a7bd08f68e03b6413e77cdca5f22b025d29d260285c3ca3a",
+    "byte_length": 44919,
+    "media_type": "application/xml",
+    "fetched_at": "2026-09-18T18:56:13.121752Z",
+    "drift_key": "sha256",
+    "drift_value": "cc186d5e92058058a7bd08f68e03b6413e77cdca5f22b025d29d260285c3ca3a"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

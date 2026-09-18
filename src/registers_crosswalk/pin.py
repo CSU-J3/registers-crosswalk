@@ -291,7 +291,7 @@ _EXIT_CODES: dict[str, int] = {
     "drift": 1,
     "amended": 1,
     # A parse failure means the document no longer states what we read from it (uscode dropped its
-    # currency line, an API changed shape). The fetch worked, so it is a content problem: exit 1.
+    # source credit, an API changed shape). The fetch worked, so it is a content problem: exit 1.
     "error": 1,
     "key_missing": 2,
     "fetch_failed": 3,

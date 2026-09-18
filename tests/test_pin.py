@@ -540,7 +540,7 @@ def test_transport_failure_reports_fetch_failed_not_drift(exc):
 
 
 def test_parse_failure_is_content_not_transport():
-    # The fetch worked; the document no longer states its currency date. That is exit 1, not 3.
+    # The fetch worked; the document no longer carries its source credit. Exit 1, not 3.
     report = check(_uscode_source(), fetch=_fetch(body=b"<html>no date here</html>"), env={})
     assert report.status == "error"
 

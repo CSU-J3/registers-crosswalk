@@ -4,7 +4,7 @@ A fetcher module exposes:
 
     NAME            the Fetcher literal it implements
     HELP            one-line CLI help
-    DRIFT_KEY       what re-fetching compares ("sha256" or "currency_date")
+    DRIFT_KEY       what re-fetching compares ("sha256" or "last_amended")
     spec(...)       -> PinSpec, keyword-only, the API the tests drive
     add_arguments(parser) / spec_from_args(args, *, fetch)   the CLI adapter for spec()
     drift_value(body) -> str

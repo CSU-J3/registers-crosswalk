@@ -117,6 +117,14 @@ def test_unknown_drift_key_rejected():
         Artifact.model_validate({**ARTIFACT, "drift_key": "etag"})
 
 
+def test_currency_date_drift_key_rejected():
+    # Retired 2026-09-18: the "laws in effect on" date it read is site-wide, not per-section, so it
+    # reported drift on OLRC's publishing schedule. Pinned here so the disproven key cannot come
+    # back quietly through a record or a fetcher.
+    with pytest.raises(ValidationError):
+        Artifact.model_validate({**ARTIFACT, "drift_key": "currency_date"})
+
+
 def test_cited_in_uses_record_mention_patterns():
     source = _source(
         cited_in=[

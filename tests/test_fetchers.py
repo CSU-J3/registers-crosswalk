@@ -23,6 +23,23 @@ from registers_crosswalk.fetchers import (
 )
 
 REPO = Path(__file__).resolve().parents[1]
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def load_fixture(stem: str) -> dict:
+    """Load a CAPTURED live API response. See docs/operations.md: fixtures for external APIs are
+    captured and dated, never authored — an authored fixture tests the author's assumptions."""
+    matches = sorted(FIXTURES.glob(f"{stem}_*.json"))
+    if not matches:
+        raise AssertionError(f"no captured fixture for {stem!r} under {FIXTURES}")
+    return json.loads(matches[-1].read_text(encoding="utf-8"))
+
+
+def _versions_fetch(stem: str):
+    def fetch(url, headers=None):
+        return json.dumps(load_fixture(stem)).encode(), "application/json"
+
+    return fetch
 
 
 def _json_fetch(payload, media_type="application/json"):
@@ -537,53 +554,7 @@ def test_ecfr_subpart_must_be_part_slash_letter(bad):
         ecfr.spec(title=5, subpart=bad, as_of=date(2026, 9, 15))
 
 
-def _versions_fetch(entries):
-    def fetch(url, headers=None):
-        return json.dumps({"content_versions": entries}).encode(), "application/json"
-
-    return fetch
-
-
-AMENDMENTS = [
-    {"amendment_date": "2026-01-02", "substantive": True, "subpart": "A", "section": "2640.201"},
-    {"amendment_date": "2026-10-01", "substantive": True, "subpart": "B", "section": "2640.202"},
-    {"amendment_date": "2026-11-01", "substantive": True, "subpart": "C", "section": "2640.203"},
-]
-
-
-def test_amendment_check_narrows_to_the_pinned_section():
-    # An amendment to a sibling section must not report THIS section as amended.
-    fetch = _versions_fetch(AMENDMENTS)
-    assert ecfr.latest_amendment(5, "2640", section="2640.202", fetch=fetch) == date(2026, 10, 1)
-    assert ecfr.latest_amendment(5, "2640", section="2640.999", fetch=fetch) is None
-    # unnarrowed, the whole part takes the latest of any section
-    assert ecfr.latest_amendment(5, "2640", fetch=fetch) == date(2026, 11, 1)
-
-
-def test_amendment_check_narrows_to_the_pinned_subpart():
-    fetch = _versions_fetch(AMENDMENTS)
-    assert ecfr.latest_amendment(5, "2640", subpart="B", fetch=fetch) == date(2026, 10, 1)
-    assert ecfr.latest_amendment(5, "2640", subpart="Z", fetch=fetch) is None
-
-
-def test_amended_since_reads_the_selector_back_out_of_the_url():
-    # The record stores only a URL, so the narrowing has to survive a round trip through it.
-    spec = ecfr.spec(title=5, section="2640.202", as_of=date(2026, 9, 15))
-    source = _as_source(spec)
-    assert ecfr.amended_since(source, fetch=_versions_fetch(AMENDMENTS)) == date(2026, 10, 1)
-
-    sibling_only = [AMENDMENTS[0]]  # 2640.201 only
-    assert ecfr.amended_since(source, fetch=_versions_fetch(sibling_only)) is None
-
-
 # ------------------------------------------------------- ecfr --as-of latest resolution
-
-TITLES_INDEX = {
-    "titles": [
-        {"number": 5, "name": "Administrative Personnel", "latest_issue_date": "2026-09-15"},
-        {"number": 11, "name": "Federal Elections", "latest_issue_date": "2026-06-08"},
-    ]
-}
 
 
 def _titles_fetch(payload=None):
@@ -591,7 +562,8 @@ def _titles_fetch(payload=None):
 
     def fetch(url, headers=None):
         calls.append(url)
-        return json.dumps(TITLES_INDEX if payload is None else payload).encode(), "application/json"
+        body = load_fixture("ecfr_titles") if payload is None else payload
+        return json.dumps(body).encode(), "application/json"
 
     fetch.calls = calls
     return fetch
@@ -606,12 +578,17 @@ def test_latest_issue_date_is_per_title():
 
 
 def test_latest_issue_date_unknown_title_raises():
-    with pytest.raises(ValueError, match="title 42 not found"):
-        ecfr.latest_issue_date(42, fetch=_titles_fetch())
+    # 99 is not a CFR title; 42 IS one, and the captured index carries all 50.
+    with pytest.raises(ValueError, match="title 99 not found"):
+        ecfr.latest_issue_date(99, fetch=_titles_fetch())
 
 
 def test_latest_issue_date_missing_field_raises():
-    payload = {"titles": [{"number": 5, "latest_issue_date": None}]}
+    # Derived from the capture by blanking one field, rather than inventing a payload shape.
+    payload = load_fixture("ecfr_titles")
+    for entry in payload["titles"]:
+        if entry["number"] == 5:
+            entry["latest_issue_date"] = None
     with pytest.raises(ValueError, match="no latest_issue_date"):
         ecfr.latest_issue_date(5, fetch=_titles_fetch(payload))
 
@@ -652,3 +629,121 @@ def test_as_of_arg_accepts_latest_and_dates_and_rejects_junk():
     assert ecfr._as_of_arg("2026-09-15") == date(2026, 9, 15)
     with pytest.raises(argparse.ArgumentTypeError, match='expected YYYY-MM-DD or "latest"'):
         ecfr._as_of_arg("yesterday")
+
+
+# ----------------------------------- amendment narrowing, against CAPTURED responses
+
+# Observed on the live /versions endpoint 2026-09-17. The earlier hand-written fixture carried a
+# "section" key that the API has never returned, which hid a filter that matched nothing at all.
+LIVE_VERSION_KEYS = {
+    "amendment_date",
+    "date",
+    "identifier",
+    "issue_date",
+    "name",
+    "part",
+    "removed",
+    "subpart",
+    "substantive",
+    "title",
+    "type",
+}
+
+
+@pytest.mark.parametrize(
+    "stem",
+    ["ecfr_versions_title5_part2640", "ecfr_versions_title5_part2634"],
+)
+def test_captured_fixture_matches_the_observed_live_key_set(stem):
+    # Guards both directions: an invented field fails, a dropped field fails. If eCFR really does
+    # change its payload, this test is the place to find out, and the fixture must be RE-CAPTURED
+    # rather than edited by hand.
+    entries = load_fixture(stem)["content_versions"]
+    assert entries
+    for entry in entries:
+        assert set(entry) == LIVE_VERSION_KEYS, entry.get("identifier")
+
+
+def test_content_versions_has_no_section_key():
+    # The bug this commit fixes, pinned so it cannot come back: matching on v["section"] silently
+    # excluded every entry, so a section pin could never report AMENDED.
+    for stem in ("ecfr_versions_title5_part2640", "ecfr_versions_title5_part2634"):
+        for entry in load_fixture(stem)["content_versions"]:
+            assert "section" not in entry
+
+
+def test_section_is_matched_by_identifier_and_type():
+    fetch = _versions_fetch("ecfr_versions_title5_part2640")
+    # 2640.202 is a real section of the captured part, amended 2017-01-01
+    assert ecfr.latest_amendment(5, "2640", section="2640.202", fetch=fetch) == date(2017, 1, 1)
+    # a section that does not exist in the part matches nothing
+    assert ecfr.latest_amendment(5, "2640", section="2640.999", fetch=fetch) is None
+    # and the unnarrowed part query still answers
+    assert ecfr.latest_amendment(5, "2640", fetch=fetch) == date(2017, 1, 1)
+
+
+def test_section_matching_ignores_a_same_named_non_section_entry():
+    # type is half the key: an appendix whose identifier happened to collide must not match.
+    payload = load_fixture("ecfr_versions_title5_part2640")
+    payload["content_versions"].append(
+        {**payload["content_versions"][0], "type": "appendix", "amendment_date": "2030-01-01"}
+    )
+
+    def fetch(url, headers=None):
+        return json.dumps(payload).encode(), "application/json"
+
+    ident = payload["content_versions"][0]["identifier"]
+    assert ecfr.latest_amendment(5, "2640", section=ident, fetch=fetch) == date(2017, 1, 1)
+
+
+def test_subpart_is_matched_on_the_subpart_field():
+    fetch = _versions_fetch("ecfr_versions_title5_part2634")
+    # subpart D really exists in the capture (30 entries); latest amendment there is 2019-01-01
+    assert ecfr.latest_amendment(5, "2634", subpart="D", fetch=fetch) == date(2019, 1, 1)
+    assert ecfr.latest_amendment(5, "2634", subpart="Z", fetch=fetch) is None
+    # the whole part reaches later amendments that subpart D does not
+    assert ecfr.latest_amendment(5, "2634", fetch=fetch) == date(2026, 7, 23)
+
+
+def test_removed_entries_count_as_amendments():
+    # Part 2634's capture carries three real removed:true appendices, struck 2019-01-01. A pin
+    # whose text no longer exists must report, not read as unchanged.
+    payload = load_fixture("ecfr_versions_title5_part2634")
+    removed = [v for v in payload["content_versions"] if v["removed"]]
+    assert removed, "capture no longer carries a removed entry; re-capture and revisit"
+    assert {v["type"] for v in removed} == {"appendix"}
+
+    # narrowed to the part, the removed entries are inside the answer's range
+    fetch = _versions_fetch("ecfr_versions_title5_part2634")
+    assert ecfr.latest_amendment(5, "2634", fetch=fetch) >= date(2019, 1, 1)
+
+    # and a removal is not filtered out: strike everything else and it still answers
+    only_removed = {**payload, "content_versions": removed}
+
+    def fetch_removed(url, headers=None):
+        return json.dumps(only_removed).encode(), "application/json"
+
+    assert ecfr.latest_amendment(5, "2634", fetch=fetch_removed) == date(2019, 1, 1)
+
+
+def test_non_substantive_entries_are_still_ignored():
+    payload = load_fixture("ecfr_versions_title5_part2640")
+    for entry in payload["content_versions"]:
+        entry["substantive"] = False
+
+    def fetch(url, headers=None):
+        return json.dumps(payload).encode(), "application/json"
+
+    assert ecfr.latest_amendment(5, "2640", fetch=fetch) is None
+
+
+def test_amended_since_reads_the_selector_back_out_of_the_url():
+    # The record stores only a URL, so the narrowing has to survive a round trip through it.
+    spec = ecfr.spec(title=5, section="2640.202", as_of=date(2016, 1, 1))
+    source = _as_source(spec)
+    fetch = _versions_fetch("ecfr_versions_title5_part2640")
+    assert ecfr.amended_since(source, fetch=fetch) == date(2017, 1, 1)
+
+    # pinned after the amendment, nothing to report
+    later = _as_source(ecfr.spec(title=5, section="2640.202", as_of=date(2020, 1, 1)))
+    assert ecfr.amended_since(later, fetch=fetch) is None

@@ -122,6 +122,28 @@ that.
 `validate` counts unverified records and tags each line. Nothing blocks on the flag; it exists so a
 reader can never mistake an unexercised parse for a checked one.
 
+**Fixtures for external APIs are captured from a live response and dated, never authored.** A
+fixture the code's author wrote tests the author's assumptions, not the API. They agree by
+construction, so the test passes and proves nothing. This is not hypothetical here: the first
+version of the eCFR amendment narrowing matched on a `section` key, with a hand-written fixture
+that supplied one. The live endpoint has never returned that key — a provision below subpart level
+is identified by `identifier` plus `type` — so the filter excluded every entry and a section pin
+could never report `AMENDED`. The tests were green throughout.
+
+The rules that follow from it:
+
+- Capture live, store under `tests/fixtures/` with the capture date in the filename, and load it;
+  don't paste an abbreviated version into the test module.
+- Trim nothing. A capture is evidence; an edited capture is an assumption again.
+- Assert the key set, so an invented field and a dropped field both fail (see
+  `test_captured_fixture_matches_the_observed_live_key_set`).
+- Need an error case the live response doesn't contain? **Mutate a copy of the capture** — blank a
+  field, append an entry — rather than inventing a payload shape.
+- When a capture stops matching the live API, **re-capture it**. Editing it by hand to make the
+  suite green converts a real finding about an upstream change into a hidden assumption.
+- This is the same discipline `fetcher_verified` enforces at the record level: a claim about an
+  external system only counts if it came from that system.
+
 ## `add` cannot write a record that fails to load
 
 Before writing, `pin add` runs the would-be record through

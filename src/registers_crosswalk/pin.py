@@ -476,6 +476,13 @@ def _cmd_add(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) ->
         print("cited sources must carry an archive copy; pass --archive", file=sys.stderr)
         return 1
 
+    # Same shape, fetcher's own requirement: where the canonical URL cannot reproduce the pinned
+    # document once it moves, the archive copy is the only thing that can, so the pin is refused
+    # without one. Also before any network call.
+    if fetchers.requires_archive(args.fetcher) and not args.archive:
+        print(f"{args.fetcher} pins must carry an archive copy; pass --archive", file=sys.stderr)
+        return 1
+
     module = fetchers.get(args.fetcher)
     spec = module.spec_from_args(args, fetch=fetch)
     xw = Crosswalk(data_dir)

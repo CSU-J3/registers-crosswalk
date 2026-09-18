@@ -640,7 +640,8 @@ def test_as_of_arg_accepts_latest_and_dates_and_rejects_junk():
 
 # ----------------------------------- amendment narrowing, against CAPTURED responses
 
-# Observed on the live /versions endpoint 2026-09-17. The earlier hand-written fixture carried a
+# Observed on the live /versions endpoint 2026-09-18 (UTC day; see docs/operations.md). The
+# earlier hand-written fixture carried a
 # "section" key that the API has never returned, which hid a filter that matched nothing at all.
 LIVE_VERSION_KEYS = {
     "amendment_date",

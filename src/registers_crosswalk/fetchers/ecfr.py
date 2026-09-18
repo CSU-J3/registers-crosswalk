@@ -1,20 +1,20 @@
 """eCFR — a CFR part, subpart or section as it read on a given date.
 
-Verified live 2026-09-17:
+Verified live 2026-09-18 (UTC):
   * `/api/versioner/v1/full/{as_of}/title-{t}.xml?part={p}` returns the part's XML as of that date.
     It answers 406 unless the request will accept gzip, which `pin.default_fetch` always sends.
     Adding `&section=` or `&subpart=` narrows it to that provision — four distinct documents with
     four distinct hashes, so the granularity is a property of the pinned document, not a display
     choice. Pinning the part when the argument cites the section substitutes a different document.
   * `/api/versioner/v1/versions/title-{t}.json?part={p}` returns `content_versions[]`. Observed
-    keys, captured 2026-09-17: `amendment_date`, `date`, `identifier`, `issue_date`, `name`,
+    keys, captured 2026-09-18 (UTC): `amendment_date`, `date`, `identifier`, `issue_date`, `name`,
     `part`, `removed`, `subpart`, `substantive`, `title`, `type`. There is NO `section` key — a
     provision below subpart level is identified by `identifier` plus `type`, e.g.
     `{"type": "section", "identifier": "2640.202", "subpart": "B"}`. Cosmetic (non-substantive)
     entries are why the amendment check filters on `substantive`: a typo correction is not an
     amendment. A `removed` entry IS one, and counts.
   * The `full` endpoint serves dates beyond a title's `latest_issue_date`, but not beyond eCFR's
-    own publication lag — "today" is routinely a 404 (verified 2026-09-17). `/titles.json` carries
+    own publication lag — "today" is routinely a 404 (verified 2026-09-18). `/titles.json` carries
     a per-title `latest_issue_date`, which is what `--as-of latest` resolves against; it differs
     sharply by title (title 5 was 2026-09-15 while title 11 was 2026-06-08 on the same day).
 
@@ -179,7 +179,7 @@ def latest_amendment(
     positive, and the fastest way to teach an operator to ignore the AMENDED status.
 
     A section is matched on `identifier` + `type`, NOT on a `section` key: the API has no such key
-    (observed 2026-09-17). A subpart is matched on `subpart`, which the API does populate, and
+    (observed 2026-09-18). A subpart is matched on `subpart`, which the API does populate, and
     membership falls out of eCFR's own tagging rather than anything computed here.
 
     `removed` entries count. A provision being struck is an amendment, and the most consequential

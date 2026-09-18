@@ -40,7 +40,7 @@ committed `main` can be read. Nothing else uses it; the package and tests never 
   lost access to it). The failing **step name tells you which repo**. This is a grant problem, not a
   scope problem — fix the PAT's selected-repositories list, don't widen permissions.
 
-**Rotate** (fine-grained PATs expire; plan for it):
+**Rotate**:
 1. Mint a replacement at <https://github.com/settings/personal-access-tokens/new> with the exact
    scope above.
 2. `gh secret set SIBLING_REPOS_TOKEN --repo CSU-J3/registers-crosswalk` and paste when prompted —
@@ -54,14 +54,22 @@ committed `main` can be read. Nothing else uses it; the package and tests never 
    it is here so the next person does not have to go looking, and so an expiry can be seen coming
    rather than discovered when CI goes red.
 
-**`SIBLING_REPOS_TOKEN` expires:** _(not recorded — read it from the settings page above and fill
-this in; the secret was set 2026-07-05, and fine-grained PATs cap at 366 days, so it is on or
-before 2027-07-06)_
+**`SIBLING_REPOS_TOKEN` expires:** never — it was minted with no expiration, read from the
+settings page above on 2026-09-18. The secret itself was last set 2026-07-05, per the `updated_at`
+that `gh api repos/CSU-J3/registers-crosswalk/actions/secrets` returns; that is when the secret was
+written here, and it says nothing about the PAT behind it.
 
 Why this matters more than it used to: `main` now requires `cross-repo-refs` and
 `join-integration`, both of which check out the private siblings with this token, and
-`enforce_admins` is on. An expired PAT is therefore a repo-wide merge freeze that cannot be
-overridden from the UI, on PRs that have nothing to do with the siblings.
+`enforce_admins` is on. A token this repo cannot use is a repo-wide merge freeze that cannot be
+overridden from the UI, on PRs that have nothing to do with the siblings. No expiry closes one
+route into that freeze, not the freeze itself: GitHub automatically revokes a fine-grained PAT
+that has gone unused for a year, or that is pushed to a public repository or gist —
+<https://docs.github.com/en/organizations/managing-programmatic-access-to-your-organization/github-credential-types>.
+`cross-repo.yml` is this token's only consumer, and it runs on `push`, `pull_request` and
+`workflow_dispatch`, never on a schedule, so a year with none of those revokes the token and the
+next PR after that is frozen. That is the same failure class as "Scheduled workflows go dark on a
+quiet repo" below: a quiet repo disarming its own machinery on a clock nobody is watching.
 
 Without the secret the repo still develops fine locally — the pre-commit hook is working-tree based
 and needs no token. Only the authoritative CI existence check is unavailable.

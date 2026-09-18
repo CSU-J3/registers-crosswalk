@@ -11,7 +11,9 @@ Verified live 2026-09-17:
     (non-substantive) entries are exactly why the amendment check filters on `substantive`: a typo
     correction is not an amendment.
   * The `full` endpoint serves dates beyond a title's `latest_issue_date`, but not beyond eCFR's
-    own publication lag — "today" is routinely a 404 (verified 2026-09-17).
+    own publication lag — "today" is routinely a 404 (verified 2026-09-17). `/titles.json` carries
+    a per-title `latest_issue_date`, which is what `--as-of latest` resolves against; it differs
+    sharply by title (title 5 was 2026-09-15 while title 11 was 2026-06-08 on the same day).
 
 The point-in-time URL is stable by construction: it keeps returning the same bytes after the
 provision is amended. So a matching hash proves nothing about whether the law changed, and the
@@ -38,6 +40,11 @@ VERIFIED = False
 VERIFIED_AT = None
 PUBLISHER = "Office of the Federal Register"
 API = "https://www.ecfr.gov/api/versioner/v1"
+# What the operator types to mean "whatever eCFR has published most recently for this title".
+# It is an INPUT ONLY: it is resolved to a concrete date before any URL is built, so neither
+# canonical_url nor point_in_time can ever carry it. A record saying "latest" would be a
+# record that means something different every time it is read.
+LATEST = "latest"
 
 _FULL_URL = re.compile(
     r"/full/(?P<as_of>\d{4}-\d{2}-\d{2})/title-(?P<title>\d+)\.xml\?part=(?P<part>[^&]+)"
@@ -92,14 +99,46 @@ def versions_url(title: int | str, part: str) -> str:
     return f"{API}/versions/title-{title}.json?part={part}"
 
 
+def titles_url() -> str:
+    return f"{API}/titles.json"
+
+
+def latest_issue_date(title: int | str, *, fetch: FetchFn = default_fetch) -> date:
+    """The most recent issue date eCFR has published for a title.
+
+    Per title, not global: eCFR reissues a title when it changes, so titles drift apart by months.
+    Asking for today's date instead is a 404 — the service runs a publication lag of a day or two.
+    """
+    body, _ = fetch(titles_url(), None)
+    for entry in json.loads(body).get("titles", []):
+        if str(entry.get("number")) == str(title):
+            issued = entry.get("latest_issue_date")
+            if not issued:
+                raise ValueError(f"title {title} has no latest_issue_date in the eCFR index")
+            return date.fromisoformat(issued)
+    raise ValueError(f"title {title} not found in the eCFR titles index")
+
+
+def resolve_as_of(title: int | str, as_of: date | str, *, fetch: FetchFn = default_fetch) -> date:
+    """Turn the caller's --as-of into a concrete date. Everything downstream sees only a date."""
+    if as_of == LATEST:
+        return latest_issue_date(title, fetch=fetch)
+    if isinstance(as_of, date):
+        return as_of
+    return date.fromisoformat(as_of)
+
+
 def spec(
     *,
     title: int | str,
     part: str | None = None,
     section: str | None = None,
     subpart: str | None = None,
-    as_of: date,
+    as_of: date | str,
+    fetch: FetchFn = default_fetch,
 ) -> PinSpec:
+    # Resolved first, so every line below this one deals in a concrete date.
+    as_of = resolve_as_of(title, as_of, fetch=fetch)
     resolved_part, section, subpart, tail = _target(part, section, subpart)
     citation = f"{title} CFR {tail}"
     return PinSpec(
@@ -168,6 +207,17 @@ def amended_since(source: Source, *, fetch: FetchFn = default_fetch) -> date | N
     return None
 
 
+def _as_of_arg(value: str) -> date | str:
+    if value == LATEST:
+        return LATEST
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            f'expected YYYY-MM-DD or "{LATEST}", got {value!r}'
+        ) from exc
+
+
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     # --title is the CFR TITLE NUMBER (5 for the OGE regulations), not the document's name.
     parser.add_argument("--title", required=True, help="CFR title number, e.g. 5")
@@ -177,16 +227,20 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     target.add_argument("--section", help="a single section, e.g. 2640.202")
     target.add_argument("--subpart", metavar="PART/LETTER", help="a subpart, e.g. 2634/D")
     parser.add_argument(
-        "--as-of", required=True, type=date.fromisoformat, help="point in time, YYYY-MM-DD"
+        "--as-of",
+        required=True,
+        type=_as_of_arg,
+        help='point in time as YYYY-MM-DD, or "latest" for this title\'s newest published issue',
     )
 
 
 def spec_from_args(args: argparse.Namespace, *, fetch: FetchFn = default_fetch) -> PinSpec:
-    del fetch  # the URL is built from the arguments; no metadata call needed
+    # `fetch` is used only when --as-of is "latest"; a concrete date needs no metadata call.
     return spec(
         title=args.title,
         part=args.part,
         section=args.section,
         subpart=args.subpart,
         as_of=args.as_of,
+        fetch=fetch,
     )

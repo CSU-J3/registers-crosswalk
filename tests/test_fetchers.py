@@ -4,6 +4,7 @@ The fixtures hold only the keys `spec()` actually reads — a full API response 
 being asserted and would rot the moment the service adds a field. Nothing here touches the network.
 """
 
+import argparse
 import json
 from datetime import date
 from pathlib import Path
@@ -573,3 +574,81 @@ def test_amended_since_reads_the_selector_back_out_of_the_url():
 
     sibling_only = [AMENDMENTS[0]]  # 2640.201 only
     assert ecfr.amended_since(source, fetch=_versions_fetch(sibling_only)) is None
+
+
+# ------------------------------------------------------- ecfr --as-of latest resolution
+
+TITLES_INDEX = {
+    "titles": [
+        {"number": 5, "name": "Administrative Personnel", "latest_issue_date": "2026-09-15"},
+        {"number": 11, "name": "Federal Elections", "latest_issue_date": "2026-06-08"},
+    ]
+}
+
+
+def _titles_fetch(payload=None):
+    calls = []
+
+    def fetch(url, headers=None):
+        calls.append(url)
+        return json.dumps(TITLES_INDEX if payload is None else payload).encode(), "application/json"
+
+    fetch.calls = calls
+    return fetch
+
+
+def test_latest_issue_date_is_per_title():
+    # Titles drift apart by months; a global "latest" would be wrong for all but one of them.
+    fetch = _titles_fetch()
+    assert ecfr.latest_issue_date(5, fetch=fetch) == date(2026, 9, 15)
+    assert ecfr.latest_issue_date("11", fetch=fetch) == date(2026, 6, 8)
+    assert fetch.calls == [ecfr.titles_url()] * 2
+
+
+def test_latest_issue_date_unknown_title_raises():
+    with pytest.raises(ValueError, match="title 42 not found"):
+        ecfr.latest_issue_date(42, fetch=_titles_fetch())
+
+
+def test_latest_issue_date_missing_field_raises():
+    payload = {"titles": [{"number": 5, "latest_issue_date": None}]}
+    with pytest.raises(ValueError, match="no latest_issue_date"):
+        ecfr.latest_issue_date(5, fetch=_titles_fetch(payload))
+
+
+def test_latest_never_reaches_the_url_or_the_record():
+    # The whole point: "latest" is an input word. A stored URL or point_in_time carrying it would
+    # mean something different every time the record was read.
+    spec = ecfr.spec(title=5, section="2640.202", as_of="latest", fetch=_titles_fetch())
+    assert "latest" not in spec.canonical_url
+    assert spec.canonical_url == (
+        "https://www.ecfr.gov/api/versioner/v1/full/2026-09-15/title-5.xml"
+        "?part=2640&section=2640.202"
+    )
+    assert spec.point_in_time == date(2026, 9, 15)
+    assert spec.title == "5 CFR 2640.202, as of 2026-09-15"
+
+    source = _as_source(spec)
+    assert "latest" not in source.model_dump_json()
+    assert source.point_in_time == date(2026, 9, 15)
+
+
+def test_latest_resolves_identically_to_passing_the_date():
+    resolved = ecfr.spec(title=5, subpart="2634/D", as_of="latest", fetch=_titles_fetch())
+    explicit = ecfr.spec(title=5, subpart="2634/D", as_of=date(2026, 9, 15))
+    assert resolved.canonical_url == explicit.canonical_url
+    assert resolved.point_in_time == explicit.point_in_time
+    assert resolved.citation == explicit.citation
+
+
+def test_a_concrete_date_makes_no_titles_call():
+    fetch = _titles_fetch()
+    ecfr.spec(title=5, part="2640", as_of=date(2026, 9, 15), fetch=fetch)
+    assert fetch.calls == []  # nothing to resolve, so nothing is requested
+
+
+def test_as_of_arg_accepts_latest_and_dates_and_rejects_junk():
+    assert ecfr._as_of_arg("latest") == "latest"
+    assert ecfr._as_of_arg("2026-09-15") == date(2026, 9, 15)
+    with pytest.raises(argparse.ArgumentTypeError, match='expected YYYY-MM-DD or "latest"'):
+        ecfr._as_of_arg("yesterday")

@@ -255,7 +255,7 @@ Consequences worth knowing:
 - **0 — clean.** Every checked pin still matches. Nothing to do.
 - **1 — the check ran and found a problem with the document.** Either the drift key changed
   (`DRIFT`), the eCFR part was amended since the pin (`AMENDED`), or the document no longer states
-  what we parse out of it (`ERROR` — uscode dropped its currency line, an API changed shape). All
+  what we parse out of it (`ERROR` — uscode dropped its source credit, an API changed shape). All
   three are real findings about the world, and all three need a human to look and re-pin.
 - **2 — the check could not run: an API key isn't set** (`KEY_MISSING`). A configuration problem
   on our side, not a finding. The failing line names the env var. Fix the secret and re-run; until
@@ -283,7 +283,10 @@ Each line is one of six statuses, and they mean genuinely different things:
   old text still cites the old text.
 - **`DRIFT`** — the drift key changed. For a PDF or an XML snapshot that is alarming: a document
   that was supposed to be immutable was replaced, so go look at what changed before re-pinning. For
-  an HTML page pinned through `manual`, it is usually just noise (see below).
+  an HTML page pinned through `manual`, it is usually just noise (see below). For a `uscode` pin it
+  is neither: the drift key is the latest date in the section's source credit, so a later date
+  means a law amended that section. Read what changed, pin the new text, and set `--supersedes` to
+  the old id — the same response as `AMENDED`, reached by a different route.
 - **`KEY_MISSING`** — the check could not run because an API key isn't set. The run fails on
   purpose: a check that quietly skipped the sources it couldn't reach would report green while
   telling you nothing.
@@ -310,11 +313,44 @@ So the date follows OLRC's publishing schedule, not the section's text, and a `u
 report `DRIFT` every time OLRC republishes, whether or not its section changed. That is the failure
 the drift key was chosen to avoid.
 
-**No `uscode` pin lands until that key is redesigned**, which resets `VERIFIED` when it happens.
-When one does land it carries `--archive`: once the currency date moves, the canonical URL serves
-the new text and cannot reproduce what was pinned, so an unarchived `uscode` pin drifts straight to
-`DRIFT unrecoverable (no archive)`. A Federal Register PDF is static and an eCFR point-in-time URL
-is dated, so neither needs one.
+**The key was redesigned on 2026-09-18.** `uscode` now uses `last_amended`: the latest date in the
+section's source credit, the parenthetical after the text that lists the enacting law and every law
+that has amended the section. That date moves only when a law amends that section, which is what
+the currency date was wrongly assumed to do. `currency_date` is retired — `Artifact` rejects it, so
+the disproven key cannot return through a record or a fetcher. The stated "laws in effect on" date
+is still read and still supplies `point_in_time` and the title: it is the document's own claim
+about itself. It is simply not the signal.
+
+The parse is scoped to the source-credit element, never the whole page. Notes below the text cite
+later laws that did not amend the section, and on 2026-09-18 the 1 U.S.C. § 1 page carried 35 such
+dates later than its credit's own latest.
+
+**What it misses, and why `--archive` is now enforced in code.** A `last_amended` pin does not
+notice an editorial change to the text or notes that adds no law to the credit. What holds the
+pinned text is the archive copy, so `uscode` sets `REQUIRES_ARCHIVE` and `add uscode` without
+`--archive` is refused before any fetch, with `uscode pins must carry an archive copy; pass
+--archive`. Once the section is amended the canonical URL serves the new text and cannot reproduce
+what was pinned, so an unarchived `uscode` pin would go straight to `DRIFT unrecoverable (no
+archive)`. A Federal Register PDF is static and an eCFR point-in-time URL is dated, so neither
+needs one.
+
+**There is still no `uscode` pin, now for a different reason.** The fetcher is unverified: the
+parser was checked against pages captured 2026-09-18, but a capture is not an `add`, and the first
+live `add` needs `--archive`. On 2026-09-18 Wayback's unauthenticated `GET /save/` answered HTTP
+500 for the § 30116 URL on three attempts, the last twenty minutes after the first.
+
+A control save of `https://example.com` the same day returned **HTTP 429**, so a known-good URL was
+refused too. That points at anonymous rate limiting rather than at Wayback being unable to take
+this particular page, and it is consistent with this path's 500s having been seen under throttling
+before. It is not proof: the two URLs returned different statuses, and the 500 has never been
+isolated. If a later control succeeds while § 30116 still 500s, the reading flips — Wayback cannot
+take the page, and the follow-up is Perma.cc (already in `ArchiveService`, still a TODO in
+`archive()`) rather than another retry.
+
+`WAYBACK_ACCESS_KEY` and `WAYBACK_SECRET_KEY` switch `archive()` to the authenticated SPN2
+endpoint, which is rate-limited far less aggressively. Neither is set locally, and neither belongs
+in CI: nothing in the workflows archives. Until a capture succeeds, `uscode` ships
+`VERIFIED = False` and 52 U.S.C. § 30116 stays unpinned.
 
 ## Scheduled workflows go dark on a quiet repo
 

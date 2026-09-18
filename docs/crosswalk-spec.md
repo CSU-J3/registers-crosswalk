@@ -141,8 +141,9 @@ Artifact
   byte_length     int
   media_type      str                              (from Content-Type, parameters dropped)
   fetched_at      datetime                         (timezone-aware, normalized to UTC)
-  drift_key       "sha256" | "currency_date"
-  drift_value     str                              (the hash again, or the parsed currency date)
+  drift_key       "sha256" | "last_amended"
+  drift_value     str                              (the hash again, or the source credit's
+                                                    latest date, ISO)
 
 Grade             Admiralty: reliability A-F, credibility 1-6; `.code()` → "A1"
 ArchiveCopy       service "wayback" | "perma" | "govinfo"; url; captured_at | null

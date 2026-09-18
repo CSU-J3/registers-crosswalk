@@ -3,6 +3,21 @@
 Runbook: what to do when something breaks or needs maintaining. The schema and the identity rules
 live in `crosswalk-spec.md`; this file is operational only.
 
+## Every date in this repo is the UTC day
+
+Record fields (`fetched_at`, `point_in_time`, `verified_at`), `VERIFIED_AT` constants, and fixture
+capture filenames all use the UTC calendar day — never the local one. The repo is maintained from
+UTC-6, so for six hours of every day the two disagree, and a run at 18:43 local is already the next
+day on the wire. Mixing them puts two clocks in one record: that is how a pin ends up looking a day
+older than the capture it was verified against, and there is no way to tell afterwards which line
+used which clock.
+
+`fetched_at` is written by `datetime.now(tz=UTC)` and is the anchor; everything a run produces is
+dated to agree with it.
+
+Dates that record someone ELSE's observation keep the date they were given. Re-dating a claim
+inherited from a handoff would assert an observation on a day it did not happen.
+
 ## SIBLING_REPOS_TOKEN (repo secret)
 
 **What.** A fine-grained PAT stored as the repo secret `SIBLING_REPOS_TOKEN`, used *only* by
@@ -32,6 +47,21 @@ committed `main` can be read. Nothing else uses it; the package and tests never 
    never put the token on a command line (shell history) or in a chat/PR.
 3. Re-run: `gh run rerun <run-id> --repo CSU-J3/registers-crosswalk`, or push any commit.
 4. Revoke the old PAT.
+5. **Record the new expiry date in the line below.** It is the one fact about this token that no
+   API can return: `CSU-J3` is a user account, not an org, so `/orgs/{org}/personal-access-tokens`
+   does not exist for it and a fine-grained PAT's expiry is visible only at
+   <https://github.com/settings/personal-access-tokens>. Nothing reads this line automatically —
+   it is here so the next person does not have to go looking, and so an expiry can be seen coming
+   rather than discovered when CI goes red.
+
+**`SIBLING_REPOS_TOKEN` expires:** _(not recorded — read it from the settings page above and fill
+this in; the secret was set 2026-07-05, and fine-grained PATs cap at 366 days, so it is on or
+before 2027-07-06)_
+
+Why this matters more than it used to: `main` now requires `cross-repo-refs` and
+`join-integration`, both of which check out the private siblings with this token, and
+`enforce_admins` is on. An expired PAT is therefore a repo-wide merge freeze that cannot be
+overridden from the UI, on PRs that have nothing to do with the siblings.
 
 Without the secret the repo still develops fine locally — the pre-commit hook is working-tree based
 and needs no token. Only the authoritative CI existence check is unavailable.
@@ -143,6 +173,24 @@ The rules that follow from it:
   suite green converts a real finding about an upstream change into a hidden assumption.
 - This is the same discipline `fetcher_verified` enforces at the record level: a claim about an
   external system only counts if it came from that system.
+
+**Second worked example, same root cause.** The `/titles.json` fixture was also authored: a
+two-entry dict with the two titles the test happened to need. The live index carries all 50, so the
+"unknown title" test used title 42 — which is a real CFR title, and would have matched against the
+real response. The authored fixture agreed with the test's assumption and hid that too. The capture
+forced the test onto title 99, which is not a CFR title and cannot silently start existing.
+
+**A behaviour with no test guarding it is a behaviour that will regress silently.** Demonstrating a
+fix by hand in a terminal proves it works today and nothing more. Two rules follow:
+
+- When a fix lands, ask which test fails if it is reverted. If the answer is none, the fix is not
+  finished. `removed`-entry handling was correct for a whole commit with nothing watching it,
+  because every removed entry in the capture was a part-level appendix and the narrowed paths were
+  never exercised.
+- Prove a guard has teeth before trusting it: reinstate the old behaviour, confirm the new test
+  fails and that nothing unrelated does, then restore. A test that passes both ways guards nothing.
+- Where the live capture cannot produce the case, mutate a copy to produce it, and assert the
+  mutation stayed inside the observed key set so it cannot drift into fiction.
 
 ## `add` cannot write a record that fails to load
 

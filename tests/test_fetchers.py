@@ -90,29 +90,88 @@ def test_ecfr_amended_since_reads_title_and_part_back_out_of_the_url():
 
 # --------------------------------------------------------------------------- federalregister
 
-FR_DOCUMENT = {
-    "citation": "60 FR 7862",
-    "title": "Express Advocacy; Independent Expenditures; Corporate and Labor Organization",
-    "publication_date": "1995-02-09",
-    "pdf_url": "https://www.govinfo.gov/content/pkg/FR-1995-02-09/pdf/95-3162.pdf",
+FR_DOCUMENT_STEM = "federalregister_document_95-3162"
+
+# Every top-level key the live document endpoint returned for 95-3162 on 2026-09-18.
+LIVE_FR_DOCUMENT_KEYS = {
+    "abstract",
+    "action",
+    "agencies",
+    "body_html_url",
+    "cfr_references",
+    "citation",
+    "comment_url",
+    "comments_close_on",
+    "correction_of",
+    "corrections",
+    "dates",
+    "disposition_notes",
+    "docket_ids",
+    "dockets",
+    "document_number",
+    "effective_on",
+    "end_page",
+    "executive_order_notes",
+    "executive_order_number",
+    "full_text_xml_url",
+    "html_url",
+    "images",
+    "images_metadata",
+    "json_url",
+    "mods_url",
+    "not_received_for_publication",
+    "page_length",
+    "page_views",
+    "pdf_url",
+    "presidential_document_number",
+    "proclamation_number",
+    "public_inspection_pdf_url",
+    "publication_date",
+    "raw_text_url",
+    "regulation_id_number_info",
+    "regulation_id_numbers",
+    "regulations_dot_gov_info",
+    "regulations_dot_gov_url",
+    "significant",
+    "signing_date",
+    "start_page",
+    "subtype",
+    "title",
+    "toc_doc",
+    "toc_subject",
+    "topics",
+    "type",
+    "volume",
 }
 
 
+def test_captured_fr_document_matches_the_observed_live_key_set():
+    # Guards both directions: an invented field fails, a dropped field fails. If the Federal
+    # Register really does change its payload, this is where it surfaces, and the fixture must be
+    # RE-CAPTURED rather than edited by hand.
+    assert set(load_fixture(FR_DOCUMENT_STEM)) == LIVE_FR_DOCUMENT_KEYS
+
+
 def test_federalregister_spec_reads_the_document_endpoint():
-    fetch = _json_fetch(FR_DOCUMENT)
+    payload = load_fixture(FR_DOCUMENT_STEM)
+    fetch = _json_fetch(payload)
     spec = federalregister.spec(document_number="95-3162", fetch=fetch)
     assert fetch.calls[0][0] == ("https://www.federalregister.gov/api/v1/documents/95-3162.json")
-    assert spec.canonical_url == FR_DOCUMENT["pdf_url"]
+    assert spec.canonical_url == payload["pdf_url"]
     assert spec.citation == "60 FR 7862"
+    assert spec.title == payload["title"]
     assert spec.published_at == date(1995, 2, 9)
     assert spec.point_in_time is None  # a published notice has no version axis
     assert spec.grade.code() == "A1"
 
 
 def test_federalregister_falls_back_to_the_govinfo_pdf():
-    spec = federalregister.spec(
-        document_number="95-3162", fetch=_json_fetch({**FR_DOCUMENT, "pdf_url": None})
-    )
+    # The live payload cannot produce this case: for 95-3162 the API's own pdf_url is already the
+    # URL fallback_pdf_url() builds, so the fallback never fires against the real response. Mutate
+    # a copy to null it out, which is the only way to exercise the construction.
+    payload = {**load_fixture(FR_DOCUMENT_STEM), "pdf_url": None}
+    assert set(payload) == LIVE_FR_DOCUMENT_KEYS  # the mutation stayed inside the observed shape
+    spec = federalregister.spec(document_number="95-3162", fetch=_json_fetch(payload))
     assert spec.canonical_url == (
         "https://www.govinfo.gov/content/pkg/FR-1995-02-09/pdf/95-3162.pdf"
     )
@@ -374,7 +433,9 @@ def _as_source(spec):
 def test_no_built_canonical_url_carries_a_key():
     specs = [
         ecfr.spec(title=11, part="114", as_of=date(2026, 9, 14)),
-        federalregister.spec(document_number="95-3162", fetch=_json_fetch(FR_DOCUMENT)),
+        federalregister.spec(
+            document_number="95-3162", fetch=_json_fetch(load_fixture(FR_DOCUMENT_STEM))
+        ),
         govinfo.spec(
             package="X", fetch=_json_fetch(GOVINFO_SUMMARY), env={"GOVINFO_API_KEY": "SECRET"}
         ),
@@ -438,6 +499,9 @@ def test_courtlistener_ships_unverified():
     [
         # ecfr: a live `add` through --section/--subpart/--as-of latest on 2026-09-18 (UTC).
         (ecfr, date(2026, 9, 18)),
+        # federalregister: a scratch `add` on FR Doc. 95-3162, 2026-09-18 (UTC), whose captured
+        # response the tests above now read.
+        (federalregister, date(2026, 9, 18)),
         # manual: no field mapping exists to be wrong, so nothing to exercise.
         (manual, date(2026, 9, 17)),
     ],
@@ -447,7 +511,7 @@ def test_exercised_fetchers_ship_verified(module, verified_on):
     assert module.VERIFIED_AT == verified_on
 
 
-@pytest.mark.parametrize("module", [federalregister, govinfo, uscode, openfec, courtlistener])
+@pytest.mark.parametrize("module", [govinfo, uscode, openfec, courtlistener])
 def test_unexercised_fetchers_ship_unverified(module):
     # A claim recorded in a handoff or a docstring is not a verification. These flip one at a
     # time, each on its own live `add` in this tree, dated the day it ran.

@@ -38,7 +38,9 @@ HELP = "a CFR part, subpart or section at a point in time (eCFR versioner)"
 DRIFT_KEY = "sha256"
 # Exercised against the live API on 2026-09-18 (UTC) through the current code path: `add ecfr
 # --section 2640.202 --as-of latest` and `--subpart 2634/D`, which resolved latest to 2026-09-15
-# and returned 10307 and 44919 bytes matching the digests recorded in data/sources/. Any further
+# and returned 10307 and 44919 bytes. That run's records were minted while this said False, so
+# they were re-minted on 2026-09-18 (UTC) with `--as-of 2026-09-15`; the sha256 of each matched
+# its original, and those records are xr_src_0001 and xr_src_0002 in data/sources/. Any further
 # edit to spec() or its parsing resets this to False — see the convention in docs/operations.md.
 VERIFIED = True
 VERIFIED_AT = date(2026, 9, 18)

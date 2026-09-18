@@ -415,7 +415,7 @@ def test_courtlistener_ships_unverified():
     assert spec.verified_at is None
 
 
-@pytest.mark.parametrize("module", [ecfr, manual])
+@pytest.mark.parametrize("module", [manual])
 def test_exercised_fetchers_ship_verified(module):
     # Only fetchers actually run from this tree: ecfr (a live `add` on 2026-09-17) and manual
     # (no field mapping exists to be wrong). Everything else waits for its own live run.
@@ -423,7 +423,7 @@ def test_exercised_fetchers_ship_verified(module):
     assert module.VERIFIED_AT == date(2026, 9, 17)
 
 
-@pytest.mark.parametrize("module", [federalregister, govinfo, uscode, openfec, courtlistener])
+@pytest.mark.parametrize("module", [ecfr, federalregister, govinfo, uscode, openfec, courtlistener])
 def test_unexercised_fetchers_ship_unverified(module):
     # A claim recorded in a handoff or a docstring is not a verification. These flip one at a
     # time, each on its own live `add` in this tree, dated the day it ran.
@@ -447,10 +447,129 @@ def test_the_stamp_reaches_the_minted_record():
     assert unverified.verified_at is None
     assert unverified.model_dump()["fetcher_verified"] is False  # and it serializes
 
+    # ecfr is unverified again after its spec() changed, so `manual` is the verified example here.
     verified = pin(
-        ecfr.spec(title=11, part="114", as_of=date(2026, 9, 14)),
+        manual.spec(url="https://example.gov/x.pdf", citation="X", title="X"),
         next_id="xr_src_0002",
-        fetch=lambda u, h=None: (b"<ECFR/>", "application/xml"),
+        fetch=lambda u, h=None: (b"%PDF fake", "application/pdf"),
     )
     assert verified.fetcher_verified is True
     assert verified.verified_at == date(2026, 9, 17)
+
+
+def test_ecfr_is_unverified_until_the_new_arguments_are_run_live():
+    # The convention in docs/operations.md: editing spec() voids the earlier live run.
+    from registers_crosswalk.pin import pin
+
+    source = pin(
+        ecfr.spec(title=5, section="2640.202", as_of=date(2026, 9, 15)),
+        next_id="xr_src_0003",
+        fetch=lambda u, h=None: (b"<ECFR/>", "application/xml"),
+    )
+    assert source.fetcher_verified is False
+    assert source.verified_at is None
+
+
+# ------------------------------------------- ecfr granularity: part / section / subpart
+
+
+def test_ecfr_part_url_and_citation():
+    spec = ecfr.spec(title=5, part="2640", as_of=date(2026, 9, 15))
+    assert spec.canonical_url == (
+        "https://www.ecfr.gov/api/versioner/v1/full/2026-09-15/title-5.xml?part=2640"
+    )
+    assert spec.citation == "5 CFR Part 2640"
+    assert spec.title == "5 CFR Part 2640, as of 2026-09-15"
+
+
+def test_ecfr_section_derives_its_part_and_cites_as_the_document_does():
+    spec = ecfr.spec(title=5, section="2640.202", as_of=date(2026, 9, 15))
+    assert spec.canonical_url == (
+        "https://www.ecfr.gov/api/versioner/v1/full/2026-09-15/title-5.xml"
+        "?part=2640&section=2640.202"
+    )
+    assert spec.citation == "5 CFR 2640.202"  # not "5 CFR Part 2640"
+    assert spec.point_in_time == date(2026, 9, 15)
+
+
+def test_ecfr_subpart_url_and_citation():
+    spec = ecfr.spec(title=5, subpart="2634/D", as_of=date(2026, 9, 15))
+    assert spec.canonical_url == (
+        "https://www.ecfr.gov/api/versioner/v1/full/2026-09-15/title-5.xml?part=2634&subpart=D"
+    )
+    assert spec.citation == "5 CFR 2634 subpart D"
+
+
+def test_the_three_granularities_are_three_different_documents():
+    # The point of the feature: each selector names its own document, so each gets its own pin.
+    urls = {
+        ecfr.spec(title=5, part="2640", as_of=date(2026, 9, 15)).canonical_url,
+        ecfr.spec(title=5, section="2640.202", as_of=date(2026, 9, 15)).canonical_url,
+        ecfr.spec(title=5, subpart="2634/D", as_of=date(2026, 9, 15)).canonical_url,
+    }
+    assert len(urls) == 3
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"part": "2640", "section": "2640.202"},
+        {"part": "2640", "subpart": "2634/D"},
+        {"section": "2640.202", "subpart": "2634/D"},
+    ],
+)
+def test_ecfr_selectors_are_mutually_exclusive(kwargs):
+    with pytest.raises(ValueError, match="exactly one of part/section/subpart"):
+        ecfr.spec(title=5, as_of=date(2026, 9, 15), **kwargs)
+
+
+@pytest.mark.parametrize("bad", ["2640", "abc"])
+def test_ecfr_section_must_carry_its_part(bad):
+    with pytest.raises(ValueError, match="full number like 2640.202"):
+        ecfr.spec(title=5, section=bad, as_of=date(2026, 9, 15))
+
+
+@pytest.mark.parametrize("bad", ["2634", "/D", "2634/"])
+def test_ecfr_subpart_must_be_part_slash_letter(bad):
+    with pytest.raises(ValueError, match="PART/LETTER like 2634/D"):
+        ecfr.spec(title=5, subpart=bad, as_of=date(2026, 9, 15))
+
+
+def _versions_fetch(entries):
+    def fetch(url, headers=None):
+        return json.dumps({"content_versions": entries}).encode(), "application/json"
+
+    return fetch
+
+
+AMENDMENTS = [
+    {"amendment_date": "2026-01-02", "substantive": True, "subpart": "A", "section": "2640.201"},
+    {"amendment_date": "2026-10-01", "substantive": True, "subpart": "B", "section": "2640.202"},
+    {"amendment_date": "2026-11-01", "substantive": True, "subpart": "C", "section": "2640.203"},
+]
+
+
+def test_amendment_check_narrows_to_the_pinned_section():
+    # An amendment to a sibling section must not report THIS section as amended.
+    fetch = _versions_fetch(AMENDMENTS)
+    assert ecfr.latest_amendment(5, "2640", section="2640.202", fetch=fetch) == date(2026, 10, 1)
+    assert ecfr.latest_amendment(5, "2640", section="2640.999", fetch=fetch) is None
+    # unnarrowed, the whole part takes the latest of any section
+    assert ecfr.latest_amendment(5, "2640", fetch=fetch) == date(2026, 11, 1)
+
+
+def test_amendment_check_narrows_to_the_pinned_subpart():
+    fetch = _versions_fetch(AMENDMENTS)
+    assert ecfr.latest_amendment(5, "2640", subpart="B", fetch=fetch) == date(2026, 10, 1)
+    assert ecfr.latest_amendment(5, "2640", subpart="Z", fetch=fetch) is None
+
+
+def test_amended_since_reads_the_selector_back_out_of_the_url():
+    # The record stores only a URL, so the narrowing has to survive a round trip through it.
+    spec = ecfr.spec(title=5, section="2640.202", as_of=date(2026, 9, 15))
+    source = _as_source(spec)
+    assert ecfr.amended_since(source, fetch=_versions_fetch(AMENDMENTS)) == date(2026, 10, 1)
+
+    sibling_only = [AMENDMENTS[0]]  # 2640.201 only
+    assert ecfr.amended_since(source, fetch=_versions_fetch(sibling_only)) is None

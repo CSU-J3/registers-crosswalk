@@ -398,7 +398,9 @@ def to_ledger_markdown(source: Source) -> str:
     head_bits = [b for b in (source.publisher, when.isoformat() if when else None) if b]
     head = ", ".join(head_bits) if head_bits else "undated"
     retrieved = f"Retrieved {source.artifact.fetched_at:%Y-%m-%d}"
-    if source.point_in_time is not None:
+    # Fetchers with a point in time put it in the title too ("11 CFR Part 114, as of 2026-09-14"),
+    # so appending it unconditionally printed the same date twice on one line.
+    if source.point_in_time is not None and source.point_in_time.isoformat() not in source.title:
         retrieved += f", as of {source.point_in_time.isoformat()}"
     archive_url = source.archives[0].url if source.archives else "pending"
     return (

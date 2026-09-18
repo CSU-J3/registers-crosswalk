@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0003",
+  "kind": "source",
+  "citation": "11 CFR Part 114",
+  "title": "11 CFR Part 114, as of 2026-09-14",
+  "publisher": "Office of the Federal Register",
+  "canonical_url": "https://www.ecfr.gov/api/versioner/v1/full/2026-09-14/title-11.xml?part=114",
+  "fetcher": "ecfr",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-18",
+  "point_in_time": "2026-09-14",
+  "published_at": null,
+  "artifact": {
+    "sha256": "b2959bf0e9a51e1d96695f2bbd87b0e8d5f3363ff6bea1814ca1556711aaaf2c",
+    "byte_length": 106200,
+    "media_type": "application/xml",
+    "fetched_at": "2026-09-18T22:03:42.029912Z",
+    "drift_key": "sha256",
+    "drift_value": "b2959bf0e9a51e1d96695f2bbd87b0e8d5f3363ff6bea1814ca1556711aaaf2c"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

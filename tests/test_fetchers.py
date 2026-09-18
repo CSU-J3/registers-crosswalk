@@ -747,3 +747,42 @@ def test_amended_since_reads_the_selector_back_out_of_the_url():
     # pinned after the amendment, nothing to report
     later = _as_source(ecfr.spec(title=5, section="2640.202", as_of=date(2020, 1, 1)))
     assert ecfr.amended_since(later, fetch=fetch) is None
+
+
+def test_a_removed_section_reports_under_both_narrowings():
+    """A repealed section must report through the narrowed queries, not just the part-level one.
+
+    The capture's own removed entries are all part-level appendices (`subpart: null`), so they
+    exercise the unnarrowed query alone. This mutates a copy to make 2634.401 — a real section of
+    subpart D — a removal, which is the case a section pin has to survive: a pin that cannot
+    report its own repeal is the same false negative in a different coat.
+
+    The mutation flips `removed` and moves `amendment_date`; it adds no keys, so the mutated copy
+    still satisfies the live key set.
+    """
+    struck = date(2030, 1, 1)
+    payload = json.loads(json.dumps(load_fixture("ecfr_versions_title5_part2634")))
+    entry = next(
+        v
+        for v in payload["content_versions"]
+        if v["type"] == "section" and v["identifier"] == "2634.401"
+    )
+    entry["removed"] = True
+    entry["amendment_date"] = struck.isoformat()
+
+    # the mutation stayed within the observed shape
+    assert set(entry) == LIVE_VERSION_KEYS
+    assert all(set(v) == LIVE_VERSION_KEYS for v in payload["content_versions"])
+    assert entry["subpart"] == "D"  # the section really is inside the subpart being queried
+
+    def fetch(url, headers=None):
+        return json.dumps(payload).encode(), "application/json"
+
+    # narrowed to the section itself
+    assert ecfr.latest_amendment(5, "2634", section="2634.401", fetch=fetch) == struck
+    # and narrowed to the subpart that contains it
+    assert ecfr.latest_amendment(5, "2634", subpart="D", fetch=fetch) == struck
+    # unmutated, neither query reaches that date
+    clean = _versions_fetch("ecfr_versions_title5_part2634")
+    assert ecfr.latest_amendment(5, "2634", section="2634.401", fetch=clean) == date(2019, 1, 1)
+    assert ecfr.latest_amendment(5, "2634", subpart="D", fetch=clean) == date(2019, 1, 1)

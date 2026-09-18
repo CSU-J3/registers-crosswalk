@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0004",
+  "kind": "source",
+  "citation": "60 FR 7862",
+  "title": "Expenditures; Reports by Political Committees; Personal Use of Campaign Funds",
+  "publisher": "Office of the Federal Register",
+  "canonical_url": "https://www.govinfo.gov/content/pkg/FR-1995-02-09/pdf/95-3162.pdf",
+  "fetcher": "federalregister",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-18",
+  "point_in_time": null,
+  "published_at": "1995-02-09",
+  "artifact": {
+    "sha256": "fc930b3e7d2936f00a67555f9116a5259def8e2d1c95839d4418e2e86e1a2ba9",
+    "byte_length": 193264,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-18T22:04:53.021302Z",
+    "drift_key": "sha256",
+    "drift_value": "fc930b3e7d2936f00a67555f9116a5259def8e2d1c95839d4418e2e86e1a2ba9"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

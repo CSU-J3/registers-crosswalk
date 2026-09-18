@@ -35,6 +35,15 @@ def load_fixture(stem: str) -> dict:
     return json.loads(matches[-1].read_text(encoding="utf-8"))
 
 
+def load_page(stem: str) -> bytes:
+    """Load a CAPTURED live HTML page, as bytes. Same discipline as load_fixture: captured, dated,
+    never authored, and never trimmed."""
+    matches = sorted(FIXTURES.glob(f"{stem}_*.html"))
+    if not matches:
+        raise AssertionError(f"no captured page for {stem!r} under {FIXTURES}")
+    return matches[-1].read_bytes()
+
+
 def _versions_fetch(stem: str):
     def fetch(url, headers=None):
         return json.dumps(load_fixture(stem)).encode(), "application/json"
@@ -241,15 +250,57 @@ def test_govinfo_content_request_reattaches_the_key():
 
 # --------------------------------------------------------------------------- uscode
 
-USCODE_PAGE = b"""<html><body>
-<p>Current through Pub. L. 119-20.</p>
-<p>Text contains those laws in effect on January 5, 2026</p>
-</body></html>"""
+USCODE_STEM = "uscode_page_title1_section1"
+
+# What the captured 1 U.S.C. 1 page stated on 2026-09-18. The source credit runs from a 1947
+# chapter law to a 2012 Pub. L., so it exercises both citation forms; the currency date is
+# site-wide and eight months younger than the section's own latest amendment, which is the whole
+# reason these are two different signals.
+USCODE_LAST_AMENDED = "2012-12-28"
+USCODE_CURRENCY = date(2026, 9, 17)
+
+
+def test_captured_uscode_page_carries_both_anchors_the_parser_needs():
+    # The HTML analogue of the key-set test: if OLRC drops either anchor, this is where it
+    # surfaces, and the page must be RE-CAPTURED rather than edited by hand.
+    page = load_page(USCODE_STEM)
+    assert page.count(b'class="source-credit"') == 1
+    assert b"laws in effect on" in page
+
+
+def test_uscode_drift_value_is_the_source_credits_latest_date():
+    page = load_page(USCODE_STEM)
+    assert uscode.drift_value(page) == USCODE_LAST_AMENDED
+    assert uscode.last_amended(page) == date(2012, 12, 28)
+
+
+def test_uscode_source_credit_covers_chapter_and_public_law_forms():
+    # Laws before 1957 are cited as chapters and carry no Pub. L. number, which is why the parser
+    # keys on dates rather than on Pub. L. numbers.
+    credit = uscode.source_credit(load_page(USCODE_STEM))
+    assert "July 30, 1947, ch. 388" in credit
+    assert "Pub. L. 112" in credit and "Dec. 28, 2012" in credit
+
+
+def test_uscode_drift_value_ignores_later_dates_outside_the_source_credit():
+    # The captured page carries many dates later than its credit's latest, in notes about laws
+    # that did not amend the section. Scoping to the credit is what keeps them out.
+    page = load_page(USCODE_STEM)
+    assert b"2019" in page  # notes really do cite later years
+    assert uscode.drift_value(page) == USCODE_LAST_AMENDED
+
+
+def test_uscode_raises_when_the_source_credit_is_gone():
+    page = load_page(USCODE_STEM).replace(b'class="source-credit"', b'class="gone"', 1)
+    with pytest.raises(ValueError, match="no source-credit element"):
+        uscode.drift_value(page)
 
 
 def test_uscode_spec_takes_its_point_in_time_from_the_page():
+    page = load_page(USCODE_STEM)
+
     def fetch(url, headers=None):
-        return USCODE_PAGE, "text/html"
+        return page, "text/html"
 
     spec = uscode.spec(title=52, section="30116", fetch=fetch)
     assert spec.canonical_url == (
@@ -257,9 +308,11 @@ def test_uscode_spec_takes_its_point_in_time_from_the_page():
         "&num=0&edition=prelim"
     )
     assert spec.citation == "52 U.S.C. § 30116"
-    assert spec.point_in_time == date(2026, 1, 5)
-    assert spec.drift_key == "currency_date"
-    assert spec.drift_value(USCODE_PAGE) == "2026-01-05"
+    # the point in time is still the page's own "laws in effect on" claim...
+    assert spec.point_in_time == USCODE_CURRENCY
+    # ...but the drift signal is not
+    assert spec.drift_key == "last_amended"
+    assert spec.drift_value(page) == USCODE_LAST_AMENDED
     assert spec.grade.code() == "A1"
 
 
@@ -439,7 +492,9 @@ def test_no_built_canonical_url_carries_a_key():
         govinfo.spec(
             package="X", fetch=_json_fetch(GOVINFO_SUMMARY), env={"GOVINFO_API_KEY": "SECRET"}
         ),
-        uscode.spec(title=52, section="30116", fetch=lambda u, h=None: (USCODE_PAGE, "text/html")),
+        uscode.spec(
+            title=52, section="30116", fetch=lambda u, h=None: (load_page(USCODE_STEM), "text/html")
+        ),
         openfec.spec(
             number="2023-01", fetch=_json_fetch(OPENFEC_SEARCH), env={"OPENFEC_API_KEY": "SECRET"}
         ),

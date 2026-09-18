@@ -1,0 +1,4 @@
+# Captured API responses and pages under tests/fixtures/ are EVIDENCE: byte-for-byte what the
+# live service returned. Git must never transform them, or the stored capture stops matching what
+# was captured -- see "Fixtures for external APIs" in docs/operations.md.
+tests/fixtures/** -text

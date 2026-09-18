@@ -104,10 +104,13 @@ Fetcher = Literal[
 # primary text from its publisher of record.
 Reliability = Literal["A", "B", "C", "D", "E", "F"]
 Credibility = Literal[1, 2, 3, 4, 5, 6]
-# What re-fetching compares. "sha256": the bytes must be identical. "currency_date": the markup is
-# expected to churn (uscode.house.gov re-renders), so the parsed "laws in effect on" date is the
-# stable signal and the hash is only advisory.
-DriftKey = Literal["sha256", "currency_date"]
+# What re-fetching compares. "sha256": the bytes must be identical. "last_amended": the markup is
+# expected to churn (uscode.house.gov re-renders), so the signal is the latest date in the
+# section's source credit — the parenthetical listing the enacting law and every law that amended
+# it — which moves only when a law amends that section. The hash is only advisory there.
+# "currency_date" was the uscode key until 2026-09-18, when the "laws in effect on" date it read
+# was shown to be site-wide rather than per-section; it is deliberately not accepted any more.
+DriftKey = Literal["sha256", "last_amended"]
 ArchiveService = Literal["wayback", "perma", "govinfo"]
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -173,7 +176,7 @@ class Artifact(XrModel):
     media_type: str
     fetched_at: AwareUtc
     drift_key: DriftKey = "sha256"
-    # The value re-fetching compares against: the sha256 again, or the parsed currency date.
+    # The value re-fetching compares against: the sha256 again, or the source credit's latest date.
     drift_value: str
 
 

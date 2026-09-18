@@ -263,7 +263,31 @@ def test_check_reattaches_the_key_from_env():
 
 
 USCODE_URL = "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title52-section30116&num=0&edition=prelim"
-USCODE_PAGE = b"<html><p>Text contains those laws in effect on January 5, 2026</p></html>"
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def load_page(stem: str) -> bytes:
+    """A CAPTURED live HTML page, as bytes. Captured, dated, never authored, never trimmed."""
+    matches = sorted(FIXTURES.glob(f"{stem}_*.html"))
+    if not matches:
+        raise AssertionError(f"no captured page for {stem!r} under {FIXTURES}")
+    return matches[-1].read_bytes()
+
+
+USCODE_PAGE = load_page("uscode_page_title1_section1")
+USCODE_LAST_AMENDED = "2012-12-28"
+
+
+def _append_to_source_credit(page: bytes, entry: bytes) -> bytes:
+    """Splice an entry into the captured page's source credit, just before it closes.
+
+    The credit's own text is broken up by <a> and <statuteAtLarge> tags, so a plain byte replace on
+    a date would miss. Mutating a copy of the capture is the rule; this keeps the mutation inside
+    the element it is meant to test.
+    """
+    start = page.index(b'class="source-credit"')
+    end = page.index(b"</p>", start)
+    return page[:end] + entry + page[end:]
 
 
 def _uscode_source(**over) -> Source:
@@ -272,39 +296,71 @@ def _uscode_source(**over) -> Source:
         canonical_url=USCODE_URL,
         fetcher="uscode",
         published_at=None,
-        point_in_time="2026-01-05",
+        point_in_time="2026-09-17",
         artifact={
             "sha256": sha256_hex(USCODE_PAGE),
             "byte_length": len(USCODE_PAGE),
             "media_type": "text/html",
-            "fetched_at": "2026-09-17T12:00:00Z",
-            "drift_key": "currency_date",
-            "drift_value": "2026-01-05",
+            "fetched_at": "2026-09-18T12:00:00Z",
+            "drift_key": "last_amended",
+            "drift_value": USCODE_LAST_AMENDED,
         },
         **over,
     )
 
 
-def test_uscode_check_ignores_markup_churn_when_the_currency_date_holds():
-    rerendered = (
-        b"<html><nav>new nav</nav><p>Text contains those laws in effect on January 5, 2026</p>"
-    )
+def test_uscode_check_ignores_markup_churn():
+    rerendered = USCODE_PAGE.replace(b"<body", b"<body><nav>new nav</nav>", 1)
+    rerendered += b"<!-- build 2 -->"
     report = check(_uscode_source(), fetch=_fetch(body=rerendered, media_type="text/html"), env={})
     assert report.status == "ok"
-    assert report.drift_key == "currency_date"
+    assert report.drift_key == "last_amended"
     assert sha256_hex(rerendered) != sha256_hex(USCODE_PAGE)  # the bytes really did change
 
 
-def test_uscode_check_reports_drift_when_the_currency_date_advances():
-    advanced = b"<html>Text contains those laws in effect on March 3, 2026</html>"
+def test_uscode_check_is_ok_when_only_the_currency_date_advances():
+    # The test that encodes the 2026-09-18 redesign. OLRC's "laws in effect on" date is site-wide,
+    # so it moves on their publishing schedule for sections nobody touched. Under the old
+    # currency_date key this reported DRIFT; under last_amended it must not.
+    advanced = USCODE_PAGE.replace(
+        b"laws in effect on September 17, 2026", b"laws in effect on December 1, 2026", 1
+    )
+    assert advanced != USCODE_PAGE
     report = check(_uscode_source(), fetch=_fetch(body=advanced, media_type="text/html"), env={})
+    assert report.status == "ok"
+    assert report.actual == USCODE_LAST_AMENDED
+
+
+def test_uscode_check_reports_drift_when_the_source_credit_gains_a_later_law():
+    # A law amended the section: the credit gains an entry. This is the finding worth a human.
+    amended = _append_to_source_credit(USCODE_PAGE, b"; Pub. L. 119-40, Mar. 4, 2026")
+    assert amended != USCODE_PAGE
+    report = check(_uscode_source(), fetch=_fetch(body=amended, media_type="text/html"), env={})
     assert report.status == "drift"
-    assert report.actual == "2026-03-03"
+    assert report.expected == USCODE_LAST_AMENDED
+    assert report.actual == "2026-03-04"
 
 
-def test_uscode_currency_date_parsed_from_the_page():
-    assert uscode.drift_value(USCODE_PAGE) == "2026-01-05"
-    with pytest.raises(ValueError, match="no 'laws in effect on'"):
+def test_uscode_check_ignores_a_later_date_in_a_note():
+    # Notes cite laws that did NOT amend the section. Scoping the parse to the source credit is
+    # what keeps an effective-date note from reading as an amendment.
+    note = b"<p>Amendment by Pub. L. 119-40, Mar. 4, 2026.</p></body>"
+    noted = USCODE_PAGE.replace(b"</body>", note, 1)
+    assert noted != USCODE_PAGE
+    report = check(_uscode_source(), fetch=_fetch(body=noted, media_type="text/html"), env={})
+    assert report.status == "ok"
+    assert report.actual == USCODE_LAST_AMENDED
+
+
+def test_uscode_check_errors_when_the_source_credit_is_gone():
+    gone = USCODE_PAGE.replace(b'class="source-credit"', b'class="gone"', 1)
+    report = check(_uscode_source(), fetch=_fetch(body=gone, media_type="text/html"), env={})
+    assert report.status == "error"
+
+
+def test_uscode_last_amended_parsed_from_the_page():
+    assert uscode.drift_value(USCODE_PAGE) == USCODE_LAST_AMENDED
+    with pytest.raises(ValueError, match="no source-credit element"):
         uscode.drift_value(b"<html>nothing here</html>")
 
 

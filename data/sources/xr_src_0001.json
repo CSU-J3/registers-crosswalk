@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0001",
+  "kind": "source",
+  "citation": "5 CFR 2640.202",
+  "title": "5 CFR 2640.202, as of 2026-09-15",
+  "publisher": "Office of the Federal Register",
+  "canonical_url": "https://www.ecfr.gov/api/versioner/v1/full/2026-09-15/title-5.xml?part=2640&section=2640.202",
+  "fetcher": "ecfr",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-18",
+  "point_in_time": "2026-09-15",
+  "published_at": null,
+  "artifact": {
+    "sha256": "aa628e17b1cc3e36fbfcc33624410b4e0c9330ff34132beb6ac17a220a509ab5",
+    "byte_length": 10307,
+    "media_type": "text/xml",
+    "fetched_at": "2026-09-18T18:56:07.350745Z",
+    "drift_key": "sha256",
+    "drift_value": "aa628e17b1cc3e36fbfcc33624410b4e0c9330ff34132beb6ac17a220a509ab5"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

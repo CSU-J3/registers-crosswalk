@@ -1,12 +1,15 @@
 """Federal Register — a published notice, rule or proposed rule, by FR document number.
 
-Verified live 2026-09-17:
+Verified live 2026-09-18 against FR Doc. 95-3162:
   * `/api/v1/documents/{docnum}.json` returns `pdf_url` (a govinfo.gov URL), `publication_date`,
-    `citation` ("60 FR 7862") and `title`. No API key is needed for the document endpoint.
+    `citation` ("60 FR 7862") and `title`, among 48 top-level keys. No API key is needed for the
+    document endpoint.
   * Coverage reaches back to 1995: FR Doc. 95-3162 resolves to 60 FR 7862.
-  * The `pdf_url` and the constructed govinfo fallback
-    `https://www.govinfo.gov/content/pkg/FR-{date}/pdf/{docnum}.pdf` return byte-identical PDFs,
-    so falling back does not change the hash.
+  * The fallback was NOT exercised. For this document the API's own `pdf_url` is character-for-
+    character the URL `fallback_pdf_url()` builds, so the two agree trivially and the live run says
+    nothing about a document whose `pdf_url` differs. The construction is covered by a test that
+    nulls `pdf_url` in a copy of the captured response; that it reproduces a real govinfo URL is
+    an observation about this document only.
 
 A published FR document is never amended in place: it has a `published_at` and no point_in_time.
 A later document that changes the rule is its own citation and its own pin.
@@ -24,12 +27,14 @@ from ..pin import FetchFn, PinSpec, default_fetch, sha256_hex
 NAME = "federalregister"
 HELP = "a Federal Register document by FR document number"
 DRIFT_KEY = "sha256"
-# NOT yet exercised against the live API from this tree. The endpoint behaviour recorded in the
-# docstring above came from the spec work, not from a run here, and a secondhand claim is not a
-# verification — so every record this module mints says `fetcher_verified: false` on its face.
-# Flip to True, dated the day it ran, on the first live `add` through this fetcher.
-VERIFIED = False
-VERIFIED_AT = None
+# Exercised against the live API on 2026-09-18 (UTC) through the current code path: a scratch
+# `add federalregister --document-number 95-3162` outside the repo, whose response is captured at
+# tests/fixtures/federalregister_document_95-3162_2026-09-18.json and which the tests now read.
+# Every field spec() maps was checked against that capture. The record it minted and the committed
+# xr_src_0004 hash the same 193264-byte PDF. Any further edit to spec() or its parsing resets this
+# to False — see the convention in docs/operations.md.
+VERIFIED = True
+VERIFIED_AT = date(2026, 9, 18)
 PUBLISHER = "Office of the Federal Register"
 API = "https://www.federalregister.gov/api/v1/documents/{}.json"
 

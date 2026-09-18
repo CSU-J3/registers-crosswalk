@@ -6,8 +6,15 @@ Verified live 2026-09-17: the section page carries "Text contains those laws in 
 Why `drift_key = "currency_date"` here and nowhere else: the page is re-rendered, so its bytes
 change for reasons that have nothing to do with the law (markup, navigation, ads for the next
 edition). Hashing it would cry drift every week and train the operator to ignore the check. The
-currency date changes only when OLRC advances the text, which is the thing we actually care about.
-The hash is still recorded in the artifact — it just isn't the signal.
+hash is still recorded in the artifact — it just isn't the signal.
+
+The currency date does NOT track the section, observed 2026-09-18: 52 U.S.C. § 30116 and
+1 U.S.C. § 1 both stated "laws in effect on September 17, 2026", while the latest OLRC release
+point affecting title 52 was Public Law 119-73 (2026-01-23) and the latest affecting title 1 was
+Public Law 119-103 (2026-09-02). The date is site-wide and follows OLRC's publishing schedule, so
+this key reports drift when nothing in the pinned section changed — the thing it was chosen to
+avoid. Until the key is redesigned no `uscode` pin is committed; see docs/operations.md. Nothing
+below has been changed on this account, so the module still ships unverified.
 
 For a citation that must be byte-stable, pin the signed annual edition through the `govinfo`
 fetcher instead (`USCODE-{year}-title{t}`).

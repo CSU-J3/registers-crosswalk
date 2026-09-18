@@ -431,14 +431,23 @@ def test_archive_sends_spn2_auth_when_keys_are_set():
 
 
 def test_ledger_markdown_format():
+    # The title already carries the as-of date, so the Retrieved clause must not repeat it.
     source = _pinned()
     assert to_ledger_markdown(source).splitlines() == [
         "- **Office of the Federal Register, 2026-09-14 (A1)** — 11 CFR Part 114, as of "
-        "2026-09-14. Retrieved 2026-09-17, as of 2026-09-14; "
+        "2026-09-14. Retrieved 2026-09-17; "
         f"sha256 {sha256_hex(BODY)[:16]}…; xr_src_0001.",
         f"  {ECFR_URL}",
         "  Archive: pending",
     ]
+
+
+def test_ledger_markdown_adds_as_of_when_the_title_does_not_carry_it():
+    # The other branch. A title that doesn't state its date still gets one, so the point in time
+    # is never left unsaid.
+    source = _pinned().model_copy(update={"title": "11 CFR Part 114"})
+    line = to_ledger_markdown(source).splitlines()[0]
+    assert "11 CFR Part 114. Retrieved 2026-09-17, as of 2026-09-14;" in line
 
 
 def test_ledger_markdown_uses_the_archive_when_there_is_one():

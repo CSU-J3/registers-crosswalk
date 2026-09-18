@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -369,6 +370,47 @@ def test_add_refuses_cited_in_without_archive_before_fetching(tmp_path):
         raise AssertionError("must not fetch")
 
     assert _add(tmp_path, extra=["--cited-in", "vi:vi_conflict_0001"], fetch=boom) == 1
+
+
+def test_add_refuses_a_uscode_pin_without_archive(tmp_path, capsys):
+    # uscode sets REQUIRES_ARCHIVE: its canonical URL serves whatever is current, so once the
+    # section moves only the archive copy can reproduce what was pinned.
+    def boom(url, headers=None):
+        raise AssertionError("must not fetch")
+
+    code = main(
+        ["--data-dir", str(tmp_path), "add", "uscode", "--title", "52", "--section", "30116"],
+        fetch=boom,
+        archive_fn=_ok_archive,
+    )
+    assert code == 1
+    assert "uscode pins must carry an archive copy; pass --archive" in capsys.readouterr().err
+    assert not (tmp_path / "sources").exists()
+
+
+def test_add_writes_a_uscode_pin_when_archive_is_passed(tmp_path):
+    page = (Path(__file__).parent / "fixtures").glob("uscode_page_title1_section1_*.html")
+    body = sorted(page)[-1].read_bytes()
+    code = main(
+        [
+            "--data-dir",
+            str(tmp_path),
+            "add",
+            "uscode",
+            "--title",
+            "52",
+            "--section",
+            "30116",
+            "--archive",
+        ],  # fmt: skip
+        fetch=lambda u, h=None: (body, "text/html"),
+        archive_fn=_ok_archive,
+    )
+    assert code == 0
+    record = json.loads((tmp_path / "sources" / "xr_src_0001.json").read_text(encoding="utf-8"))
+    assert record["artifact"]["drift_key"] == "last_amended"
+    assert record["artifact"]["drift_value"] == "2012-12-28"
+    assert record["archives"][0]["url"] == ARCHIVED.url
 
 
 def test_cited_in_does_not_imply_archive(tmp_path, capsys):

@@ -5,6 +5,7 @@ A fetcher module exposes:
     NAME            the Fetcher literal it implements
     HELP            one-line CLI help
     DRIFT_KEY       what re-fetching compares ("sha256" or "last_amended")
+    REQUIRES_ARCHIVE  optional; True refuses an `add` through this fetcher without --archive
     spec(...)       -> PinSpec, keyword-only, the API the tests drive
     add_arguments(parser) / spec_from_args(args, *, fetch)   the CLI adapter for spec()
     drift_value(body) -> str
@@ -68,6 +69,16 @@ def drift_value(name: str, body: bytes) -> str:
 
 def drift_key(name: str) -> DriftKey:
     return get(name).DRIFT_KEY
+
+
+def requires_archive(name: str) -> bool:
+    """Whether a pin through this fetcher is refused without --archive.
+
+    True where the canonical URL cannot reproduce what was pinned once the document moves: uscode
+    serves whatever is current, with no version axis, so an unarchived uscode pin drifts straight
+    to "DRIFT unrecoverable (no archive)".
+    """
+    return bool(getattr(get(name), "REQUIRES_ARCHIVE", False))
 
 
 def amended_since(name: str) -> Callable[..., date | None] | None:

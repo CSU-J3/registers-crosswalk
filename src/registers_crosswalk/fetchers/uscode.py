@@ -23,13 +23,13 @@ inside and no nested `<p>`. Pre-1957 laws are cited as chapters ("July 30, 1947,
 no Pub. L. number, so the parser keys on dates, in the Bluebook month forms the credit uses.
 
 What this key misses: an editorial change to the text or the notes that adds no law to the source
-credit. The archive copy is what holds the pinned text.
+credit. The archive copy is what holds the pinned text, which is why REQUIRES_ARCHIVE is set.
 
 Verification status: NOT verified live. The parser was checked against two pages captured
 2026-09-18 (52 U.S.C. 30116 -> 2014-12-16, 1 U.S.C. 1 -> 2012-12-28), and the 1 U.S.C. 1 capture is
 the fixture the tests read. That is evidence about parsing, not about minting: no record has been
-minted through this code path. The first live `add` is pending, blocked on 2026-09-18 by a
-Wayback 500 (see docs/operations.md).
+minted through this code path. The first live `add` needs `--archive` and is pending, blocked on
+2026-09-18 by a Wayback 500 (see docs/operations.md).
 
 For a citation that must be byte-stable, pin the signed annual edition through the `govinfo`
 fetcher instead (`USCODE-{year}-title{t}`).
@@ -53,6 +53,10 @@ DRIFT_KEY = "last_amended"
 # first live `add` through this fetcher.
 VERIFIED = False
 VERIFIED_AT = None
+# The canonical URL has no version axis: it serves whatever OLRC currently publishes. Once the
+# section is amended, nothing can reproduce the pinned text except the archive copy, so a pin
+# without one is refused rather than written and regretted.
+REQUIRES_ARCHIVE = True
 PUBLISHER = "Office of the Law Revision Counsel"
 VIEW = "https://uscode.house.gov/view.xhtml"
 

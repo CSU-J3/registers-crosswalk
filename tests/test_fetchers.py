@@ -433,15 +433,21 @@ def test_courtlistener_ships_unverified():
     assert spec.verified_at is None
 
 
-@pytest.mark.parametrize("module", [manual])
-def test_exercised_fetchers_ship_verified(module):
-    # Only fetchers actually run from this tree: ecfr (a live `add` on 2026-09-17) and manual
-    # (no field mapping exists to be wrong). Everything else waits for its own live run.
+@pytest.mark.parametrize(
+    ("module", "verified_on"),
+    [
+        # ecfr: a live `add` through --section/--subpart/--as-of latest on 2026-09-18 (UTC).
+        (ecfr, date(2026, 9, 18)),
+        # manual: no field mapping exists to be wrong, so nothing to exercise.
+        (manual, date(2026, 9, 17)),
+    ],
+)
+def test_exercised_fetchers_ship_verified(module, verified_on):
     assert module.VERIFIED is True
-    assert module.VERIFIED_AT == date(2026, 9, 17)
+    assert module.VERIFIED_AT == verified_on
 
 
-@pytest.mark.parametrize("module", [ecfr, federalregister, govinfo, uscode, openfec, courtlistener])
+@pytest.mark.parametrize("module", [federalregister, govinfo, uscode, openfec, courtlistener])
 def test_unexercised_fetchers_ship_unverified(module):
     # A claim recorded in a handoff or a docstring is not a verification. These flip one at a
     # time, each on its own live `add` in this tree, dated the day it ran.
@@ -475,8 +481,9 @@ def test_the_stamp_reaches_the_minted_record():
     assert verified.verified_at == date(2026, 9, 17)
 
 
-def test_ecfr_is_unverified_until_the_new_arguments_are_run_live():
-    # The convention in docs/operations.md: editing spec() voids the earlier live run.
+def test_ecfr_stamps_its_live_run_onto_every_record():
+    # The convention in docs/operations.md: editing spec() voids the run and resets this to False.
+    # It is True again because the current code path was exercised live on 2026-09-18 (UTC).
     from registers_crosswalk.pin import pin
 
     source = pin(
@@ -484,8 +491,8 @@ def test_ecfr_is_unverified_until_the_new_arguments_are_run_live():
         next_id="xr_src_0003",
         fetch=lambda u, h=None: (b"<ECFR/>", "application/xml"),
     )
-    assert source.fetcher_verified is False
-    assert source.verified_at is None
+    assert source.fetcher_verified is True
+    assert source.verified_at == date(2026, 9, 18)
 
 
 # ------------------------------------------- ecfr granularity: part / section / subpart

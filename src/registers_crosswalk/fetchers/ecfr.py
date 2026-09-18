@@ -36,11 +36,12 @@ from ..pin import FetchFn, PinSpec, default_fetch, sha256_hex
 NAME = "ecfr"
 HELP = "a CFR part, subpart or section at a point in time (eCFR versioner)"
 DRIFT_KEY = "sha256"
-# Reset to False by the convention in docs/operations.md: spec() and its URL building changed when
-# --section/--subpart landed, so the earlier live run no longer covers this code path. Flips back
-# on the first live `add` through the new arguments, dated the day it runs.
-VERIFIED = False
-VERIFIED_AT = None
+# Exercised against the live API on 2026-09-18 (UTC) through the current code path: `add ecfr
+# --section 2640.202 --as-of latest` and `--subpart 2634/D`, which resolved latest to 2026-09-15
+# and returned 10307 and 44919 bytes matching the digests recorded in data/sources/. Any further
+# edit to spec() or its parsing resets this to False — see the convention in docs/operations.md.
+VERIFIED = True
+VERIFIED_AT = date(2026, 9, 18)
 PUBLISHER = "Office of the Federal Register"
 API = "https://www.ecfr.gov/api/versioner/v1"
 # What the operator types to mean "whatever eCFR has published most recently for this title".

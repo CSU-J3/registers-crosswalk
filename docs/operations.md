@@ -153,6 +153,26 @@ rule, and it is the whole point of the field:
   parse, or a fallback. The flag records "this code path has been run against the real API", and
   the moment the code path changes, the old run no longer covers it.
 
+**How a first live run actually goes.** A verifying `add` straight into `data/` cannot work.
+`spec()` stamps the record when it is minted, the stamp is never retyped per record, and the flag
+still says `False` at that moment — so the run would verify the fetcher and leave behind a record
+saying it hadn't been. The order that does work:
+
+1. The first `add` for a fetcher runs with `--data-dir` pointed outside the repo, and every raw
+   response it reads is captured there, untrimmed and dated, per the fixture rules below.
+2. Each field `spec()` maps is checked against those captures. A mismatch is a parse bug, and
+   fixing it edits `spec()`, which voids the run — the corrected path has never been exercised.
+3. Only then do `VERIFIED` / `VERIFIED_AT` flip, to the scratch run's UTC day, and the fetcher's
+   tests move onto the captures.
+4. The real record is minted into `data/` with every date pinned rather than `latest`, and its
+   drift value is compared with the scratch record's. A difference there is a document that moved
+   between the two runs, not a working fetcher.
+5. The scratch record's fields go in the PR body. The scratch dir is evidence nobody else can
+   check, so it has to be quoted to be reviewable.
+
+`xr_src_0001` and `xr_src_0002` are how this was learned: the run that verified `ecfr` minted them
+while the module still said `False`, and they had to be re-minted before they could be committed.
+
 `manual` is `True` by a different route: a human types every field, so there is no mapping that can
 be silently wrong. That says nothing about whether they typed the *right* thing — no flag can carry
 that.
@@ -278,8 +298,23 @@ Each line is one of six statuses, and they mean genuinely different things:
 nav change, a cookie banner or a rotating build id reads as DRIFT. That is the honest answer for a
 page with no version axis, but before pinning HTML check whether the same document exists as a PDF
 or in eCFR / GovInfo / the Federal Register, and pin it there instead. `uscode` is the one HTML
-fetcher that dodges this: its drift key is the "laws in effect on" date the page states, so markup
-churn is ignored and only an actual advance of the text reports drift.
+fetcher that was meant to dodge this: its drift key is the "laws in effect on" date the page
+states, so markup churn is ignored.
+
+**That date is site-wide, not per-title — observed 2026-09-18.** 52 U.S.C. § 30116 and
+1 U.S.C. § 1 both read "laws in effect on September 17, 2026", though the latest OLRC release
+point affecting title 52 was Public Law 119-73 (2026-01-23) and the latest affecting title 1 was
+Public Law 119-103 (2026-09-02). The current release point, Public Law 119-108 (2026-09-11),
+affects titles 26, 31 and 40 — neither of theirs — and the stated date is later than it besides.
+So the date follows OLRC's publishing schedule, not the section's text, and a `uscode` pin would
+report `DRIFT` every time OLRC republishes, whether or not its section changed. That is the failure
+the drift key was chosen to avoid.
+
+**No `uscode` pin lands until that key is redesigned**, which resets `VERIFIED` when it happens.
+When one does land it carries `--archive`: once the currency date moves, the canonical URL serves
+the new text and cannot reproduce what was pinned, so an unarchived `uscode` pin drifts straight to
+`DRIFT unrecoverable (no archive)`. A Federal Register PDF is static and an eCFR point-in-time URL
+is dated, so neither needs one.
 
 ## Scheduled workflows go dark on a quiet repo
 

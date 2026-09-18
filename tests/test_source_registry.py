@@ -62,11 +62,12 @@ def test_loads_sources(tmp_path):
     assert xw.sources["xr_src_0001"].point_in_time == date(2026, 9, 14)
 
 
-def test_seed_data_dir_still_loads_with_an_empty_sources_dir():
-    # data/sources/ ships as .gitkeep only; the real data dir must still load.
+def test_real_data_dir_loads():
+    # The real data dir must load: every file parses and the id and url guards above stay quiet
+    # over it. Nothing here pins how many sources it holds or what their ids are, so `pin add`
+    # keeps working without a test edit.
     xw = Crosswalk(Path(__file__).resolve().parents[1] / "data")
     assert set(xw.nodes) == {"xr_holder_0001", "xr_org_0001"}
-    assert xw.sources == {}
 
 
 def test_duplicate_source_id_across_files_rejected(tmp_path):

@@ -352,12 +352,26 @@ def test_ecfr_check_ignores_a_cosmetic_amendment():
         {
             "content_versions": [
                 {"amendment_date": "2026-09-30", "substantive": False},
-                {"amendment_date": "2026-10-01", "substantive": True, "removed": True},
                 {"amendment_date": "2026-01-02", "substantive": True},
             ]
         }
     )
     assert check(_ecfr_source(), fetch=fetch, env={}).status == "ok"
+
+
+def test_ecfr_check_reports_a_removal_as_an_amendment():
+    # A removal is an amendment, and the most consequential kind: the pinned text no longer
+    # exists. Earlier this was filtered out alongside cosmetic edits, which read as "ok".
+    fetch = _ecfr_fetch(
+        {
+            "content_versions": [
+                {"amendment_date": "2026-10-01", "substantive": True, "removed": True},
+            ]
+        }
+    )
+    report = check(_ecfr_source(), fetch=fetch, env={})
+    assert report.status == "amended"
+    assert "2026-10-01" in report.detail
 
 
 def test_ecfr_latest_amendment_reads_the_versions_endpoint():

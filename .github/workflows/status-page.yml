@@ -1,0 +1,106 @@
+name: status-page
+# Builds the read-only status page and publishes it to GitHub Pages.
+#
+# The page is GENERATED, never committed: `build/` is gitignored, and this job is the only thing
+# that ever produces the HTML. Nothing here writes to the repository.
+#
+# The job runs the drift check and then builds the page from its JSON, so the published page and
+# this run's red/green always agree. The check step is `continue-on-error` and its exit code is
+# carried to the LAST step, which exits with it — so a drifted pin still publishes a page that
+# says so, and still fails the run. Swallowing that code would publish a red page under a green
+# check, which is the one outcome that would make the page worth less than nothing.
+#
+# `sources-drift.yml` is untouched and stays the proven weekly check; its red badge keeps its
+# meaning. This job's schedule sits twenty minutes behind that cron so the page is rebuilt just
+# after the check that people actually watch.
+#
+# WHY THIS ONE FETCHES ON `push` AND THAT ONE DOES NOT. sources-drift's header rules out per-push
+# re-fetching: a pin drifts on the publisher's schedule, not ours, and hitting every canonical URL
+# on every commit would be rude to the services and slow. That rule is kept here, not broken.
+# `push` is narrowed to `main`, so this job never runs on a PR push or on a branch — it runs when
+# a merge lands, plus the weekly schedule and manual dispatch. Development is therefore as quiet
+# against the publishers as it was before; what is added is one fetch per merge to main, which is
+# the moment the published page would otherwise start describing a tree that no longer exists.
+#
+# The alternative — publish on every push, check only weekly — was rejected because a page built
+# without a check has to SAY so, and a page that spends most of the week saying "Not checked in
+# this build" is a worse artifact than one that is checked when it changes. The two are not in
+# tension: the page never claims a check it did not run. `status` takes the verdicts from
+# `--drift-json` and from nothing else, and with no JSON it prints "Not checked in this build"
+# and no pills at all. There is no path by which a stale or assumed OK reaches the page.
+#
+# GOVINFO_API_KEY / OPENFEC_API_KEY / COURTLISTENER_TOKEN are optional repo secrets, passed for the
+# same reason `sources-drift` passes them: without one, pins through that fetcher report
+# KEY_MISSING, which is a grey pill on the page and exit 2 here. Nothing in this job archives, so
+# the Wayback keys are not needed and are deliberately absent.
+#
+# One-time setup: repo Settings -> Pages -> Source must be "GitHub Actions" or the deploy step
+# fails. Nothing else needs fixing when it does.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "20 12 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time, and never cancel one in flight: a cancelled deploy can leave the site on
+# the previous build with no indication of it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  status-page:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+
+      - name: Re-fetch pinned documents and compare
+        id: check
+        continue-on-error: true
+        env:
+          GOVINFO_API_KEY: ${{ secrets.GOVINFO_API_KEY }}
+          OPENFEC_API_KEY: ${{ secrets.OPENFEC_API_KEY }}
+          COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
+        run: |
+          mkdir -p build
+          set +e
+          python -m registers_crosswalk.pin check --json > build/drift.json
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit $code
+
+      - name: Build the status page
+        # The only step that reads data/. It never touches the network. The guard is for the one
+        # case the check cannot report through its JSON — it died before printing any — and it
+        # keeps that from costing us the page as well as the check.
+        run: |
+          args=""
+          if [ -s build/drift.json ]; then
+            args="--drift-json build/drift.json"
+          fi
+          python -m registers_crosswalk.status $args --out build/status/index.html
+
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/status
+      - id: deploy
+        uses: actions/deploy-pages@v5
+
+      - name: Exit with the drift check's code
+        run: exit ${{ steps.check.outputs.code }}

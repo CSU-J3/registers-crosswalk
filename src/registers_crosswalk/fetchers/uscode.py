@@ -27,11 +27,12 @@ no Pub. L. number, so the parser keys on dates, in the Bluebook month forms the 
 What this key misses: an editorial change to the text or the notes that adds no law to the source
 credit. The archive copy is what holds the pinned text, which is why REQUIRES_ARCHIVE is set.
 
-Verification status: NOT verified live. The parser was checked against two pages captured
-2026-09-18 (52 U.S.C. 30116 -> 2014-12-16, 1 U.S.C. 1 -> 2012-12-28), and the 1 U.S.C. 1 capture is
-the fixture the tests read. That is evidence about parsing, not about minting: no record has been
-minted through this code path. The first live `add` needs `--archive` and is pending, blocked on
-2026-09-18 by a Wayback 500 (see docs/operations.md).
+Verification status: verified live 2026-09-19 (UTC). A scratch
+`add uscode --title 52 --section 30116 --archive` outside the repo minted a record through this
+code path: `point_in_time` 2026-09-18 from the page's own currency sentence, `drift_value`
+2014-12-16 from the source credit's latest date, archived through the Wayback Machine's keyed SPN2
+job interface. Every field spec() maps was checked against the capture the run read. Any further
+edit to spec() or its parsing resets this to False — see the convention in docs/operations.md.
 
 For a citation that must be byte-stable, pin the signed annual edition through the `govinfo`
 fetcher instead (`USCODE-{year}-title{t}`).
@@ -50,11 +51,13 @@ from ..pin import FetchFn, PinSpec, default_fetch
 NAME = "uscode"
 HELP = "a U.S. Code section (OLRC prelim, uscode.house.gov)"
 DRIFT_KEY = "last_amended"
-# NOT yet exercised against the live API from this tree: a capture is not an `add`. See the
-# verification-status paragraph in the docstring above. Flip to True, dated the day it ran, on the
-# first live `add` through this fetcher.
-VERIFIED = False
-VERIFIED_AT = None
+# Exercised against the live page on 2026-09-19 (UTC) through the current code path: a scratch
+# `add uscode --title 52 --section 30116 --archive` outside the repo, which read the currency
+# sentence "laws in effect on September 18, 2026" and the § 30116 source credit ending
+# Dec. 16, 2014. The committed xr_src_0005 carries the same drift_value. Any further edit to spec()
+# or its parsing resets this to False — see the convention in docs/operations.md.
+VERIFIED = True
+VERIFIED_AT = date(2026, 9, 19)
 # The canonical URL has no version axis: it serves whatever OLRC currently publishes. Once the
 # section is amended, nothing can reproduce the pinned text except the archive copy, so a pin
 # without one is refused rather than written and regretted.

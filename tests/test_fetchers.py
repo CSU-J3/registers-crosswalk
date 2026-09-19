@@ -587,6 +587,9 @@ def test_courtlistener_ships_unverified():
         (federalregister, date(2026, 9, 18)),
         # manual: no field mapping exists to be wrong, so nothing to exercise.
         (manual, date(2026, 9, 17)),
+        # uscode: a scratch `add --title 52 --section 30116 --archive` on 2026-09-19 (UTC), the
+        # first capture this tree took through the keyed SPN2 path.
+        (uscode, date(2026, 9, 19)),
     ],
 )
 def test_exercised_fetchers_ship_verified(module, verified_on):
@@ -594,7 +597,7 @@ def test_exercised_fetchers_ship_verified(module, verified_on):
     assert module.VERIFIED_AT == verified_on
 
 
-@pytest.mark.parametrize("module", [govinfo, uscode, openfec, courtlistener])
+@pytest.mark.parametrize("module", [govinfo, openfec, courtlistener])
 def test_unexercised_fetchers_ship_unverified(module):
     # A claim recorded in a handoff or a docstring is not a verification. These flip one at a
     # time, each on its own live `add` in this tree, dated the day it ran.

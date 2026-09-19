@@ -18,6 +18,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.request
 import zlib
 from collections.abc import Callable, Iterable, Mapping
@@ -25,7 +26,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 
 from .ids import SRC_ID
 from .models import (
@@ -55,6 +56,11 @@ FetchFn = Callable[[str, Mapping[str, str] | None], tuple[bytes, str]]
 # archive() needs RESPONSE HEADERS rather than a body (Wayback answers in Content-Location), so it
 # gets its own injection point of a different shape. Same rule, different signature.
 HeadersFn = Callable[[str, Mapping[str, str] | None], Mapping[str, str]]
+# SPN2 answers in a JSON body rather than in response headers, so the keyed path needs a third
+# injection point. (url, headers, data) -> parsed JSON; `data` None is a GET, bytes is a POST.
+JsonFn = Callable[[str, Mapping[str, str] | None, bytes | None], Mapping[str, object]]
+# Polling has to wait between attempts; tests pass a fake so the suite neither sleeps nor drifts.
+SleepFn = Callable[[float], None]
 # The CLI's archiving step, injected for the same reason: tests stay offline.
 ArchiveFn = Callable[[str], "ArchiveCopy | None"]
 
@@ -213,7 +219,15 @@ def pin(
 # --------------------------------------------------------------------------- archiving
 
 _WAYBACK_SAVE = "https://web.archive.org/save/"
+# SPN2: POST the url, then poll the job. The anonymous GET above is the synchronous save path,
+# which answered 500 for the uscode section URL on 2026-09-18 (anonymous) and again on 2026-09-19
+# with keys — see docs/operations.md. SPN2 is the interface Wayback documents for keyholders.
+_WAYBACK_SPN2 = "https://web.archive.org/save"
+_WAYBACK_SPN2_STATUS = "https://web.archive.org/save/status/"
 _WAYBACK_TS = re.compile(r"/web/(\d{14})/")
+# How long to wait between polls of an SPN2 job, and the shape of the wait. Injected in tests so
+# they neither sleep nor reach the network.
+_SPN2_POLL_SECONDS = 5.0
 
 
 def _response_headers(
@@ -224,6 +238,19 @@ def _response_headers(
         return dict(resp.headers)
 
 
+def _json_call(
+    url: str,
+    headers: Mapping[str, str] | None = None,
+    data: bytes | None = None,
+    *,
+    timeout: float = 90,
+) -> Mapping[str, object]:
+    """POST (with `data`) or GET `url` and parse the JSON reply. No gzip: these bodies are tiny."""
+    req = urllib.request.Request(url, data=data, headers={"User-Agent": _UA, **(headers or {})})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 def _header(headers: Mapping[str, str], name: str) -> str | None:
     want = name.lower()
     for key, value in headers.items():
@@ -232,10 +259,63 @@ def _header(headers: Mapping[str, str], name: str) -> str | None:
     return None
 
 
+def _capture_from_timestamp(url: str, timestamp: str) -> ArchiveCopy:
+    return ArchiveCopy(
+        service="wayback",
+        url=f"https://web.archive.org/web/{timestamp}/{url}",
+        captured_at=datetime.strptime(timestamp, "%Y%m%d%H%M%S").replace(tzinfo=UTC),
+    )
+
+
+def _archive_spn2(
+    url: str,
+    auth: Mapping[str, str],
+    *,
+    json_fn: JsonFn,
+    sleep_fn: SleepFn,
+    timeout: float,
+) -> ArchiveCopy | None:
+    """Capture `url` through Wayback's SPN2 job interface: POST the url, then poll the job.
+
+    Raises nothing of its own; `archive()` owns the best-effort contract. `timeout` is the whole
+    poll budget, not a per-request one — a job that is still pending when it runs out is a failed
+    capture, the same as an error, because the caller has a pin to write or refuse now.
+    """
+    headers = {**auth, "Accept": "application/json"}
+    started = json_fn(
+        _WAYBACK_SPN2,
+        {**headers, "Content-Type": "application/x-www-form-urlencoded"},
+        urlencode({"url": url}).encode("utf-8"),
+    )
+    job_id = started.get("job_id")
+    if not job_id:
+        # SPN2 refuses some urls outright (robots, a host it will not fetch) and says so here
+        # instead of handing back a job.
+        return None
+    waited = 0.0
+    while waited < timeout:
+        sleep_fn(_SPN2_POLL_SECONDS)
+        waited += _SPN2_POLL_SECONDS
+        state = json_fn(f"{_WAYBACK_SPN2_STATUS}{job_id}", headers, None)
+        status = state.get("status")
+        if status == "pending":
+            continue
+        if status != "success":
+            # "error", or a status this code does not know: either way there is no capture.
+            return None
+        timestamp = state.get("timestamp")
+        if not timestamp:
+            return None
+        return _capture_from_timestamp(str(state.get("original_url") or url), str(timestamp))
+    return None
+
+
 def archive(
     url: str,
     *,
     headers_fn: HeadersFn | None = None,
+    json_fn: JsonFn | None = None,
+    sleep_fn: SleepFn | None = None,
     timeout: float = 90,
     env: Mapping[str, str] | None = None,
 ) -> ArchiveCopy | None:
@@ -243,19 +323,33 @@ def archive(
 
     Best-effort by design: archiving is a courtesy copy, not the pin. Any failure — service down,
     rate-limited, URL refused — returns None and never raises, so a slow archive can't cost you a
-    good fetch. With WAYBACK_ACCESS_KEY/WAYBACK_SECRET_KEY set it uses the authenticated SPN2
-    endpoint, which is rate-limited far less aggressively.
+    good fetch.
+
+    Two interfaces, chosen by whether WAYBACK_ACCESS_KEY/WAYBACK_SECRET_KEY are both set. With
+    keys, the documented SPN2 job interface: POST the url, poll the job, read `timestamp` from the
+    success reply. Without them, the anonymous synchronous save, which answers in
+    `Content-Location`. The keyed path is not merely the anonymous one with a header: sending the
+    Authorization header on that GET was tried against the uscode section URL on 2026-09-19 and
+    answered 500, as the anonymous GET had the day before.
 
     TODO: Perma.cc as a second service (needs an API key and a registrar account).
     """
     env = os.environ if env is None else env
-    fn = headers_fn or functools.partial(_response_headers, timeout=timeout)
     auth: dict[str, str] = {}
     access, secret = env.get("WAYBACK_ACCESS_KEY"), env.get("WAYBACK_SECRET_KEY")
     if access and secret:
         auth["Authorization"] = f"LOW {access}:{secret}"
     try:
-        headers = fn(f"{_WAYBACK_SAVE}{url}", auth or None)
+        if auth:
+            return _archive_spn2(
+                url,
+                auth,
+                json_fn=json_fn or functools.partial(_json_call, timeout=timeout),
+                sleep_fn=sleep_fn or time.sleep,
+                timeout=timeout,
+            )
+        fn = headers_fn or functools.partial(_response_headers, timeout=timeout)
+        headers = fn(f"{_WAYBACK_SAVE}{url}", None)
         location = _header(headers, "Content-Location")
         if not location:
             return None

@@ -4,6 +4,7 @@ import socket
 import urllib.error
 from datetime import UTC, date, datetime
 from pathlib import Path
+from urllib.parse import urlencode
 
 import pytest
 
@@ -468,19 +469,123 @@ def test_archive_returns_none_without_a_content_location():
     assert archive(ECFR_URL, headers_fn=lambda u, h=None: {"Server": "nginx"}, env={}) is None
 
 
-def test_archive_sends_spn2_auth_when_keys_are_set():
-    seen = {}
+KEYS = {"WAYBACK_ACCESS_KEY": "k", "WAYBACK_SECRET_KEY": "s"}
 
-    def headers_fn(url, headers=None):
-        seen["headers"] = headers
-        return {}
 
+def _spn2(*replies, calls=None):
+    """A fake SPN2 transport: hands back `replies` in order, recording every call."""
+    queue = list(replies)
+
+    def json_fn(url, headers=None, data=None):
+        if calls is not None:
+            calls.append((url, dict(headers or {}), data))
+        return queue.pop(0) if queue else {}
+
+    return json_fn
+
+
+def test_archive_spn2_returns_the_capture_when_the_job_succeeds():
+    copy = archive(
+        ECFR_URL,
+        json_fn=_spn2(
+            {"job_id": "spn2-abc"},
+            {"status": "success", "timestamp": "20260919120000", "original_url": ECFR_URL},
+        ),
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert copy.service == "wayback"
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+    assert copy.captured_at == datetime(2026, 9, 19, 12, 0, tzinfo=UTC)
+
+
+def test_archive_spn2_polls_until_the_job_stops_pending():
+    slept = []
+    copy = archive(
+        ECFR_URL,
+        json_fn=_spn2(
+            {"job_id": "spn2-abc"},
+            {"status": "pending"},
+            {"status": "pending"},
+            {"status": "success", "timestamp": "20260919120000"},
+        ),
+        sleep_fn=slept.append,
+        env=KEYS,
+    )
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+    assert len(slept) == 3
+
+
+def test_archive_spn2_returns_none_when_the_job_errors():
+    assert (
+        archive(
+            ECFR_URL,
+            json_fn=_spn2({"job_id": "spn2-abc"}, {"status": "error", "message": "no capture"}),
+            sleep_fn=lambda _s: None,
+            env=KEYS,
+        )
+        is None
+    )
+
+
+def test_archive_spn2_returns_none_when_the_job_never_finishes():
+    # A job still pending when the budget runs out is a failed capture: the caller has a pin to
+    # write or refuse now, and --archive refuses it rather than writing an unrecoverable one.
+    slept = []
+
+    def json_fn(url, headers=None, data=None):
+        return {"job_id": "spn2-abc"} if data is not None else {"status": "pending"}
+
+    assert archive(ECFR_URL, json_fn=json_fn, sleep_fn=slept.append, env=KEYS, timeout=20) is None
+    assert sum(slept) >= 20
+
+
+def test_archive_spn2_returns_none_when_the_post_hands_back_no_job():
+    assert (
+        archive(
+            ECFR_URL,
+            json_fn=_spn2({"message": "url refused"}),
+            sleep_fn=lambda _s: None,
+            env=KEYS,
+        )
+        is None
+    )
+
+
+def test_archive_spn2_posts_the_url_with_the_keyed_authorization():
+    calls = []
     archive(
         ECFR_URL,
-        headers_fn=headers_fn,
-        env={"WAYBACK_ACCESS_KEY": "k", "WAYBACK_SECRET_KEY": "s"},
+        json_fn=_spn2(
+            {"job_id": "spn2-abc"},
+            {"status": "success", "timestamp": "20260919120000"},
+            calls=calls,
+        ),
+        sleep_fn=lambda _s: None,
+        env=KEYS,
     )
-    assert seen["headers"] == {"Authorization": "LOW k:s"}
+    post_url, post_headers, post_data = calls[0]
+    assert post_url == "https://web.archive.org/save"
+    assert post_headers["Authorization"] == "LOW k:s"
+    assert post_headers["Accept"] == "application/json"
+    assert post_data == urlencode({"url": ECFR_URL}).encode("utf-8")
+    poll_url, poll_headers, poll_data = calls[1]
+    assert poll_url == "https://web.archive.org/save/status/spn2-abc"
+    assert poll_headers["Authorization"] == "LOW k:s"
+    assert poll_data is None
+
+
+def test_archive_without_keys_never_touches_spn2():
+    def json_fn(url, headers=None, data=None):
+        raise AssertionError("the anonymous path must not call SPN2")
+
+    copy = archive(
+        ECFR_URL,
+        headers_fn=lambda u, h=None: {"Content-Location": "/web/20260917120000/x"},
+        json_fn=json_fn,
+        env={},
+    )
+    assert copy.url == "https://web.archive.org/web/20260917120000/x"
 
 
 # --------------------------------------------------------------------------- emitting

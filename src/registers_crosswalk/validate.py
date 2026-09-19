@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from .registry import Crosswalk
+from .registry import Crosswalk, unarchived_sources, unverified_sources
 
 
 def main() -> int:
@@ -11,8 +11,8 @@ def main() -> int:
     for node in xw.nodes.values():
         refs = ", ".join(f"{r.register}:{r.local_id}({r.ref_type})" for r in node.registers)
         print(f"  {node.xr_id}  {node.canonical_name}  [{refs}]")
-    unverified = [s for s in xw.sources.values() if not s.fetcher_verified]
-    unarchived = [s for s in xw.sources.values() if not s.archives]
+    unverified = unverified_sources(xw.sources)
+    unarchived = unarchived_sources(xw.sources)
     print(
         f"ok: {len(xw.sources)} source(s), {len(unverified)} unverified-fetcher, "
         f"{len(unarchived)} unarchived"

@@ -290,6 +290,34 @@ def test_uscode_drift_value_ignores_later_dates_outside_the_source_credit():
     assert uscode.drift_value(page) == USCODE_LAST_AMENDED
 
 
+def _with_credit_entry(page: bytes, entry: bytes) -> bytes:
+    """Splice an entry into the captured page's source credit, just before it closes.
+
+    The credit's text is broken up by <a> and <statuteAtLarge> tags, so a plain byte replace on a
+    date would miss. Mutating a copy of the capture is the rule; this keeps the mutation inside the
+    element under test.
+    """
+    start = page.index(b'class="source-credit"')
+    end = page.index(b"</p>", start)
+    return page[:end] + entry + page[end:]
+
+
+def test_uscode_accepts_the_abbreviated_september_form():
+    # The credits observed on 2026-09-18 write "Sept.", but "Sep." costs nothing to accept and an
+    # unknown month form is now an error rather than a silent skip.
+    page = _with_credit_entry(load_page(USCODE_STEM), b"; Pub. L. 119-1, Sep. 30, 2020")
+    assert uscode.last_amended(page) == date(2020, 9, 30)
+
+
+def test_uscode_raises_on_a_date_it_cannot_read():
+    # The failure this guards: a month spelling the parser does not know used to vanish, which
+    # LOWERS the latest date and hides the amendment it belongs to. Now it is an ERROR, which
+    # `check` reports and a human looks at.
+    page = _with_credit_entry(load_page(USCODE_STEM), b"; Pub. L. 119-2, Frob. 1, 2030")
+    with pytest.raises(ValueError, match=r"Frob\. 1, 2030"):
+        uscode.last_amended(page)
+
+
 def test_uscode_raises_when_the_source_credit_is_gone():
     page = load_page(USCODE_STEM).replace(b'class="source-credit"', b'class="gone"', 1)
     with pytest.raises(ValueError, match="no source-credit element"):

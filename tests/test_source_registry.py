@@ -130,6 +130,95 @@ def test_two_documents_may_cite_the_same_record(tmp_path):
     assert len(Crosswalk(tmp_path).sources) == 2
 
 
+# ------------------------------------ the same document, pinned twice under a moving URL or date
+
+USC_URL = (
+    "https://uscode.house.gov/view.xhtml"
+    "?req=granuleid:USC-prelim-title52-section30116&num=0&edition=prelim"
+)
+USC_ARTIFACT = {
+    **ARTIFACT,
+    "media_type": "text/html",
+    "drift_key": "last_amended",
+    "drift_value": "2014-12-16",
+}
+
+
+def _write_uscode_pin(data: Path, xr_id: str, **over) -> None:
+    """A uscode pin, the shape the (canonical_url, point_in_time) rule cannot see a re-pin in.
+
+    That URL has no version axis and point_in_time is OLRC's site-wide "laws in effect on" date,
+    which moves every few days without the section changing. The defaults are one document:
+    52 U.S.C. § 30116, whose source credit ends Dec. 16, 2014.
+    """
+    fields = {
+        "citation": "52 U.S.C. § 30116",
+        "canonical_url": USC_URL,
+        "fetcher": "uscode",
+        "point_in_time": "2026-09-17",
+        "artifact": dict(USC_ARTIFACT),
+    }
+    fields.update(over)
+    _write_source(data, xr_id, **fields)
+
+
+def test_a_second_live_pin_of_an_unchanged_document_is_rejected(tmp_path):
+    # The hole the URL rule leaves open: neither the URL nor the date matches, and it is still one
+    # unamended section pinned twice. The citation styles differ too — the rule folds them, as
+    # resolve_source does.
+    _write_uscode_pin(tmp_path, "xr_src_0001")
+    _write_uscode_pin(
+        tmp_path,
+        "xr_src_0002",
+        citation="52 USC 30116",
+        canonical_url=USC_URL + "&f=treesort",
+        point_in_time="2026-09-19",
+    )
+    with pytest.raises(ValueError, match="is live on both xr_src_0001 and xr_src_0002"):
+        Crosswalk(tmp_path)
+
+
+def test_a_superseded_pin_does_not_collide(tmp_path):
+    # The override, and it is not a flag: naming the earlier pin makes it not live, so there is
+    # nothing left to collide with. Re-pinning an unchanged document on purpose is allowed; doing
+    # it by accident is what the rule refuses.
+    _write_uscode_pin(tmp_path, "xr_src_0001")
+    _write_uscode_pin(tmp_path, "xr_src_0002", point_in_time="2026-09-19", supersedes="xr_src_0001")
+    assert len(Crosswalk(tmp_path).sources) == 2
+
+
+def test_a_merged_loser_does_not_collide(tmp_path):
+    # Same reason by the other route: a merged_into loser was wrong, so it holds nothing.
+    _write_uscode_pin(tmp_path, "xr_src_0001", merged_into="xr_src_0002")
+    _write_uscode_pin(tmp_path, "xr_src_0002", point_in_time="2026-09-19")
+    assert len(Crosswalk(tmp_path).sources) == 2
+
+
+def test_a_changed_drift_value_is_a_new_document(tmp_path):
+    # An amended text is a new version, not a duplicate, and needs no --supersedes to be written.
+    _write_uscode_pin(tmp_path, "xr_src_0001")
+    _write_uscode_pin(
+        tmp_path,
+        "xr_src_0002",
+        point_in_time="2026-09-19",
+        artifact={**USC_ARTIFACT, "drift_value": "2026-03-04"},
+    )
+    assert len(Crosswalk(tmp_path).sources) == 2
+
+
+def test_two_sections_sharing_a_drift_value_are_not_duplicates(tmp_path):
+    # One law amends two sections, so both credits end on the same date. Their citations differ,
+    # so they are two documents. Keying on the drift value alone would have merged them.
+    _write_uscode_pin(tmp_path, "xr_src_0001")
+    _write_uscode_pin(
+        tmp_path,
+        "xr_src_0002",
+        citation="52 U.S.C. § 30118",
+        canonical_url=USC_URL.replace("section30116", "section30118"),
+    )
+    assert len(Crosswalk(tmp_path).sources) == 2
+
+
 def test_normalize_citation_folds_punctuation_and_case():
     assert normalize_citation("11 C.F.R. Part 114") == normalize_citation("11 cfr  part 114")
     assert normalize_citation("52 U.S.C. § 30116") == normalize_citation("52 USC 30116")
@@ -269,7 +358,10 @@ def _source_obj(xr_id="xr_src_0001", **over):
         "canonical_url": ECFR_URL.format("2026-09-14"),
         "fetcher": "ecfr",
         "point_in_time": "2026-09-14",
-        "artifact": dict(ARTIFACT),
+        # Distinct bytes per pin, like _write_source above: two pins that really are different
+        # documents must not collide on the same-document rule while a URL-rule test is what is
+        # being asserted. Overridable, which is how the same-document tests below make them agree.
+        "artifact": {**ARTIFACT, "sha256": xr_id[-1] * 64, "drift_value": xr_id[-1] * 64},
         "grade": dict(GRADE),
     }
     base.update(over)
@@ -331,6 +423,90 @@ def test_duplicate_of_and_the_invariant_agree_on_a_constructed_pair():
     # ...and agree that `distinct` is not
     assert duplicate_of(existing, distinct.canonical_url, distinct.point_in_time) is None
     check_source_invariants({**existing, distinct.xr_id: distinct})
+
+
+def _usc_obj(xr_id: str, **over):
+    base = {
+        "citation": "52 U.S.C. § 30116",
+        "canonical_url": USC_URL,
+        "fetcher": "uscode",
+        "point_in_time": "2026-09-17",
+        "artifact": dict(USC_ARTIFACT),
+    }
+    base.update(over)
+    return _source_obj(xr_id, **base)
+
+
+def test_pre_write_check_rejects_a_re_pin_of_an_unchanged_document():
+    # `pin add` runs this over "existing sources plus the new one", so the same-document rule
+    # reaches the write path exactly the way the URL rule does.
+    from registers_crosswalk.registry import check_source_invariants
+
+    existing = _usc_obj("xr_src_0001")
+    new = _usc_obj(
+        "xr_src_0002",
+        citation="52 USC 30116",
+        canonical_url=USC_URL + "&f=treesort",
+        point_in_time="2026-09-19",
+    )
+    with pytest.raises(ValueError, match="is live on both xr_src_0001 and xr_src_0002"):
+        check_source_invariants({existing.xr_id: existing, new.xr_id: new})
+
+
+def test_same_document_of_and_the_invariant_agree_on_a_constructed_pair():
+    # The agreement the duplicate_of test above asserts, for the second rule: whatever
+    # same_document_of() names, check_source_invariants() must refuse, and whatever it clears must
+    # load.
+    from registers_crosswalk.registry import check_source_invariants, same_document_of
+
+    first = _usc_obj("xr_src_0001")
+    repin = _usc_obj(
+        "xr_src_0002",
+        citation="52 USC 30116",
+        canonical_url=USC_URL + "&f=treesort",
+        point_in_time="2026-09-19",
+    )
+    amended = _usc_obj(
+        "xr_src_0003",
+        canonical_url=USC_URL + "&f=treesort",
+        point_in_time="2026-09-19",
+        artifact={**USC_ARTIFACT, "drift_value": "2026-03-04"},
+    )
+    existing = {first.xr_id: first}
+
+    # agree that `repin` holds the document `first` already holds
+    art = repin.artifact
+    held = same_document_of(existing, repin.citation, art.drift_key, art.drift_value)
+    assert held == "xr_src_0001"
+    with pytest.raises(ValueError, match="is live on both"):
+        check_source_invariants({**existing, repin.xr_id: repin})
+
+    # ...and agree that the amended text is a different document
+    art = amended.artifact
+    assert same_document_of(existing, amended.citation, art.drift_key, art.drift_value) is None
+    check_source_invariants({**existing, amended.xr_id: amended})
+
+
+def test_same_document_of_counts_only_live_pins():
+    from registers_crosswalk.registry import same_document_of
+
+    pinned = _usc_obj("xr_src_0001")
+    held = {pinned.xr_id: pinned}
+    assert same_document_of(held, pinned.citation, "last_amended", "2014-12-16") == "xr_src_0001"
+    assert same_document_of(held, pinned.citation, "sha256", "2014-12-16") is None
+    assert same_document_of(held, "52 U.S.C. § 30118", "last_amended", "2014-12-16") is None
+    assert same_document_of({}, pinned.citation, "last_amended", "2014-12-16") is None
+
+    # Superseded is history — reachable through as_of, never a collision. The heir is what holds
+    # the document now, so it is the id the rule names.
+    heir = _usc_obj("xr_src_0002", point_in_time="2026-09-19", supersedes="xr_src_0001")
+    chain = {pinned.xr_id: pinned, heir.xr_id: heir}
+    assert same_document_of(chain, pinned.citation, "last_amended", "2014-12-16") == "xr_src_0002"
+
+    # A merged loser was wrong, so it holds nothing.
+    loser = _usc_obj("xr_src_0001", merged_into="xr_src_0002")
+    lost = {loser.xr_id: loser}
+    assert same_document_of(lost, loser.citation, "last_amended", "2014-12-16") is None
 
 
 def test_duplicate_of_distinguishes_point_in_time():

@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
 
-from .models import Node, Source
+from .models import DriftKey, Node, Source
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 _SUBDIRS = ("holders", "orgs")
@@ -34,6 +34,45 @@ def duplicate_of(
     """
     for source in sources.values():
         if source.canonical_url == canonical_url and source.point_in_time == point_in_time:
+            return source.xr_id
+    return None
+
+
+def _superseded_ids(sources: Mapping[str, Source]) -> set[str]:
+    """The ids retired by some other pin naming them in `supersedes`."""
+    return {s.supersedes for s in sources.values() if s.supersedes is not None}
+
+
+def same_document_of(
+    sources: Mapping[str, Source], citation: str, drift_key: DriftKey, drift_value: str
+) -> str | None:
+    """The xr_id of the LIVE pin already holding this document, or None.
+
+    The second definition of "already pinned", and the one `duplicate_of` cannot see: a document is
+    the same document when its citation and its drift value agree, whatever URL or point_in_time it
+    was reached by. uscode is why this is needed — its canonical URL has no version axis and its
+    point_in_time is OLRC's site-wide "laws in effect on" date, which moves every few days without
+    the section changing, so the URL rule waves a re-pin of an unchanged section straight through.
+
+    Only LIVE pins count: `merged_into` losers were wrong, and a pin another one supersedes is
+    history, which is exactly the chain this rule must not forbid. That is also where the override
+    lives — naming a pin with `--supersedes` makes it not live, so the collision disappears. No
+    separate force flag, because superseding is the assertion the operator is actually making.
+
+    Both callers go through here — `pin add` to refuse before it archives anything, and
+    `check_source_invariants` to enforce the rule on load — so the shortcut and the authoritative
+    check cannot drift apart.
+    """
+    want = normalize_citation(citation)
+    superseded = _superseded_ids(sources)
+    for source in sources.values():
+        if source.merged_into is not None or source.xr_id in superseded:
+            continue
+        if (
+            normalize_citation(source.citation) == want
+            and source.artifact.drift_key == drift_key
+            and source.artifact.drift_value == drift_value
+        ):
             return source.xr_id
     return None
 
@@ -78,6 +117,23 @@ def check_source_invariants(
                 f"by both {other} and {source.xr_id}"
             )
         accepted[source.xr_id] = source
+    # One LIVE pin per document, decided by same_document_of for the same reason: one definition.
+    # Liveness depends on the whole set — a later pin's `supersedes` retires an earlier one, and
+    # file order says nothing about which came first — so the retired ids are computed over every
+    # source before the walk, and only live pins are tested against each other.
+    superseded = _superseded_ids(sources)
+    live: dict[str, Source] = {}
+    for source in sources.values():
+        if source.merged_into is not None or source.xr_id in superseded:
+            continue
+        artifact = source.artifact
+        other = same_document_of(live, source.citation, artifact.drift_key, artifact.drift_value)
+        if other is not None:
+            raise ValueError(
+                f"{source.citation} with {artifact.drift_key} {artifact.drift_value} is live on "
+                f"both {other} and {source.xr_id}: the same document pinned twice"
+            )
+        live[source.xr_id] = source
 
 
 class Crosswalk:

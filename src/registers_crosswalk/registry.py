@@ -38,9 +38,26 @@ def duplicate_of(
     return None
 
 
-def _superseded_ids(sources: Mapping[str, Source]) -> set[str]:
+def superseded_ids(sources: Mapping[str, Source]) -> set[str]:
     """The ids retired by some other pin naming them in `supersedes`."""
     return {s.supersedes for s in sources.values() if s.supersedes is not None}
+
+
+def unverified_sources(sources: Mapping[str, Source]) -> list[Source]:
+    """Pins minted by a fetcher whose field mapping has never been exercised against the live API.
+
+    One definition, because two readers now ask it: `validate` counts them on the terminal line and
+    the status page would otherwise re-derive the same predicate from the same field.
+    """
+    return [s for s in sources.values() if not s.fetcher_verified]
+
+
+def unarchived_sources(sources: Mapping[str, Source]) -> list[Source]:
+    """Pins with no archive copy: if the publisher replaces the document, the text is gone.
+
+    Same reason as above for living here rather than in either caller.
+    """
+    return [s for s in sources.values() if not s.archives]
 
 
 def same_document_of(
@@ -64,7 +81,7 @@ def same_document_of(
     check cannot drift apart.
     """
     want = normalize_citation(citation)
-    superseded = _superseded_ids(sources)
+    superseded = superseded_ids(sources)
     for source in sources.values():
         if source.merged_into is not None or source.xr_id in superseded:
             continue
@@ -121,7 +138,7 @@ def check_source_invariants(
     # Liveness depends on the whole set — a later pin's `supersedes` retires an earlier one, and
     # file order says nothing about which came first — so the retired ids are computed over every
     # source before the walk, and only live pins are tested against each other.
-    superseded = _superseded_ids(sources)
+    superseded = superseded_ids(sources)
     live: dict[str, Source] = {}
     for source in sources.values():
         if source.merged_into is not None or source.xr_id in superseded:

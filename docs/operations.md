@@ -334,23 +334,33 @@ what was pinned, so an unarchived `uscode` pin would go straight to `DRIFT unrec
 archive)`. A Federal Register PDF is static and an eCFR point-in-time URL is dated, so neither
 needs one.
 
-**There is still no `uscode` pin, now for a different reason.** The fetcher is unverified: the
-parser was checked against pages captured 2026-09-18, but a capture is not an `add`, and the first
-live `add` needs `--archive`. On 2026-09-18 Wayback's unauthenticated `GET /save/` answered HTTP
-500 for the § 30116 URL on three attempts, the last twenty minutes after the first.
+**`uscode` was verified live on 2026-09-19, and § 30116 is pinned.** A scratch
+`add uscode --title 52 --section 30116 --archive` outside the repo minted a record through the
+current code path — `point_in_time` 2026-09-18 from the page's own currency sentence,
+`drift_value` 2014-12-16 from the source credit's latest date — and `check` on it exited 0. The
+committed pin is `xr_src_0005`, archived, carrying the same `drift_value`. The fetcher now ships
+`VERIFIED = True`, `VERIFIED_AT = 2026-09-19`. SPN2 answered the real pin with the capture the
+scratch run had just made, so the record's `captured_at` precedes its `fetched_at`: expected, and
+not a defect, because what the archive preserves is the credit date and the text, not the bytes,
+which vary from request to request.
 
-A control save of `https://example.com` the same day returned **HTTP 429**, so a known-good URL was
-refused too. That points at anonymous rate limiting rather than at Wayback being unable to take
-this particular page, and it is consistent with this path's 500s having been seen under throttling
-before. It is not proof: the two URLs returned different statuses, and the 500 has never been
-isolated. If a later control succeeds while § 30116 still 500s, the reading flips — Wayback cannot
-take the page, and the follow-up is Perma.cc (already in `ArchiveService`, still a TODO in
-`archive()`) rather than another retry.
+**The header on the GET was not enough; `archive()` had to speak SPN2.** On 2026-09-18 Wayback's
+unauthenticated `GET /save/` answered HTTP 500 for the § 30116 URL three times over twenty minutes,
+while a control save of `https://example.com` returned 429 — that history is why the keys were
+obtained. With the keys set, the same `GET /save/` carrying `Authorization: LOW …` answered 500
+again on 2026-09-19 (`X-location: save-sync`), so the authenticated path was never a header on the
+old request. `archive()` now posts to SPN2 (`POST /save` with `url=`, then polls
+`GET /save/status/{job_id}` until `status` is `success` and reads `timestamp`) whenever both keys
+are set, and falls back to the anonymous synchronous save when they are not. The first capture
+through that path succeeded in about twenty seconds. The POST and the poll go through injectable
+callables, so the tests for success, pending-then-success, error and timeout stay offline.
 
-`WAYBACK_ACCESS_KEY` and `WAYBACK_SECRET_KEY` switch `archive()` to the authenticated SPN2
-endpoint, which is rate-limited far less aggressively. Neither is set locally, and neither belongs
-in CI: nothing in the workflows archives. Until a capture succeeds, `uscode` ships
-`VERIFIED = False` and 52 U.S.C. § 30116 stays unpinned.
+The keys live in a gitignored `.env` read into the process environment for a run. A `uscode` pin
+needs them there: `REQUIRES_ARCHIVE` refuses the pin without a capture, and the synchronous save
+path 500s for these URLs with or without an Authorization header, so an unkeyed run cannot produce
+one. Neither key belongs in CI: nothing in the workflows archives, so an unkeyed CI checkout takes
+the anonymous path and never needs it. Perma.cc stays a TODO in `archive()` rather than the next
+step — a keyed capture now works, so there is nothing for it to rescue.
 
 ## Scheduled workflows go dark on a quiet repo
 

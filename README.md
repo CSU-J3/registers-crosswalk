@@ -30,7 +30,7 @@ consuming project.
     docs/operations.md                     # runbook: tokens, API keys, drift, resolver deps, chores
     data/holders/  data/orgs/              # xr_holder_NNNN / xr_org_NNNN nodes
     data/sources/                          # xr_src_NNNN pinned documents (ships empty)
-    src/registers_crosswalk/               # pydantic models + registry + validate + pin
+    src/registers_crosswalk/               # pydantic models + registry + validate + pin + status
     src/registers_crosswalk/fetchers/      # one module per document source (eCFR, FR, GovInfo, …)
     tests/
     hooks/pre-commit                       # local cross-repo existence check (CI can't read siblings)
@@ -65,6 +65,26 @@ mapping error could be sitting in the record. `validate` counts them.
 API keys (`GOVINFO_API_KEY`, `OPENFEC_API_KEY`, `COURTLISTENER_TOKEN`) come from the environment and
 never enter a stored URL — see `docs/operations.md`, which also explains what each drift status
 means and why a quiet repo can silently stop drift-checking.
+
+## Status page
+
+    python -m registers_crosswalk.status --out build/status/index.html
+
+Generates one read-only HTML page from `data/`: every pinned document with the version that was
+pinned, its archive copy, a link to the publisher's own copy, and a button that puts its
+source-links ledger entry on the clipboard. Plus the actors resolved across registers and which
+fetchers have been run live. Add `--drift-json PATH` (the output of `pin check --json`) to stamp
+each row with the latest check; without it the page says it was not checked.
+
+It writes exactly one file, into gitignored `build/`. **The page is never committed**, the build
+never touches the network, and it never reads `.env` — only `pin check` fetches anything.
+
+`.github/workflows/status-page.yml` runs the check, builds the page from its JSON and deploys it
+to GitHub Pages on every push to `main`, twenty minutes after the weekly drift cron, and on
+`workflow_dispatch`. It exits with the check's own code, so a drifted pin is a red run *and* a red
+page rather than either alone. Published at `https://csu-j3.github.io/registers-crosswalk/`.
+One-time setup, admin only: **Settings → Pages → Source → GitHub Actions**; until that is set the
+deploy step fails and nothing else is wrong.
 
 ## Reference integrity (three layers)
 

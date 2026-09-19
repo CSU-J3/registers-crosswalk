@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0005",
+  "kind": "source",
+  "citation": "52 U.S.C. § 30116",
+  "title": "52 U.S.C. § 30116 (prelim, laws in effect on 2026-09-18)",
+  "publisher": "Office of the Law Revision Counsel",
+  "canonical_url": "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title52-section30116&num=0&edition=prelim",
+  "fetcher": "uscode",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-19",
+  "point_in_time": "2026-09-18",
+  "published_at": null,
+  "artifact": {
+    "sha256": "e9b29291a71fbf977e4edf71bd3a95547db6a693a4d528b3ca138a4d010ea2ce",
+    "byte_length": 195752,
+    "media_type": "text/html",
+    "fetched_at": "2026-09-19T19:47:17.128626Z",
+    "drift_key": "last_amended",
+    "drift_value": "2014-12-16"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260919194240/https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title52-section30116&num=0&edition=prelim",
+      "captured_at": "2026-09-19T19:42:40Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

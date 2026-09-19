@@ -156,7 +156,9 @@ Two different failures, deliberately not one field:
 
 - **`supersedes`** — the earlier pin was *right then*. 11 CFR Part 114 as of 2026-03-01 is a real
   document with a real hash; it is simply no longer current. Both pins stay valid and both stay
-  reachable: `resolve_source(citation, as_of=...)` is how you reach the older text.
+  reachable: `resolve_source(citation, as_of=...)` is how you reach the older text. It is also how
+  you re-pin an **unchanged** document on purpose: invariant 9 refuses a second live pin of one
+  document, and naming the earlier pin is the assertion that lifts it.
 - **`merged_into`** — the loser was *wrong*: a duplicate, a bad URL, a mis-keyed citation. Same
   semantics as `Node.merged_into`. Losers are excluded from resolution at every `as_of`.
 
@@ -194,10 +196,14 @@ against the same `REGISTER_ID_PATTERNS` table the actor refs use.
 7. `xr_id` matches `xr_src_\d{4}` and agrees with `kind`; `supersedes`/`merged_into` are `xr_src_`
    ids that resolve to known sources.
 8. no two sources share a `(canonical_url, point_in_time)` — that is the same bytes pinned twice.
-9. `canonical_url` is http(s) and carries **no** API key. This repo is public, so a key
-   interpolated into a stored URL would be a committed secret; fetchers store the key-free content
-   URL and re-attach the key from the environment at fetch time.
-10. the one-actor-per-`local_id` invariant does **not** apply to `cited_in`. Many documents may
+9. no two **live** sources share a `(normalize_citation(citation), drift_key, drift_value)` — that
+   is the same document pinned twice under a URL or a date that happened to differ. A source is
+   live when `merged_into` is null and no other source's `supersedes` names it, so `--supersedes`
+   is the override: naming the earlier pin retires it, and the collision is gone.
+10. `canonical_url` is http(s) and carries **no** API key. This repo is public, so a key
+    interpolated into a stored URL would be a committed secret; fetchers store the key-free content
+    URL and re-attach the key from the environment at fetch time.
+11. the one-actor-per-`local_id` invariant does **not** apply to `cited_in`. Many documents may
     cite one record, and that is normal.
 
 `cited_in` refs join the existing two reference-integrity layers for free (`iter_node_refs` yields

@@ -242,6 +242,22 @@ Consequences worth knowing:
   `check_source_invariants` still runs before the write. Both go through the same
   `duplicate_of()`, so the shortcut cannot disagree with the authority — it is one rule read
   twice, not two rules.
+- **There are two duplicate rules, and they catch different things.** Same URL at the same
+  `point_in_time` is the same *bytes* pinned twice. Same citation at the same `drift_value` — over
+  live pins only — is the same *document* pinned twice, under a URL or a date that happened to
+  differ. The second runs through `registry.same_document_of` and it too is read twice, by the
+  same `check_source_invariants` and by an early exit in `add`.
+- **Where each one runs, and why there.** The URL rule runs before `pin()` fetches, because
+  nothing the fetch could return would change its answer. The same-document rule cannot: a
+  `drift_value` is only knowable once the document has been read. So it runs *after* the fetch and
+  *before* `archive_fn` — a refused pin should still cost no Save Page Now capture, which is slow,
+  rate-limited, and leaves a public artifact behind for a record that was never written.
+- **`--supersedes` is the override, and it is not a flag.** The rule counts live pins, and naming
+  the earlier pin makes it not live. So `add ... --supersedes xr_src_NNNN` re-pins an unchanged
+  document on purpose, and the refusal message says so and names the id to pass. There is no
+  `--force` and no `--allow-duplicate`: superseding is the assertion the operator is actually
+  making. Two *different* sections that share a `drift_value` — one law amended both, so both
+  credits end on the same date — are not duplicates, because their citations differ.
 - A refused `add` may still have written the content-addressed blob to `--blob-dir`. That file
   lives outside this repo, is named by its own hash, and is rewritten identically on the retry.
 
@@ -311,7 +327,10 @@ Public Law 119-103 (2026-09-02). The current release point, Public Law 119-108 (
 affects titles 26, 31 and 40 — neither of theirs — and the stated date is later than it besides.
 So the date follows OLRC's publishing schedule, not the section's text, and a `uscode` pin would
 report `DRIFT` every time OLRC republishes, whether or not its section changed. That is the failure
-the drift key was chosen to avoid.
+the drift key was chosen to avoid. It opened a second hole on the write side: a URL with no version
+axis plus a date that moves on its own means `add uscode`, re-run after any republish, cleared the
+`(canonical_url, point_in_time)` rule and minted a second pin of an unamended section. The
+same-document rule above is what closed it.
 
 **The key was redesigned on 2026-09-18.** `uscode` now uses `last_amended`: the latest date in the
 section's source credit, the parenthetical after the text that lists the enacting law and every law

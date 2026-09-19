@@ -17,7 +17,9 @@ artifact — it just isn't the signal.
 
 Scoped to the credit element on purpose. Notes below the text cite later laws that did NOT amend
 the section (effective-date notes, termination provisions); on 2026-09-18 the 1 U.S.C. § 1 page
-carried 35 dates later than its credit's own latest. Markup observed that day, on both pages:
+carried 35 dates later than its credit's own latest. A date-shaped token whose month form this
+parser does not know is an ERROR, not a dropped date: dropping one would lower the latest date and
+hide the amendment it belongs to. Markup observed that day, on both pages:
 exactly one `<p class="source-credit">` per section page, with `<a>` and `<statuteAtLarge>` nested
 inside and no nested `<p>`. Pre-1957 laws are cited as chapters ("July 30, 1947, ch. 388") and carry
 no Pub. L. number, so the parser keys on dates, in the Bluebook month forms the credit uses.
@@ -70,12 +72,19 @@ _TAG = re.compile(rb"<[^>]+>")
 # Bluebook month forms, as the credit writes them. "May", "June" and "July" are never abbreviated.
 _MONTHS = {
     "Jan.": 1, "Feb.": 2, "Mar.": 3, "Apr.": 4, "May": 5, "June": 6,
-    "July": 7, "Aug.": 8, "Sept.": 9, "Oct.": 10, "Nov.": 11, "Dec.": 12,
+    "July": 7, "Aug.": 8, "Sept.": 9, "Sep.": 9, "Oct.": 10, "Nov.": 11, "Dec.": 12,
 }  # fmt: skip
+# "Sept." is the Bluebook form and what the credits observed on 2026-09-18 use; "Sep." is accepted
+# because it costs nothing and an unrecognised month is now an error rather than a silent skip.
+# Sept. must precede Sep. only for readability — the alternation backtracks correctly either way.
 _CREDIT_DATE = re.compile(
-    r"\b(Jan\.|Feb\.|Mar\.|Apr\.|May|June|July|Aug\.|Sept\.|Oct\.|Nov\.|Dec\.)"
+    r"\b(Jan\.|Feb\.|Mar\.|Apr\.|May|June|July|Aug\.|Sept\.|Sep\.|Oct\.|Nov\.|Dec\.)"
     r"\s+(\d{1,2}),\s+(\d{4})"
 )
+# Anything SHAPED like a credit date, whatever the month form. What _CREDIT_DATE parses must
+# account for every one of these; a leftover is a month spelling this parser does not know, and
+# silently dropping it would lower the maximum and hide an amendment.
+_DATE_SHAPED = re.compile(r"\b([A-Z][a-zA-Z]{1,4}\.?)\s+(\d{1,2}),\s+(\d{4})")
 
 
 def section_url(title: int | str, section: str) -> str:
@@ -108,10 +117,16 @@ def last_amended(body: bytes) -> date:
     on 2026-09-18, every one of them later than its credit's own latest.
     """
     credit = source_credit(body)
-    dates = [
-        date(int(year), _MONTHS[month], int(day))
-        for month, day, year in _CREDIT_DATE.findall(credit)
-    ]
+    parsed = list(_CREDIT_DATE.finditer(credit))
+    shaped = list(_DATE_SHAPED.finditer(credit))
+    if len(shaped) > len(parsed):
+        spans = {m.span() for m in parsed}
+        token = next(m.group(0) for m in shaped if m.span() not in spans)
+        raise ValueError(
+            f"unreadable date in the source credit: {token!r}. Its month form is not one this "
+            "parser knows, and dropping it would lower the latest date and hide an amendment."
+        )
+    dates = [date(int(m[3]), _MONTHS[m[1]], int(m[2])) for m in parsed]
     if not dates:
         raise ValueError(f"no dates found in the source credit: {credit[:120]!r}")
     return max(dates)

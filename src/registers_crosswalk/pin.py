@@ -46,6 +46,7 @@ from .registry import (
     check_source_invariants,
     duplicate_of,
     normalize_citation,
+    same_document_of,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -602,6 +603,34 @@ def _cmd_add(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) ->
         return 1
 
     source = pin(spec, next_id=xr_id, fetch=fetch, blob_dir=args.blob_dir)
+
+    # The other duplicate rule: the same citation at the same drift value is the same document,
+    # however its URL and point_in_time happen to read. It cannot join the early exit above,
+    # because drift_value is only known once pin() has fetched. It must still run BEFORE the
+    # archive step: a refused pin should not cost a Save Page Now capture, which is slow,
+    # rate-limited, and leaves a public artifact behind for a pin that was never written.
+    #
+    # --supersedes is applied first, because naming a pin is the whole override — it makes that pin
+    # not live, so the collision disappears. Asking over "every existing source plus this one" is
+    # the same question check_source_invariants answers below, which is why the shortcut cannot
+    # disagree with the authority; a hit on the new record's own id just means nothing else holds
+    # this document.
+    candidate = source.model_copy(update={"supersedes": args.supersedes})
+    artifact = candidate.artifact
+    held = same_document_of(
+        {**xw.sources, candidate.xr_id: candidate},
+        candidate.citation,
+        artifact.drift_key,
+        artifact.drift_value,
+    )
+    if held is not None and held != candidate.xr_id:
+        print(
+            f"{candidate.citation} with {artifact.drift_key} {artifact.drift_value} is already "
+            f"pinned as {held} and the document has not changed; pass --supersedes {held} to "
+            "chain a new pin anyway",
+            file=sys.stderr,
+        )
+        return 1
 
     archives: list[ArchiveCopy] = []
     if args.archive:

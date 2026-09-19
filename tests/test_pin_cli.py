@@ -471,3 +471,132 @@ def test_everything_add_writes_can_be_read_back(tmp_path, capsys):
     capsys.readouterr()
     assert main(["--data-dir", str(tmp_path), "ledger"], fetch=_fetch()) == 0
     assert main(["--data-dir", str(tmp_path), "check"], fetch=_fetch()) == 0
+
+
+# -------------------------- the second duplicate rule: one live pin per (citation, drift value)
+
+FIXTURES = Path(__file__).parent / "fixtures"
+USCODE_PAGE = sorted(FIXTURES.glob("uscode_page_title1_section1_*.html"))[-1].read_bytes()
+
+
+def _later_currency_date(page: bytes) -> bytes:
+    """The capture re-served with OLRC's site-wide date advanced and the credit untouched.
+
+    That is the whole footgun. "Laws in effect on" moves every few days for sections nobody
+    amended, so the (canonical_url, point_in_time) rule sees a new version where there is none.
+    """
+    moved = page.replace(
+        b"laws in effect on September 17, 2026", b"laws in effect on December 1, 2026", 1
+    )
+    assert moved != page
+    return moved
+
+
+def _amended_source_credit(page: bytes) -> bytes:
+    """The capture re-served with a law spliced into the source credit: a real amendment.
+
+    Same splice as tests/test_pin.py uses — the credit's text is broken up by <a> and
+    <statuteAtLarge> tags, so the entry goes in just before the element closes.
+    """
+    start = page.index(b'class="source-credit"')
+    end = page.index(b"</p>", start)
+    return page[:end] + b"; Pub. L. 119-40, Mar. 4, 2026" + page[end:]
+
+
+def _add_uscode(tmp_path, body, *, extra=(), archive_fn=_ok_archive, fetch=None):
+    def serve(url, headers=None):
+        return body, "text/html"
+
+    argv = [
+        "--data-dir",
+        str(tmp_path),
+        "add",
+        "uscode",
+        "--title",
+        "1",
+        "--section",
+        "1",
+        "--archive",
+        *extra,
+    ]
+    return main(argv, fetch=fetch or serve, archive_fn=archive_fn)
+
+
+def test_add_refuses_a_second_live_pin_of_an_unchanged_section(tmp_path, capsys):
+    # The footgun end to end: pin the section, wait for OLRC to republish, run the same `add`
+    # again. The URL is unchanged and the date moved, so the URL rule waves it through; the
+    # section was never amended, so this is one document about to be pinned twice.
+    assert _add_uscode(tmp_path, USCODE_PAGE) == 0
+    capsys.readouterr()
+
+    def must_not_archive(url):
+        raise AssertionError("archive was called")
+
+    code = _add_uscode(tmp_path, _later_currency_date(USCODE_PAGE), archive_fn=must_not_archive)
+    assert code == 1
+    err = capsys.readouterr().err
+    assert "1 U.S.C. § 1 with last_amended 2012-12-28 is already pinned as xr_src_0001" in err
+    assert "pass --supersedes xr_src_0001 to chain a new pin anyway" in err
+    assert _sources(tmp_path) == ["xr_src_0001.json"]
+
+
+def test_supersedes_is_how_you_re_pin_an_unchanged_section_on_purpose(tmp_path):
+    # The override falls out of the definition rather than being a flag: naming the pin makes it
+    # not live, so the collision is gone. No --force, no --allow-duplicate.
+    assert _add_uscode(tmp_path, USCODE_PAGE) == 0
+    captures = []
+
+    def counting_archive(url):
+        captures.append(url)
+        return ARCHIVED
+
+    code = _add_uscode(
+        tmp_path,
+        _later_currency_date(USCODE_PAGE),
+        extra=["--supersedes", "xr_src_0001"],
+        archive_fn=counting_archive,
+    )
+    assert code == 0
+    written = json.loads((tmp_path / "sources/xr_src_0002.json").read_text(encoding="utf-8"))
+    assert written["supersedes"] == "xr_src_0001"
+    assert written["point_in_time"] == "2026-12-01"
+    assert len(captures) == 1
+
+
+def test_an_amended_section_needs_no_supersedes(tmp_path):
+    # The credit gained a law, so the document really did change: a new version, not a duplicate.
+    # The currency date moves with it, because OLRC republishing is what carried the amendment in.
+    assert _add_uscode(tmp_path, USCODE_PAGE) == 0
+    amended = _amended_source_credit(_later_currency_date(USCODE_PAGE))
+    assert _add_uscode(tmp_path, amended) == 0
+    written = json.loads((tmp_path / "sources/xr_src_0002.json").read_text(encoding="utf-8"))
+    assert written["artifact"]["drift_value"] == "2026-03-04"
+    assert written["supersedes"] is None
+
+
+def test_the_url_rule_still_fires_first_and_before_the_hashing_fetch(tmp_path, capsys):
+    # Both rules on the table at once: same URL, same date, same document. The URL rule is the
+    # cheaper one and keeps its place — it answers before pin() fetches the bytes to hash, and
+    # before anything is archived.
+    calls = {"fetch": 0, "archive": 0}
+
+    def counting_fetch(url, headers=None):
+        calls["fetch"] += 1
+        return USCODE_PAGE, "text/html"
+
+    def counting_archive(url):
+        calls["archive"] += 1
+        return ARCHIVED
+
+    first = _add_uscode(tmp_path, USCODE_PAGE, fetch=counting_fetch, archive_fn=counting_archive)
+    assert first == 0
+    # spec() reads the currency date, then pin() fetches the bytes it hashes.
+    assert calls == {"fetch": 2, "archive": 1}
+    capsys.readouterr()
+
+    code = _add_uscode(tmp_path, USCODE_PAGE, fetch=counting_fetch, archive_fn=counting_archive)
+    assert code == 1
+    assert "at point_in_time 2026-09-17 is already pinned as xr_src_0001" in capsys.readouterr().err
+    # only spec()'s read: no second hashing fetch, no capture requested
+    assert calls == {"fetch": 3, "archive": 1}
+    assert _sources(tmp_path) == ["xr_src_0001.json"]

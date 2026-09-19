@@ -381,6 +381,34 @@ one. Neither key belongs in CI: nothing in the workflows archives, so an unkeyed
 the anonymous path and never needs it. Perma.cc stays a TODO in `archive()` rather than the next
 step — a keyed capture now works, so there is nothing for it to rescue.
 
+## The status page is generated, never committed
+
+`.github/workflows/status-page.yml` runs `pin check --json`, feeds the JSON to
+`python -m registers_crosswalk.status`, and publishes the one HTML file it writes to GitHub
+Pages. Reproduce it locally with `python -m registers_crosswalk.status --out
+build/status/index.html` (add `--drift-json` if you have a check's JSON to hand).
+
+- **Generated, not tracked.** The page lands in `build/`, which is gitignored, and in the Pages
+  artifact in CI. No HTML is committed, so there is nothing in the tree that can go stale and
+  nothing to regenerate by hand after a `pin add`.
+- **It reads two things and nothing else:** `data/` and the check's JSON. It has no fetch of its
+  own and never reads `.env`. Everything it shows is already public in this repository, which is
+  what makes publishing it a non-decision.
+- **The workflow exits with the check's code.** The check step is `continue-on-error` and its exit
+  code is carried to the last step, which re-raises it. The page is therefore built and deployed
+  whatever the check found: a red check is a red run *and* a red page at once, and the page can
+  never show green under a failing check. That is the whole reason the check and the build sit in
+  one job rather than two.
+- **A drifted pin with no archive is the row to read first.** The archive column says
+  `none, drift unrecoverable` there, because the digest has become the only surviving evidence
+  that the old text existed and it cannot say what it said. Everything above about `uscode` and
+  `REQUIRES_ARCHIVE` is aimed at never seeing that line.
+- **Pages must be switched on once, by hand:** Settings → Pages → Source → **GitHub Actions**.
+  Until then the deploy step fails and nothing else is wrong.
+- **`sources-drift.yml` is untouched.** It stays the check to watch, and its red badge keeps its
+  meaning. This job is a second reader of the same answer, not a replacement — which is also why
+  the section above still describes the only drift runbook there is.
+
 ## Scheduled workflows go dark on a quiet repo
 
 **GitHub disables a `schedule:` trigger after 60 days with no repository activity.** It does not
@@ -404,5 +432,6 @@ in the period you most need it.
 
 - **Node 20 → newer action majors.** `actions/checkout@v4` and `actions/setup-python@v5` currently
   run on Node 24 with a deprecation warning (Node 20 sunset, GitHub 2025-09-19). Bump to action
-  majors that target Node 24 across `ci.yml` and `cross-repo.yml`. Warning only, non-urgent; do it in
+  majors that target Node 24 across every workflow (`ci.yml`, `cross-repo.yml`,
+  `sources-drift.yml`, `status-page.yml`). Warning only, non-urgent; do it in
   step with the sibling repos so all four move together.

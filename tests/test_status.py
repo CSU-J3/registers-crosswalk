@@ -260,6 +260,23 @@ def test_ecfr_row_reads_as_of_and_federalregister_row_reads_published(xw):
     assert "unchanged if the PDF still hashes the same" in version
 
 
+def test_a_title_that_only_restates_the_citation_is_not_shown(xw):
+    page = _page(xw)
+    # The eCFR fixture is the hard case on purpose: its citation is punctuated "11 C.F.R. Part 114"
+    # and its title "11 CFR Part 114, as of 2026-09-14", so a raw prefix test would call them
+    # different and print the citation twice in two spellings.
+    ecfr = xw.sources["xr_src_0001"]
+    cell = _cell(_row(page, "xr_src_0001"), "document")
+    assert cell.count(html.escape(ecfr.citation, quote=True)) == 1
+    assert html.escape(ecfr.title, quote=True) not in cell
+    # uscode is the same shape, reached through § rather than through the dots.
+    uscode = xw.sources["xr_src_0005"]
+    assert html.escape(uscode.title, quote=True) not in _cell(_row(page, "xr_src_0005"), "document")
+    # The Federal Register title is the document's own name and is the one that must survive.
+    fr = xw.sources["xr_src_0004"]
+    assert html.escape(fr.title, quote=True) in _cell(_row(page, "xr_src_0004"), "document")
+
+
 # --------------------------------------------------------------------------- which pins show
 
 

@@ -25,7 +25,7 @@ from pathlib import Path
 from . import fetchers
 from .models import Node, Source
 from .pin import DriftReport, to_ledger_markdown
-from .registry import DATA_DIR, Crosswalk, superseded_ids
+from .registry import DATA_DIR, Crosswalk, normalize_citation, superseded_ids
 
 # --------------------------------------------------------------------------- fixed copy
 #
@@ -158,11 +158,31 @@ def _check_cell(report: DriftReport | None, superseded: bool) -> str:
     return f'<span class="pill pill-{tone}">{_e(label)}</span>'
 
 
+def _title_adds_anything(source: Source) -> bool:
+    """Whether the title says something the citation and the version column do not.
+
+    Most fetchers build the title as the citation plus the version qualifier — "11 CFR Part 114,
+    as of 2026-09-14", "52 U.S.C. § 30116 (prelim, laws in effect on 2026-09-18)" — and the
+    version column already prints that date, so showing the title set the citation down twice on
+    every ecfr and uscode row. A Federal Register title is the document's own name and is the case
+    this predicate exists to keep.
+
+    Compared through `normalize_citation`, not raw, because a title and its citation routinely
+    disagree on punctuation style — "11 C.F.R. Part 114" against "11 CFR Part 114, as of …" — and
+    a raw prefix test would call those two different strings and print the citation twice in two
+    spellings, which is the duplication at its worst.
+
+    A pin whose title restates its citation but which still wants a label on the page sets `notes`,
+    which prints ahead of the title and is never suppressed by this rule.
+    """
+    return not normalize_citation(source.title).startswith(normalize_citation(source.citation))
+
+
 def _document_cell(source: Source, superseded_by: str | None) -> str:
     bits = [f'<span class="cite">{_e(source.citation)}</span>']
     if source.notes:
         bits.append(f' <span class="muted">· {_e(source.notes)}</span>')
-    elif source.title != source.citation:
+    elif _title_adds_anything(source):
         bits.append(f' <span class="muted">{_e(source.title)}</span>')
     if superseded_by is not None:
         bits.append(

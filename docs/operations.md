@@ -482,6 +482,15 @@ EARLIER than `artifact.fetched_at` on a freshly written record, and a second pin
 inside that hour carries the first pin's capture. Neither is a fault; read a capture that predates
 its fetch as "this is the copy Wayback already had", not as a clock problem.
 
+Because of that, `archive()` asks first. It queries `https://archive.org/wayback/available` before
+requesting anything, and **an archive is reused only when its bytes hash to the pinned artifact** —
+fetched through the `id_` form, which serves the archived response as it was rather than wrapped in
+Wayback's toolbar. An availability hit alone is not enough: it says something was captured at that
+url, which is a different claim from "the bytes we pinned are recoverable", and a url that served a
+different document last year has a capture too. No hash, no reuse; a mismatch, no reuse; either way
+it falls through and asks Save Page Now for a real one. The probe is an optimisation, so a broken
+availability API cannot refuse a pin — it just means the long way round.
+
 **A 5xx from Wayback is retried; a 4xx is not.** `POST /save` answered 503 with an HTML "Internet
 Archive: Temporarily Offline" page at 19:22 UTC on 2026-09-20 and was serving normally by 19:23.
 Before the retry, a blip that short refused an otherwise good pin — and for `uscode`, where

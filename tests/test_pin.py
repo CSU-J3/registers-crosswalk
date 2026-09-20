@@ -4,7 +4,7 @@ import socket
 import urllib.error
 from datetime import UTC, date, datetime
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import pytest
 
@@ -679,7 +679,7 @@ def test_add_source_prints_the_reason_the_archiver_gave(tmp_path):
         data_dir=tmp_path,
         archive=True,
         fetch=_fetch(),
-        archive_fn=lambda url: ArchiveFailure("HTTP 503 from the Wayback Machine for " + url),
+        archive_fn=lambda url, **_: ArchiveFailure("HTTP 503 from the Wayback Machine for " + url),
     )
     assert outcome.status == "archive_failed"
     assert outcome.message == (
@@ -692,12 +692,210 @@ def test_add_source_keeps_the_old_wording_for_an_archiver_that_gives_no_reason(t
     """A bare None from an injected fake still reads as it always did, url and all."""
     (tmp_path / "sources").mkdir()
     outcome = add_source(
-        _spec(), data_dir=tmp_path, archive=True, fetch=_fetch(), archive_fn=lambda url: None
+        _spec(), data_dir=tmp_path, archive=True, fetch=_fetch(), archive_fn=lambda url, **_: None
     )
     assert outcome.status == "archive_failed"
     assert outcome.message == (
         f"archive step failed: no capture returned for {ECFR_URL}; nothing written"
     )
+
+
+# ------------------------------------------- reusing a capture that already holds these bytes
+
+ARCHIVED_BODY = b"%PDF-1.4 the pinned bytes"
+ARCHIVED_TS = "20260920190851"
+AVAILABLE_URL = "https://archive.org/wayback/available?url=" + quote(ECFR_URL, safe="")
+
+
+def _available(url, timestamp=ARCHIVED_TS, *, present=True):
+    """The availability API's answer, in the shape it actually returns (captured 2026-09-20)."""
+    if not present:
+        return {"url": url, "archived_snapshots": {}}
+    return {
+        "url": url,
+        "archived_snapshots": {
+            "closest": {
+                "status": "200",
+                "available": True,
+                "url": f"http://web.archive.org/web/{timestamp}/{url}",
+                "timestamp": timestamp,
+            }
+        },
+    }
+
+
+def _spn2_success(url, data):
+    if data is not None:
+        return {"job_id": "spn2-abc"}
+    return {"status": "success", "timestamp": "20260919120000"}
+
+
+def test_archive_reuses_an_existing_capture_whose_bytes_match():
+    """No Save Page Now request at all: the archive already holds exactly what we pinned.
+
+    SPN2 would not have taken a new capture anyway for anything archived in the last hour, so the
+    round trip buys nothing and spends a write against a rate-limited service.
+    """
+    calls = []
+
+    def json_fn(url, headers=None, data=None):
+        calls.append(url)
+        if url.startswith("https://archive.org/wayback/available"):
+            return _available(ECFR_URL)
+        raise AssertionError(f"Save Page Now was called: {url}")
+
+    def fetch_fn(url, headers=None):
+        calls.append(url)
+        return ARCHIVED_BODY, "application/pdf"
+
+    copy = archive(
+        ECFR_URL,
+        expected_sha256=sha256_hex(ARCHIVED_BODY),
+        json_fn=json_fn,
+        fetch_fn=fetch_fn,
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert copy.service == "wayback"
+    assert copy.url == f"https://web.archive.org/web/{ARCHIVED_TS}/{ECFR_URL}"
+    assert copy.captured_at == datetime(2026, 9, 20, 19, 8, 51, tzinfo=UTC)
+    # the availability probe, then the capture's own bytes through the id_ form, and nothing else.
+    # `id_` matters: without it Wayback serves the document wrapped in its toolbar and rewritten,
+    # which would never hash to what we pinned and would make this check always fail.
+    assert calls == [
+        AVAILABLE_URL,
+        f"https://web.archive.org/web/{ARCHIVED_TS}id_/{ECFR_URL}",
+    ]
+
+
+def test_archive_falls_through_to_spn2_when_the_existing_capture_does_not_match():
+    """A capture of that url is not the same claim as a capture of these bytes.
+
+    A url that served something else last year has a capture; reusing it would attach a
+    recoverable copy of the wrong document to the record.
+    """
+    posted = []
+
+    def json_fn(url, headers=None, data=None):
+        if url.startswith("https://archive.org/wayback/available"):
+            return _available(ECFR_URL)
+        posted.append(url)
+        return _spn2_success(url, data)
+
+    def fetch_fn(url, headers=None):
+        return b"some other document entirely", "application/pdf"
+
+    copy = archive(
+        ECFR_URL,
+        expected_sha256=sha256_hex(ARCHIVED_BODY),
+        json_fn=json_fn,
+        fetch_fn=fetch_fn,
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert posted, "SPN2 was never asked for a capture"
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+
+
+def test_archive_falls_through_to_spn2_when_there_is_no_capture():
+    posted = []
+
+    def json_fn(url, headers=None, data=None):
+        if url.startswith("https://archive.org/wayback/available"):
+            return _available(ECFR_URL, present=False)
+        posted.append(url)
+        return _spn2_success(url, data)
+
+    def fetch_fn(url, headers=None):
+        raise AssertionError("nothing to fetch: there is no capture")
+
+    copy = archive(
+        ECFR_URL,
+        expected_sha256=sha256_hex(ARCHIVED_BODY),
+        json_fn=json_fn,
+        fetch_fn=fetch_fn,
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert posted
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+
+
+def test_archive_does_not_reuse_without_a_hash_to_check_against():
+    """No hash, no reuse. Reuse is conditional on the bytes matching, and nothing would match."""
+    asked = []
+
+    def json_fn(url, headers=None, data=None):
+        asked.append(url)
+        return _spn2_success(url, data)
+
+    archive(ECFR_URL, json_fn=json_fn, sleep_fn=lambda _s: None, env=KEYS)
+    assert not any("wayback/available" in url for url in asked)
+
+
+def test_a_broken_availability_api_cannot_refuse_a_pin():
+    """The probe is an optimisation; if it dies the pin goes the long way round, as before."""
+    posted = []
+
+    def json_fn(url, headers=None, data=None):
+        if url.startswith("https://archive.org/wayback/available"):
+            raise OSError("availability api down")
+        posted.append(url)
+        return _spn2_success(url, data)
+
+    copy = archive(
+        ECFR_URL,
+        expected_sha256=sha256_hex(ARCHIVED_BODY),
+        json_fn=json_fn,
+        fetch_fn=lambda u, h=None: (b"x", "application/pdf"),
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert posted
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+
+
+def test_reuse_is_tried_on_the_anonymous_path_too():
+    """Nothing about skipping a capture depends on holding keys."""
+    calls = []
+
+    def json_fn(url, headers=None, data=None):
+        calls.append(url)
+        return _available(ECFR_URL)
+
+    def headers_fn(url, headers=None):
+        raise AssertionError("the anonymous save was called")
+
+    copy = archive(
+        ECFR_URL,
+        expected_sha256=sha256_hex(ARCHIVED_BODY),
+        json_fn=json_fn,
+        fetch_fn=lambda u, h=None: (ARCHIVED_BODY, "application/pdf"),
+        headers_fn=headers_fn,
+        sleep_fn=lambda _s: None,
+        env={},
+    )
+    assert copy.url == f"https://web.archive.org/web/{ARCHIVED_TS}/{ECFR_URL}"
+    assert calls == [AVAILABLE_URL]
+
+
+def test_add_source_hands_the_artifact_hash_to_the_archiver(tmp_path):
+    """The hash has to reach `archive()` or none of the above can happen from a real pin."""
+    (tmp_path / "sources").mkdir()
+    seen = {}
+
+    def archive_fn(url, *, expected_sha256=None):
+        seen["url"] = url
+        seen["expected_sha256"] = expected_sha256
+        return ArchiveCopy(service="wayback", url="https://web.archive.org/web/1/x")
+
+    outcome = add_source(
+        _spec(), data_dir=tmp_path, archive=True, fetch=_fetch(), archive_fn=archive_fn
+    )
+    assert outcome.status == "written"
+    assert seen["url"] == ECFR_URL
+    assert seen["expected_sha256"] == sha256_hex(BODY)
+    assert seen["expected_sha256"] == outcome.source.artifact.sha256
 
 
 # --------------------------------------------------------------------------- emitting

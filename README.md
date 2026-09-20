@@ -67,6 +67,23 @@ API keys (`GOVINFO_API_KEY`, `OPENFEC_API_KEY`, `COURTLISTENER_TOKEN`) come from
 never enter a stored URL — see `docs/operations.md`, which also explains what each drift status
 means and why a quiet repo can silently stop drift-checking.
 
+## Archiving a pin after the fact
+
+    python -m registers_crosswalk.pin archive xr_src_0006
+
+`add --archive` is all-or-nothing: the capture has to succeed or the pin is not written. That is
+right where the archive is a requirement — a `uscode` pin without one is unrecoverable the moment
+the section changes — but it means a Wayback outage can cost a good fetch of a document whose
+archive is practice rather than requirement. This is the other order: pin now, archive when the
+service is up.
+
+It does not re-fetch the document and does not re-decide anything about it. It goes through the
+same reuse-or-capture path `add` uses — an existing capture whose bytes hash to the pinned artifact
+is adopted without asking Save Page Now for anything — and rewrites only the record's `archives`
+field, so the diff is the one fact that changed. It refuses a pin that already has an archive, an
+unknown id, and a failed capture (with the reason). The console lists every pin with no archive
+copy and offers the same thing as a button.
+
 ## Finding a document
 
     python -m registers_crosswalk.pin search courtlistener "Dunne v. United States"
@@ -103,6 +120,9 @@ through the terminal, where its output is read.
 **It reads `.env` itself and never modifies the environment.** Keys are parsed into a private
 mapping that is passed to the calls that need one. The page shows only a variable's *name* and
 whether it is set, never a value.
+
+It also lists any pin with no archive copy and offers **Archive now** on each, which calls the
+same `pin archive` code path.
 
 **A pin is still a commit.** Clicking Pin writes one record to `data/sources/` and nothing more;
 the page shows the ledger entry, the manifest line, and the `git add` that starts the commit. The

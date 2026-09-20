@@ -592,14 +592,162 @@ def _latest_per_citation(xw: Crosswalk) -> list[Source]:
     return sorted(wanted.values(), key=lambda s: s.xr_id)
 
 
+@dataclass(frozen=True)
+class AddOutcome:
+    """What `add_source` did, in the shape both callers need to report it.
+
+    A frozen dataclass rather than an exception per refusal: a refusal here is an ordinary answer
+    ("that document is already pinned"), not a failure of the program, and the console has to put
+    it on a page as readily as the CLI puts it on stderr. `message` is the CLI's own wording,
+    unchanged, so the two cannot describe the same refusal differently.
+    """
+
+    status: Literal["written", "refused", "archive_failed"]
+    message: str
+    source: Source | None = None
+    path: Path | None = None
+    ledger: str | None = None
+
+
+def add_source(
+    spec: PinSpec,
+    *,
+    data_dir: Path,
+    archive: bool = False,
+    supersedes: str | None = None,
+    cited_in: list[CitationRef] | None = None,
+    notes: str | None = None,
+    blob_dir: Path | None = None,
+    fetch: FetchFn = default_fetch,
+    # Bound at definition time, where `archive` is still the module-level function; the `archive`
+    # parameter above only shadows it inside the body.
+    archive_fn: ArchiveFn = archive,
+) -> AddOutcome:
+    """Guard, fetch, archive and write one pin. The whole write side of `add`, minus argparse.
+
+    Extracted from `_cmd_add` so the console reaches the guards through the same code rather than
+    around it (working rule 5 of the console handoff). `_cmd_add` keeps only what is genuinely
+    about the command line: the two refusals that can be decided from flags alone, and turning
+    `args` into a `PinSpec`. Everything from the `duplicate_of` early exit to the write lives
+    here, and every refusal string is the one `tests/test_pin_cli.py` already asserts.
+
+    Returns rather than prints, and never calls `sys.exit`: the caller decides what a refusal
+    looks like. `archive_failed` is kept distinct from `refused` because it is the one outcome the
+    operator can fix by retrying, which is worth saying on a page with a button on it.
+    """
+    xw = Crosswalk(data_dir)
+
+    # Cheap early exit on the one refusal we can reach without doing any work: re-pinning a
+    # document version we already hold. Placed before pin() and before the archive step so a
+    # duplicate `add` costs no document fetch and — more to the point — sends no Save Page Now
+    # request to archive.org for a URL that is already pinned. It shares duplicate_of() with the
+    # authoritative check below, so it is a shortcut, not a second opinion.
+    already = duplicate_of(xw.sources, spec.canonical_url, spec.point_in_time)
+    if already is not None:
+        return AddOutcome(
+            status="refused",
+            message=(
+                f"{spec.canonical_url} at point_in_time {spec.point_in_time} is already pinned "
+                f"as {already}"
+            ),
+        )
+
+    xr_id = next_source_id(data_dir)
+    path = _sources_dir(data_dir) / f"{xr_id}.json"
+    if path.exists():
+        return AddOutcome(status="refused", message=f"refusing to overwrite {path}")
+
+    source = pin(spec, next_id=xr_id, fetch=fetch, blob_dir=blob_dir)
+
+    # The other duplicate rule: the same citation at the same drift value is the same document,
+    # however its URL and point_in_time happen to read. It cannot join the early exit above,
+    # because drift_value is only known once pin() has fetched. It must still run BEFORE the
+    # archive step: a refused pin should not cost a Save Page Now capture, which is slow,
+    # rate-limited, and leaves a public artifact behind for a pin that was never written.
+    #
+    # --supersedes is applied first, because naming a pin is the whole override — it makes that pin
+    # not live, so the collision disappears. Asking over "every existing source plus this one" is
+    # the same question check_source_invariants answers below, which is why the shortcut cannot
+    # disagree with the authority; a hit on the new record's own id just means nothing else holds
+    # this document.
+    candidate = source.model_copy(update={"supersedes": supersedes})
+    artifact = candidate.artifact
+    held = same_document_of(
+        {**xw.sources, candidate.xr_id: candidate},
+        candidate.citation,
+        artifact.drift_key,
+        artifact.drift_value,
+    )
+    if held is not None and held != candidate.xr_id:
+        return AddOutcome(
+            status="refused",
+            message=(
+                f"{candidate.citation} with {artifact.drift_key} {artifact.drift_value} is already "
+                f"pinned as {held} and the document has not changed; pass --supersedes {held} to "
+                "chain a new pin anyway"
+            ),
+        )
+
+    archives: list[ArchiveCopy] = []
+    if archive:
+        copy = archive_fn(source.canonical_url)
+        if copy is None:
+            # --archive is a requirement, not a courtesy: the caller asked for a recoverable pin
+            # and we could not make one, so there is nothing worth writing.
+            return AddOutcome(
+                status="archive_failed",
+                message=(
+                    f"archive step failed: no capture returned for {source.canonical_url}; "
+                    "nothing written"
+                ),
+            )
+        archives = [copy]
+    # pin() builds the document facts; the crosswalk facts (who cites it, what it replaces) are the
+    # caller's. Re-validate the assembled node rather than trusting model_copy, which skips it.
+    source = Source.model_validate(
+        source.model_copy(
+            update={
+                "archives": archives,
+                "cited_in": cited_in or [],
+                "supersedes": supersedes,
+                "notes": notes,
+            }
+        ).model_dump()
+    )
+
+    # The read path is the authority. Run the would-be record through exactly the invariants
+    # Crosswalk applies on load — against every existing source plus this one — so `add` can never
+    # leave behind a file that the next validate/check/ledger refuses to load. This is also where
+    # a duplicate (canonical_url, point_in_time) is caught: one rule, one implementation, one
+    # message, rather than a second copy of the check that can drift from the first.
+    try:
+        check_source_invariants({**xw.sources, source.xr_id: source}, xw.nodes)
+    except ValueError as exc:
+        return AddOutcome(status="refused", message=str(exc))
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(source.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return AddOutcome(
+        status="written",
+        message=f"wrote {path}",
+        source=source,
+        path=path,
+        ledger=to_ledger_markdown(source),
+    )
+
+
 def _cmd_add(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
+    """argparse in, exit code out. The guards and the write live in `add_source`."""
     from . import fetchers
 
-    data_dir: Path = args.data_dir
     # Refused before any network call: the load path requires a cited source to carry an archive,
     # so this combination could only ever produce a record that cannot be read back. --cited-in
     # does NOT imply --archive — archiving is a separate act with its own failure mode, and
     # silently performing it on the caller's behalf would hide that.
+    #
+    # This and the next refusal stay here rather than in add_source because both are decided from
+    # the flags alone, before there is a spec to hand over — and because both name a flag, which
+    # is a fact about the command line and not about pinning.
     if args.cited_in and not args.archive:
         print("cited sources must carry an archive copy; pass --archive", file=sys.stderr)
         return 1
@@ -613,94 +761,23 @@ def _cmd_add(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) ->
 
     module = fetchers.get(args.fetcher)
     spec = module.spec_from_args(args, fetch=fetch)
-    xw = Crosswalk(data_dir)
 
-    # Cheap early exit on the one refusal we can reach without doing any work: re-pinning a
-    # document version we already hold. Placed before pin() and before the archive step so a
-    # duplicate `add` costs no document fetch and — more to the point — sends no Save Page Now
-    # request to archive.org for a URL that is already pinned. It shares duplicate_of() with the
-    # authoritative check below, so it is a shortcut, not a second opinion.
-    already = duplicate_of(xw.sources, spec.canonical_url, spec.point_in_time)
-    if already is not None:
-        print(
-            f"{spec.canonical_url} at point_in_time {spec.point_in_time} is already pinned "
-            f"as {already}",
-            file=sys.stderr,
-        )
-        return 1
-
-    xr_id = next_source_id(data_dir)
-    path = _sources_dir(data_dir) / f"{xr_id}.json"
-    if path.exists():
-        print(f"refusing to overwrite {path}", file=sys.stderr)
-        return 1
-
-    source = pin(spec, next_id=xr_id, fetch=fetch, blob_dir=args.blob_dir)
-
-    # The other duplicate rule: the same citation at the same drift value is the same document,
-    # however its URL and point_in_time happen to read. It cannot join the early exit above,
-    # because drift_value is only known once pin() has fetched. It must still run BEFORE the
-    # archive step: a refused pin should not cost a Save Page Now capture, which is slow,
-    # rate-limited, and leaves a public artifact behind for a pin that was never written.
-    #
-    # --supersedes is applied first, because naming a pin is the whole override — it makes that pin
-    # not live, so the collision disappears. Asking over "every existing source plus this one" is
-    # the same question check_source_invariants answers below, which is why the shortcut cannot
-    # disagree with the authority; a hit on the new record's own id just means nothing else holds
-    # this document.
-    candidate = source.model_copy(update={"supersedes": args.supersedes})
-    artifact = candidate.artifact
-    held = same_document_of(
-        {**xw.sources, candidate.xr_id: candidate},
-        candidate.citation,
-        artifact.drift_key,
-        artifact.drift_value,
+    outcome = add_source(
+        spec,
+        data_dir=args.data_dir,
+        archive=args.archive,
+        supersedes=args.supersedes,
+        cited_in=args.cited_in,
+        notes=args.notes,
+        blob_dir=args.blob_dir,
+        fetch=fetch,
+        archive_fn=archive_fn,
     )
-    if held is not None and held != candidate.xr_id:
-        print(
-            f"{candidate.citation} with {artifact.drift_key} {artifact.drift_value} is already "
-            f"pinned as {held} and the document has not changed; pass --supersedes {held} to "
-            "chain a new pin anyway",
-            file=sys.stderr,
-        )
+    if outcome.status != "written":
+        print(outcome.message, file=sys.stderr)
         return 1
-
-    archives: list[ArchiveCopy] = []
-    if args.archive:
-        copy = archive_fn(source.canonical_url)
-        if copy is None:
-            # --archive is a requirement, not a courtesy: the caller asked for a recoverable pin
-            # and we could not make one, so there is nothing worth writing.
-            print(
-                f"archive step failed: no capture returned for {source.canonical_url}; "
-                "nothing written",
-                file=sys.stderr,
-            )
-            return 1
-        archives = [copy]
-    # pin() builds the document facts; the crosswalk facts (who cites it, what it replaces) are the
-    # caller's. Re-validate the assembled node rather than trusting model_copy, which skips it.
-    source = Source.model_validate(
-        source.model_copy(
-            update={"archives": archives, "cited_in": args.cited_in, "supersedes": args.supersedes}
-        ).model_dump()
-    )
-
-    # The read path is the authority. Run the would-be record through exactly the invariants
-    # Crosswalk applies on load — against every existing source plus this one — so `add` can never
-    # leave behind a file that the next validate/check/ledger refuses to load. This is also where
-    # a duplicate (canonical_url, point_in_time) is caught: one rule, one implementation, one
-    # message, rather than a second copy of the check that can drift from the first.
-    try:
-        check_source_invariants({**xw.sources, source.xr_id: source}, xw.nodes)
-    except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(source.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    print(f"wrote {path}")
-    print(to_ledger_markdown(source))
+    print(outcome.message)
+    print(outcome.ledger)
     return 0
 
 
@@ -818,6 +895,12 @@ def _build_parser() -> argparse.ArgumentParser:
         )
         fetcher_parser.add_argument(
             "--supersedes", type=_src_id_arg, default=None, metavar="xr_src_NNNN"
+        )
+        fetcher_parser.add_argument(
+            "--notes",
+            default=None,
+            metavar="TEXT",
+            help="a plain-language label; the status page prints it ahead of the title",
         )
         fetcher_parser.add_argument(
             "--cited-in",

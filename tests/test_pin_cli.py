@@ -9,11 +9,11 @@ from registers_crosswalk.pin import main, sha256_hex
 ARCHIVED = ArchiveCopy(service="wayback", url="https://web.archive.org/web/1/x")
 
 
-def _ok_archive(url):
+def _ok_archive(url, **_):
     return ARCHIVED
 
 
-def _failing_archive(url):
+def _failing_archive(url, **_):
     return None  # archive() never raises; it returns None on any failure
 
 
@@ -451,7 +451,7 @@ def test_duplicate_costs_no_fetch_and_no_archive(tmp_path, capsys):
         calls["fetch"] += 1
         return BODY, "application/pdf"
 
-    def counting_archive(url):
+    def counting_archive(url, **_):
         calls["archive"] += 1
         return ARCHIVED
 
@@ -534,7 +534,7 @@ def test_add_refuses_a_second_live_pin_of_an_unchanged_section(tmp_path, capsys)
     assert _add_uscode(tmp_path, USCODE_PAGE) == 0
     capsys.readouterr()
 
-    def must_not_archive(url):
+    def must_not_archive(url, **_):
         raise AssertionError("archive was called")
 
     code = _add_uscode(tmp_path, _later_currency_date(USCODE_PAGE), archive_fn=must_not_archive)
@@ -551,7 +551,7 @@ def test_supersedes_is_how_you_re_pin_an_unchanged_section_on_purpose(tmp_path):
     assert _add_uscode(tmp_path, USCODE_PAGE) == 0
     captures = []
 
-    def counting_archive(url):
+    def counting_archive(url, **_):
         captures.append(url)
         return ARCHIVED
 
@@ -589,7 +589,7 @@ def test_the_url_rule_still_fires_first_and_before_the_hashing_fetch(tmp_path, c
         calls["fetch"] += 1
         return USCODE_PAGE, "text/html"
 
-    def counting_archive(url):
+    def counting_archive(url, **_):
         calls["archive"] += 1
         return ARCHIVED
 

@@ -67,7 +67,11 @@ SleepFn = Callable[[float], None]
 # The CLI's archiving step, injected for the same reason: tests stay offline. `archive()` answers
 # an ArchiveFailure when there is no capture; a plain None is still accepted from an injected fake
 # and normalised by `add_source`, so a test double stays a one-liner.
-ArchiveFn = Callable[[str], "ArchiveCopy | ArchiveFailure | None"]
+#
+# Called as `archive_fn(url, expected_sha256=...)`. The hash is what lets an already-archived
+# document skip Save Page Now, and it is keyword-only so a fake that does not care can take
+# `**_` and ignore it.
+ArchiveFn = Callable[..., "ArchiveCopy | ArchiveFailure | None"]
 
 _UA = "registers-crosswalk/0.1 (+https://github.com/CSU-J3/registers-crosswalk)"
 # eCFR's versioner returns 406 without an Accept-Encoding the client will take (verified
@@ -262,6 +266,9 @@ _SPN2_POLL_SECONDS = 5.0
 # "Temporarily Offline" blips are short — one on 2026-09-20 was over inside a minute — so the
 # schedule is shaped to outlast one without making a failed pin take appreciably longer to fail.
 _ARCHIVE_RETRY_WAITS: tuple[float, ...] = (10.0, 20.0, 30.0)
+# Where to ask whether a capture already exists. Read-only, and not part of Save Page Now:
+# asking costs nothing and takes no capture.
+_WAYBACK_AVAILABLE = "https://archive.org/wayback/available"
 
 
 def _response_headers(
@@ -352,6 +359,50 @@ def _retrying(
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+def _existing_capture(
+    url: str,
+    expected_sha256: str,
+    *,
+    json_fn: JsonFn,
+    fetch_fn: FetchFn,
+) -> ArchiveCopy | None:
+    """A capture Wayback already holds whose BYTES are the ones we pinned, or None.
+
+    Asking first is worth a request because Save Page Now will not take a new capture of a url it
+    captured in the last hour anyway — it answers `success` with the older capture's timestamp
+    (observed 2026-09-20: `duration_sec: 0.52`, `resources: []`, nothing fetched). So for a
+    document already in the archive, the SPN2 round trip buys nothing and costs a write against a
+    rate-limited service. This route skips it.
+
+    The hash is the whole safety of it. An availability hit says only that SOMETHING was captured
+    at that url, which is a different claim from "the bytes we pinned are recoverable" — a url
+    that served a different document last year has a capture, and reusing it would attach a
+    recoverable copy of the wrong thing to the record. So the capture's own bytes are fetched
+    through the `id_` form (which serves the original response, without Wayback's banner or any
+    rewriting) and hashed, and anything but an exact match falls through to a real capture.
+
+    Best-effort in both directions: any failure here returns None and the caller asks SPN2, which
+    is what it would have done anyway. A broken availability API must not be able to refuse a pin.
+    """
+    try:
+        payload = json_fn(f"{_WAYBACK_AVAILABLE}?{urlencode({'url': url})}", None, None)
+        snapshot = ((payload.get("archived_snapshots") or {}) or {}).get("closest") or {}
+        if not isinstance(snapshot, Mapping):
+            return None
+        timestamp = snapshot.get("timestamp")
+        if not snapshot.get("available") or not timestamp:
+            return None
+        # `id_` asks for the archived response as it was served. Without it Wayback returns the
+        # document wrapped in its own toolbar and with links rewritten, which would never hash to
+        # what we pinned and would make this check always fail.
+        body, _ = fetch_fn(f"https://web.archive.org/web/{timestamp}id_/{url}", None)
+    except Exception:  # noqa: BLE001 - an optimisation may not raise; fall through to SPN2
+        return None
+    if sha256_hex(body) != expected_sha256:
+        return None
+    return _capture_from_timestamp(url, str(timestamp))
+
+
 def _archive_spn2(
     url: str,
     auth: Mapping[str, str],
@@ -410,8 +461,10 @@ def _archive_spn2(
 def archive(
     url: str,
     *,
+    expected_sha256: str | None = None,
     headers_fn: HeadersFn | None = None,
     json_fn: JsonFn | None = None,
+    fetch_fn: FetchFn | None = None,
     sleep_fn: SleepFn | None = None,
     timeout: float = 90,
     env: Mapping[str, str] | None = None,
@@ -422,6 +475,10 @@ def archive(
     or broken archive can't cost you a good fetch — but every failure now says what it was, so
     `add_source` can print a reason the operator can act on rather than one sentence for all of
     them. A transient 5xx is retried first; see `_retrying`.
+
+    With `expected_sha256`, an existing capture whose bytes hash to it is returned as-is and no
+    capture is requested at all — see `_existing_capture`. Without it there is no reuse, because
+    reuse is conditional on the bytes matching and there would be nothing to match them against.
 
     Two interfaces, chosen by whether WAYBACK_ACCESS_KEY/WAYBACK_SECRET_KEY are both set. With
     keys, the documented SPN2 job interface: POST the url, poll the job, read `timestamp` from the
@@ -438,6 +495,21 @@ def archive(
     """
     env = os.environ if env is None else env
     sleep_fn = sleep_fn or time.sleep
+    json_call = json_fn or functools.partial(_json_call, timeout=timeout)
+
+    # Ask before asking for a capture. Only with a hash to check it against: an archive is reused
+    # when its BYTES are the ones we pinned, never merely because a capture of that url exists.
+    # Without `expected_sha256` there is nothing to check, so there is no reuse.
+    if expected_sha256:
+        existing = _existing_capture(
+            url,
+            expected_sha256,
+            json_fn=json_call,
+            fetch_fn=fetch_fn or functools.partial(default_fetch, timeout=timeout),
+        )
+        if existing is not None:
+            return existing
+
     auth: dict[str, str] = {}
     access, secret = env.get("WAYBACK_ACCESS_KEY"), env.get("WAYBACK_SECRET_KEY")
     if access and secret:
@@ -447,7 +519,7 @@ def archive(
             return _archive_spn2(
                 url,
                 auth,
-                json_fn=json_fn or functools.partial(_json_call, timeout=timeout),
+                json_fn=json_call,
                 sleep_fn=sleep_fn,
                 timeout=timeout,
             )
@@ -770,7 +842,9 @@ def add_source(
 
     archives: list[ArchiveCopy] = []
     if archive:
-        result = archive_fn(source.canonical_url)
+        # The hash goes with the request so `archive()` can recognise a capture that already
+        # holds these exact bytes and skip asking for a new one.
+        result = archive_fn(source.canonical_url, expected_sha256=source.artifact.sha256)
         if not isinstance(result, ArchiveCopy):
             # --archive is a requirement, not a courtesy: the caller asked for a recoverable pin
             # and we could not make one, so there is nothing worth writing. What differs now is

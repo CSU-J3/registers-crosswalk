@@ -85,7 +85,7 @@ def cl_fetch(cluster=None, document=PDF_BYTES):
 def fake_archive():
     calls = []
 
-    def archive_fn(url):
+    def archive_fn(url, **_):
         calls.append(url)
         return ArchiveCopy(service="wayback", url=f"https://web.archive.org/web/1/{url}")
 

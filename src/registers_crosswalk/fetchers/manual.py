@@ -13,6 +13,7 @@ and get a stable hash.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from datetime import date
 
 from ..models import Credibility, Grade, Reliability
@@ -72,7 +73,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--credibility", type=int, default=2, choices=(1, 2, 3, 4, 5, 6))
 
 
-def spec_from_args(args: argparse.Namespace, *, fetch: FetchFn = default_fetch) -> PinSpec:
+def spec_from_args(
+    args: argparse.Namespace,
+    *,
+    fetch: FetchFn = default_fetch,
+    env: Mapping[str, str] | None = None,
+) -> PinSpec:
     del fetch  # nothing to look up; the caller already knows everything
     return spec(
         url=args.url,

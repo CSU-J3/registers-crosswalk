@@ -104,5 +104,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def spec_from_args(args: argparse.Namespace, *, fetch: FetchFn = default_fetch) -> PinSpec:
-    return spec(package=args.package, granule=args.granule, citation=args.citation, fetch=fetch)
+def spec_from_args(
+    args: argparse.Namespace,
+    *,
+    fetch: FetchFn = default_fetch,
+    env: Mapping[str, str] | None = None,
+) -> PinSpec:
+    return spec(
+        package=args.package, granule=args.granule, citation=args.citation, fetch=fetch, env=env
+    )

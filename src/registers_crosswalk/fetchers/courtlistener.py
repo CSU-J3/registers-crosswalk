@@ -288,5 +288,10 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--citation", default=None, help="override the reporter citation")
 
 
-def spec_from_args(args: argparse.Namespace, *, fetch: FetchFn = default_fetch) -> PinSpec:
-    return spec(cluster_id=args.cluster_id, citation=args.citation, fetch=fetch)
+def spec_from_args(
+    args: argparse.Namespace,
+    *,
+    fetch: FetchFn = default_fetch,
+    env: Mapping[str, str] | None = None,
+) -> PinSpec:
+    return spec(cluster_id=args.cluster_id, citation=args.citation, fetch=fetch, env=env)

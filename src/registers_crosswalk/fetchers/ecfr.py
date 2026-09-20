@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from collections.abc import Mapping
 from datetime import date
 
 from ..models import Grade, Source
@@ -251,7 +252,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def spec_from_args(args: argparse.Namespace, *, fetch: FetchFn = default_fetch) -> PinSpec:
+def spec_from_args(
+    args: argparse.Namespace,
+    *,
+    fetch: FetchFn = default_fetch,
+    env: Mapping[str, str] | None = None,
+) -> PinSpec:
     # `fetch` is used only when --as-of is "latest"; a concrete date needs no metadata call.
     return spec(
         title=args.title,

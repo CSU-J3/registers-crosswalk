@@ -5,9 +5,12 @@ A fetcher module exposes:
     NAME            the Fetcher literal it implements
     HELP            one-line CLI help
     DRIFT_KEY       what re-fetching compares ("sha256" or "last_amended")
+    VERIFIED        whether this fetcher has been run live against the real endpoint
+    VERIFIED_AT     the date of that run, or None
+    ENV_KEY         optional; the environment variable holding this fetcher's API key
     REQUIRES_ARCHIVE  optional; True refuses an `add` through this fetcher without --archive
     spec(...)       -> PinSpec, keyword-only, the API the tests drive
-    add_arguments(parser) / spec_from_args(args, *, fetch)   the CLI adapter for spec()
+    add_arguments(parser) / spec_from_args(args, *, fetch, env)   the CLI adapter for spec()
     drift_value(body) -> str
     content_request(url, *, env) -> (url, headers)   optional; re-attaches an API key at fetch time
     amended_since(source, *, fetch) -> date | None   optional; eCFR only
@@ -17,6 +20,11 @@ A fetcher that can look a document UP as well as fetch it also exposes:
     SEARCH_TYPES    the --type values its search accepts; absent means it has no search
     search(query, *, doc_type, fetch, env) -> list[SearchHit]
     add_command(hit, doc_type) -> str | None   the `pin add` that would pin that hit
+
+`spec_from_args` takes `env` on every module, whether or not its `spec()` reads a key from one, so
+a caller can hand the adapter a private mapping without knowing which fetchers need one. None means
+`os.environ`, which is what the CLI passes. `registers_crosswalk.console` passes the `.env` it read
+itself, so running the console never modifies the process environment.
 
 Every metadata call goes through the same injectable `FetchFn` the pin itself uses, so tests never
 touch the network. Endpoint behaviour recorded in these modules was verified live on 2026-09-17

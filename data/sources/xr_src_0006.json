@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0006",
+  "kind": "source",
+  "citation": "138 F.2d 137",
+  "title": "Dunne v. United States",
+  "publisher": "Court of Appeals for the Eighth Circuit",
+  "canonical_url": "https://storage.courtlistener.com/harvard_pdf/1481640.pdf",
+  "fetcher": "courtlistener",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-20",
+  "point_in_time": null,
+  "published_at": "1943-09-20",
+  "artifact": {
+    "sha256": "c87c69e04dd526fa2bf8958a68ab2b1f40904c0442329a65bca60c420a47cbaf",
+    "byte_length": 1305928,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-20T01:06:10.794184Z",
+    "drift_key": "sha256",
+    "drift_value": "c87c69e04dd526fa2bf8958a68ab2b1f40904c0442329a65bca60c420a47cbaf"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260920010017/https://storage.courtlistener.com/harvard_pdf/1481640.pdf",
+      "captured_at": "2026-09-20T01:00:17Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

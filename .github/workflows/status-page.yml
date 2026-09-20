@@ -103,4 +103,15 @@ jobs:
         uses: actions/deploy-pages@v5
 
       - name: Exit with the drift check's code
+        # `always()`, because without it any failure above SKIPS this step and the drift verdict is
+        # never re-raised. Not hypothetical: the first run on main failed at `configure-pages`
+        # (Pages was not yet switched on) and steps 8-10 were skipped, so the check's code went
+        # unread. That run was still red, but red for the Pages reason — and a run with a drifted
+        # pin AND a Pages problem would have reported only the Pages one. The check's answer is
+        # what this job exists to carry, so it is re-raised whatever became of the deploy; a deploy
+        # failure still fails the run on its own account.
+        #
+        # On a cancelled run this fires with an empty `code` and `exit` returns 0. Harmless: a
+        # cancelled run is never reported as passing, so there is no path to a misleading green.
+        if: always()
         run: exit ${{ steps.check.outputs.code }}

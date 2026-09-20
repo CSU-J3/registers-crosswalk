@@ -12,7 +12,9 @@ from registers_crosswalk import pin as pinmod
 from registers_crosswalk.fetchers import ecfr, uscode
 from registers_crosswalk.models import ArchiveCopy, Grade, Source
 from registers_crosswalk.pin import (
+    ArchiveFailure,
     PinSpec,
+    add_source,
     archive,
     check,
     default_fetch,
@@ -458,15 +460,22 @@ def test_archive_returns_the_capture():
     assert copy.captured_at == datetime(2026, 9, 17, 12, 0, tzinfo=UTC)
 
 
-def test_archive_returns_none_when_the_service_raises():
+def test_archive_reports_the_reason_when_the_service_raises():
+    # Still no exception out of archive() — the best-effort contract is unchanged. What changed
+    # is that the caller is told what happened instead of being handed one bare None for
+    # everything, so `add_source` can print something the operator can act on.
     def headers_fn(url, headers=None):
-        raise OSError("503")
+        raise OSError("boom")
 
-    assert archive(ECFR_URL, headers_fn=headers_fn, env={}) is None
+    result = archive(ECFR_URL, headers_fn=headers_fn, env={})
+    assert isinstance(result, ArchiveFailure)
+    assert "OSError" in result.reason and "boom" in result.reason
 
 
-def test_archive_returns_none_without_a_content_location():
-    assert archive(ECFR_URL, headers_fn=lambda u, h=None: {"Server": "nginx"}, env={}) is None
+def test_archive_reports_a_missing_content_location():
+    result = archive(ECFR_URL, headers_fn=lambda u, h=None: {"Server": "nginx"}, env={})
+    assert isinstance(result, ArchiveFailure)
+    assert "no Content-Location" in result.reason
 
 
 KEYS = {"WAYBACK_ACCESS_KEY": "k", "WAYBACK_SECRET_KEY": "s"}
@@ -516,19 +525,25 @@ def test_archive_spn2_polls_until_the_job_stops_pending():
     assert len(slept) == 3
 
 
-def test_archive_spn2_returns_none_when_the_job_errors():
-    assert (
-        archive(
-            ECFR_URL,
-            json_fn=_spn2({"job_id": "spn2-abc"}, {"status": "error", "message": "no capture"}),
-            sleep_fn=lambda _s: None,
-            env=KEYS,
-        )
-        is None
+def test_archive_spn2_reports_what_the_job_said_when_it_failed():
+    # SPN2's own words, carried through: status, status_ext and message are what tell a blocked
+    # url apart from a url that simply could not be reached today.
+    result = archive(
+        ECFR_URL,
+        json_fn=_spn2(
+            {"job_id": "spn2-abc"},
+            {"status": "error", "status_ext": "error:blocked", "message": "no capture"},
+        ),
+        sleep_fn=lambda _s: None,
+        env=KEYS,
     )
+    assert isinstance(result, ArchiveFailure)
+    assert "status=error" in result.reason
+    assert "status_ext=error:blocked" in result.reason
+    assert "message=no capture" in result.reason
 
 
-def test_archive_spn2_returns_none_when_the_job_never_finishes():
+def test_archive_spn2_reports_a_job_that_never_finishes():
     # A job still pending when the budget runs out is a failed capture: the caller has a pin to
     # write or refuse now, and --archive refuses it rather than writing an unrecoverable one.
     slept = []
@@ -536,20 +551,83 @@ def test_archive_spn2_returns_none_when_the_job_never_finishes():
     def json_fn(url, headers=None, data=None):
         return {"job_id": "spn2-abc"} if data is not None else {"status": "pending"}
 
-    assert archive(ECFR_URL, json_fn=json_fn, sleep_fn=slept.append, env=KEYS, timeout=20) is None
+    result = archive(ECFR_URL, json_fn=json_fn, sleep_fn=slept.append, env=KEYS, timeout=20)
+    assert isinstance(result, ArchiveFailure)
+    assert "still pending after 20s" in result.reason
     assert sum(slept) >= 20
 
 
-def test_archive_spn2_returns_none_when_the_post_hands_back_no_job():
-    assert (
-        archive(
-            ECFR_URL,
-            json_fn=_spn2({"message": "url refused"}),
-            sleep_fn=lambda _s: None,
-            env=KEYS,
-        )
-        is None
+def test_archive_spn2_reports_a_post_that_hands_back_no_job():
+    result = archive(
+        ECFR_URL,
+        json_fn=_spn2({"message": "url refused"}),
+        sleep_fn=lambda _s: None,
+        env=KEYS,
     )
+    assert isinstance(result, ArchiveFailure)
+    assert "save refused" in result.reason
+    assert "message=url refused" in result.reason
+
+
+def _http_error(code):
+    return urllib.error.HTTPError("https://web.archive.org/save", code, "boom", {}, None)
+
+
+def test_archive_retries_a_5xx_and_succeeds_on_a_later_attempt():
+    """The 2026-09-20 outage: /save answered 503 with an HTML page, and the next request worked.
+
+    Before the retry, that one-minute blip refused an otherwise good pin — and for `uscode`,
+    where --archive is required, the pin could not be made at all until someone tried by hand.
+    """
+    slept = []
+    attempts = []
+
+    def json_fn(url, headers=None, data=None):
+        attempts.append(url)
+        if data is not None and len(attempts) == 1:
+            raise _http_error(503)
+        return (
+            {"job_id": "spn2-abc"}
+            if data is not None
+            else {
+                "status": "success",
+                "timestamp": "20260919120000",
+            }
+        )
+
+    copy = archive(ECFR_URL, json_fn=json_fn, sleep_fn=slept.append, env=KEYS)
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+    assert slept[0] == 10.0  # the first retry wait, before the poll waits
+
+
+def test_archive_gives_up_on_a_5xx_after_three_retries_and_says_so():
+    slept = []
+
+    def json_fn(url, headers=None, data=None):
+        raise _http_error(503)
+
+    result = archive(ECFR_URL, json_fn=json_fn, sleep_fn=slept.append, env=KEYS)
+    assert isinstance(result, ArchiveFailure)
+    assert "HTTP 503" in result.reason
+    # three retries, about a minute of waiting
+    assert slept == [10.0, 20.0, 30.0]
+    assert sum(slept) == 60.0
+
+
+def test_archive_does_not_retry_a_4xx():
+    """A 4xx is Wayback saying no; asking again cannot change the answer."""
+    slept = []
+    calls = []
+
+    def json_fn(url, headers=None, data=None):
+        calls.append(url)
+        raise _http_error(403)
+
+    result = archive(ECFR_URL, json_fn=json_fn, sleep_fn=slept.append, env=KEYS)
+    assert isinstance(result, ArchiveFailure)
+    assert "HTTP 403" in result.reason
+    assert len(calls) == 1
+    assert slept == []
 
 
 def test_archive_spn2_posts_the_url_with_the_keyed_authorization():
@@ -586,6 +664,40 @@ def test_archive_without_keys_never_touches_spn2():
         env={},
     )
     assert copy.url == "https://web.archive.org/web/20260917120000/x"
+
+
+def test_add_source_prints_the_reason_the_archiver_gave(tmp_path):
+    """The reason has to survive the trip, or carrying it was pointless.
+
+    `add_source` composes "archive step failed: " + whatever the archiver said, so a transient 503
+    and a url Wayback will not take read differently to the operator — on the page and in the
+    terminal alike, since both go through this one function.
+    """
+    (tmp_path / "sources").mkdir()
+    outcome = add_source(
+        _spec(),
+        data_dir=tmp_path,
+        archive=True,
+        fetch=_fetch(),
+        archive_fn=lambda url: ArchiveFailure("HTTP 503 from the Wayback Machine for " + url),
+    )
+    assert outcome.status == "archive_failed"
+    assert outcome.message == (
+        "archive step failed: HTTP 503 from the Wayback Machine for " + ECFR_URL
+    )
+    assert list((tmp_path / "sources").glob("*.json")) == []
+
+
+def test_add_source_keeps_the_old_wording_for_an_archiver_that_gives_no_reason(tmp_path):
+    """A bare None from an injected fake still reads as it always did, url and all."""
+    (tmp_path / "sources").mkdir()
+    outcome = add_source(
+        _spec(), data_dir=tmp_path, archive=True, fetch=_fetch(), archive_fn=lambda url: None
+    )
+    assert outcome.status == "archive_failed"
+    assert outcome.message == (
+        f"archive step failed: no capture returned for {ECFR_URL}; nothing written"
+    )
 
 
 # --------------------------------------------------------------------------- emitting

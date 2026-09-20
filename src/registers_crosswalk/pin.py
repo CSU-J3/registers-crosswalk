@@ -19,9 +19,10 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 import zlib
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -63,8 +64,10 @@ HeadersFn = Callable[[str, Mapping[str, str] | None], Mapping[str, str]]
 JsonFn = Callable[[str, Mapping[str, str] | None, bytes | None], Mapping[str, object]]
 # Polling has to wait between attempts; tests pass a fake so the suite neither sleeps nor drifts.
 SleepFn = Callable[[float], None]
-# The CLI's archiving step, injected for the same reason: tests stay offline.
-ArchiveFn = Callable[[str], "ArchiveCopy | None"]
+# The CLI's archiving step, injected for the same reason: tests stay offline. `archive()` answers
+# an ArchiveFailure when there is no capture; a plain None is still accepted from an injected fake
+# and normalised by `add_source`, so a test double stays a one-liner.
+ArchiveFn = Callable[[str], "ArchiveCopy | ArchiveFailure | None"]
 
 _UA = "registers-crosswalk/0.1 (+https://github.com/CSU-J3/registers-crosswalk)"
 # eCFR's versioner returns 406 without an Accept-Encoding the client will take (verified
@@ -255,6 +258,10 @@ _WAYBACK_TS = re.compile(r"/web/(\d{14})/")
 # How long to wait between polls of an SPN2 job, and the shape of the wait. Injected in tests so
 # they neither sleep nor reach the network.
 _SPN2_POLL_SECONDS = 5.0
+# Waits between retries of a 5xx, in order: three retries over about a minute. Wayback's
+# "Temporarily Offline" blips are short — one on 2026-09-20 was over inside a minute — so the
+# schedule is shaped to outlast one without making a failed pin take appreciably longer to fail.
+_ARCHIVE_RETRY_WAITS: tuple[float, ...] = (10.0, 20.0, 30.0)
 
 
 def _response_headers(
@@ -294,6 +301,57 @@ def _capture_from_timestamp(url: str, timestamp: str) -> ArchiveCopy:
     )
 
 
+@dataclass(frozen=True)
+class ArchiveFailure:
+    """Why a capture did not happen, in words fit to print after "archive step failed:".
+
+    `archive()` used to answer None for everything — service down, url refused, still pending —
+    and `add_source` turned every one of those into the same sentence. A transient 503 and a URL
+    Wayback will never take are not the same problem, and the operator can only act on the first
+    one; saying which is which is the whole point of this type.
+    """
+
+    reason: str
+
+
+def _spn2_reason(payload: Mapping[str, object]) -> str:
+    """The failure as SPN2 itself described it: status, status_ext and message, when present."""
+    bits = []
+    for field in ("status", "status_ext", "message"):
+        value = payload.get(field)
+        if value:
+            bits.append(f"{field}={value}")
+    return ", ".join(bits) if bits else "no reason given"
+
+
+def _retrying(
+    call: Callable[[], object],
+    *,
+    sleep_fn: SleepFn,
+    waits: Sequence[float] = _ARCHIVE_RETRY_WAITS,
+) -> object:
+    """Run `call`, retrying a 5xx a few times over about a minute.
+
+    Save Page Now answers 503 with an HTML "Internet Archive: Temporarily Offline" page during
+    short outages — one was observed lasting under a minute on 2026-09-20, with the very next
+    request succeeding. Before this, that blip propagated as a bare failure and refused an
+    otherwise good pin, which for `uscode` (where --archive is required) meant the pin could not
+    be made at all until someone tried again by hand.
+
+    Only 5xx is retried. A 4xx is Wayback saying no — a url it will not take, a bad credential —
+    and asking again cannot change the answer.
+    """
+    attempts = len(waits) + 1
+    for attempt in range(1, attempts + 1):
+        try:
+            return call()
+        except urllib.error.HTTPError as exc:
+            if exc.code < 500 or attempt == attempts:
+                raise
+            sleep_fn(waits[attempt - 1])
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
 def _archive_spn2(
     url: str,
     auth: Mapping[str, str],
@@ -301,40 +359,52 @@ def _archive_spn2(
     json_fn: JsonFn,
     sleep_fn: SleepFn,
     timeout: float,
-) -> ArchiveCopy | None:
+) -> ArchiveCopy | ArchiveFailure:
     """Capture `url` through Wayback's SPN2 job interface: POST the url, then poll the job.
 
     Raises nothing of its own; `archive()` owns the best-effort contract. `timeout` is the whole
     poll budget, not a per-request one — a job that is still pending when it runs out is a failed
     capture, the same as an error, because the caller has a pin to write or refuse now.
+
+    A `success` here does NOT mean a capture was just taken. SPN2 reuses a capture under an hour
+    old and says so in `message`, returning that older capture's timestamp — which is a real
+    capture of the same bytes, so it is accepted, but it is why an archive can predate the fetch
+    it belongs to. See docs/operations.md.
     """
     headers = {**auth, "Accept": "application/json"}
-    started = json_fn(
-        _WAYBACK_SPN2,
-        {**headers, "Content-Type": "application/x-www-form-urlencoded"},
-        urlencode({"url": url}).encode("utf-8"),
+    started = _retrying(
+        lambda: json_fn(
+            _WAYBACK_SPN2,
+            {**headers, "Content-Type": "application/x-www-form-urlencoded"},
+            urlencode({"url": url}).encode("utf-8"),
+        ),
+        sleep_fn=sleep_fn,
     )
+    assert isinstance(started, Mapping)  # noqa: S101 - json_fn's contract
     job_id = started.get("job_id")
     if not job_id:
         # SPN2 refuses some urls outright (robots, a host it will not fetch) and says so here
         # instead of handing back a job.
-        return None
+        return ArchiveFailure(f"save refused {url}: {_spn2_reason(started)}")
     waited = 0.0
     while waited < timeout:
         sleep_fn(_SPN2_POLL_SECONDS)
         waited += _SPN2_POLL_SECONDS
-        state = json_fn(f"{_WAYBACK_SPN2_STATUS}{job_id}", headers, None)
+        state = _retrying(
+            lambda: json_fn(f"{_WAYBACK_SPN2_STATUS}{job_id}", headers, None), sleep_fn=sleep_fn
+        )
+        assert isinstance(state, Mapping)  # noqa: S101 - json_fn's contract
         status = state.get("status")
         if status == "pending":
             continue
         if status != "success":
             # "error", or a status this code does not know: either way there is no capture.
-            return None
+            return ArchiveFailure(f"save job for {url} ended: {_spn2_reason(state)}")
         timestamp = state.get("timestamp")
         if not timestamp:
-            return None
+            return ArchiveFailure(f"save job for {url} reported success with no timestamp")
         return _capture_from_timestamp(str(state.get("original_url") or url), str(timestamp))
-    return None
+    return ArchiveFailure(f"save job for {url} still pending after {timeout:.0f}s")
 
 
 def archive(
@@ -345,12 +415,13 @@ def archive(
     sleep_fn: SleepFn | None = None,
     timeout: float = 90,
     env: Mapping[str, str] | None = None,
-) -> ArchiveCopy | None:
-    """Ask the Wayback Machine to capture `url`; return the capture, or None.
+) -> ArchiveCopy | ArchiveFailure:
+    """Ask the Wayback Machine to capture `url`; return the capture, or why there isn't one.
 
-    Best-effort by design: archiving is a courtesy copy, not the pin. Any failure — service down,
-    rate-limited, URL refused — returns None and never raises, so a slow archive can't cost you a
-    good fetch.
+    Best-effort by design: archiving is a courtesy copy, not the pin. No failure raises — a slow
+    or broken archive can't cost you a good fetch — but every failure now says what it was, so
+    `add_source` can print a reason the operator can act on rather than one sentence for all of
+    them. A transient 5xx is retried first; see `_retrying`.
 
     Two interfaces, chosen by whether WAYBACK_ACCESS_KEY/WAYBACK_SECRET_KEY are both set. With
     keys, the documented SPN2 job interface: POST the url, poll the job, read `timestamp` from the
@@ -359,9 +430,14 @@ def archive(
     Authorization header on that GET was tried against the uscode section URL on 2026-09-19 and
     answered 500, as the anonymous GET had the day before.
 
+    `env` defaults to `os.environ`, and a caller holding keys OUTSIDE the environment must pass
+    its own mapping — `registers_crosswalk.console` does, and a pin made through it took the
+    anonymous path for as long as it did not.
+
     TODO: Perma.cc as a second service (needs an API key and a registrar account).
     """
     env = os.environ if env is None else env
+    sleep_fn = sleep_fn or time.sleep
     auth: dict[str, str] = {}
     access, secret = env.get("WAYBACK_ACCESS_KEY"), env.get("WAYBACK_SECRET_KEY")
     if access and secret:
@@ -372,14 +448,15 @@ def archive(
                 url,
                 auth,
                 json_fn=json_fn or functools.partial(_json_call, timeout=timeout),
-                sleep_fn=sleep_fn or time.sleep,
+                sleep_fn=sleep_fn,
                 timeout=timeout,
             )
         fn = headers_fn or functools.partial(_response_headers, timeout=timeout)
-        headers = fn(f"{_WAYBACK_SAVE}{url}", None)
+        headers = _retrying(lambda: fn(f"{_WAYBACK_SAVE}{url}", None), sleep_fn=sleep_fn)
+        assert isinstance(headers, Mapping)  # noqa: S101 - headers_fn's contract
         location = _header(headers, "Content-Location")
         if not location:
-            return None
+            return ArchiveFailure(f"anonymous save of {url} returned no Content-Location")
         captured_at = None
         m = _WAYBACK_TS.search(location)
         if m is not None:
@@ -389,8 +466,11 @@ def archive(
             url=urljoin("https://web.archive.org", location),
             captured_at=captured_at,
         )
-    except Exception:
-        return None
+    except urllib.error.HTTPError as exc:
+        # The 5xx case has already been retried by the time it reaches here.
+        return ArchiveFailure(f"HTTP {exc.code} from the Wayback Machine for {url}")
+    except Exception as exc:  # noqa: BLE001 - best-effort contract: nothing here may raise
+        return ArchiveFailure(f"{type(exc).__name__}: {exc}")
 
 
 # --------------------------------------------------------------------------- drift
@@ -690,18 +770,22 @@ def add_source(
 
     archives: list[ArchiveCopy] = []
     if archive:
-        copy = archive_fn(source.canonical_url)
-        if copy is None:
+        result = archive_fn(source.canonical_url)
+        if not isinstance(result, ArchiveCopy):
             # --archive is a requirement, not a courtesy: the caller asked for a recoverable pin
-            # and we could not make one, so there is nothing worth writing.
-            return AddOutcome(
-                status="archive_failed",
-                message=(
-                    f"archive step failed: no capture returned for {source.canonical_url}; "
-                    "nothing written"
-                ),
+            # and we could not make one, so there is nothing worth writing. What differs now is
+            # that the operator is told WHICH failure it was — a transient 5xx reads differently
+            # from a url Wayback will not take, and only one of them is worth retrying.
+            #
+            # A bare None is still accepted, from an injected fake that has no reason to give,
+            # and keeps the wording this refusal has always had.
+            reason = (
+                result.reason
+                if isinstance(result, ArchiveFailure)
+                else f"no capture returned for {source.canonical_url}; nothing written"
             )
-        archives = [copy]
+            return AddOutcome(status="archive_failed", message=f"archive step failed: {reason}")
+        archives = [result]
     # pin() builds the document facts; the crosswalk facts (who cites it, what it replaces) are the
     # caller's. Re-validate the assembled node rather than trusting model_copy, which skips it.
     source = Source.model_validate(

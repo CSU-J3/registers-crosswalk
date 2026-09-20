@@ -44,6 +44,7 @@ from .pin import (
     PinSpec,
     add_source,
     archive,
+    archive_source,
     default_fetch,
     to_manifest_line,
 )
@@ -227,7 +228,12 @@ def state(data_dir: Path, env: Mapping[str, str]) -> dict[str, Any]:
         )
     xw = Crosswalk(data_dir)
     pins = [
-        {"xr_id": s.xr_id, "citation": s.citation, "title": s.title}
+        {
+            "xr_id": s.xr_id,
+            "citation": s.citation,
+            "title": s.title,
+            "archived": bool(s.archives),
+        }
         for s in sorted(xw.sources.values(), key=lambda s: s.xr_id)
     ]
     return {"fetchers": modules, "pins": pins, "git": _git_state(data_dir)}
@@ -486,6 +492,19 @@ class Console:
                 self._specs.pop(resolve_id, None)
         return 200, _outcome_payload(outcome)
 
+    def api_archive(self, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        """Archive a pin that has none. The same `archive_source` the CLI's `pin archive` calls.
+
+        Nothing here decides anything about archiving; it hands the id over and reports what came
+        back, so the page and the terminal cannot disagree about what a refusal means.
+        """
+        xr_id = str(body.get("xr_id") or "")
+        try:
+            outcome = archive_source(xr_id, data_dir=self.data_dir, archive_fn=self.archive_fn)
+        except (ValueError, OSError) as exc:
+            return 200, {"status": "refused", "message": f"{type(exc).__name__}: {exc}"}
+        return 200, _outcome_payload(outcome)
+
 
 def _outcome_payload(outcome: AddOutcome) -> dict[str, Any]:
     source = outcome.source
@@ -612,6 +631,9 @@ def make_handler(console: Console) -> type[BaseHTTPRequestHandler]:
                 return
             if parsed.path == "/api/pin":
                 self._json(*console.api_pin(body))
+                return
+            if parsed.path == "/api/archive":
+                self._json(*console.api_archive(body))
                 return
             self._json(404, {"error": "no such path"})
 
@@ -1024,6 +1046,81 @@ _JS = """
       if (go) { go.disabled = false; go.textContent = 'Pin'; }
     });
   }
+  // -- pins with no archive copy --------------------------------------------
+  //
+  // `add --archive` is all-or-nothing: the capture has to succeed or the pin is not written. That
+  // is right where the archive is a requirement, but it means a Wayback outage can cost a good
+  // fetch. This is the other order — pin now, archive when the service is up — and it goes
+  // through the same `archive_source` the CLI's `pin archive` calls.
+
+  var unarchivedCard = byId('unarchived-card');
+  var unarchivedList = byId('unarchived-list');
+
+  function drawUnarchived(pins) {
+    var waiting = (pins || []).filter(function (p) { return !p.archived; });
+    clear(unarchivedList);
+    if (!waiting.length) { unarchivedCard.classList.add('hidden'); return; }
+    unarchivedCard.classList.remove('hidden');
+    var table = el('table');
+    var body = el('tbody');
+    waiting.forEach(function (pin) {
+      var tr = el('tr');
+      tr.appendChild(el('td', pin.xr_id)).className = 'mono';
+      var what = el('td');
+      what.appendChild(el('span', pin.citation, 'cite'));
+      if (pin.title && pin.title !== pin.citation) {
+        what.appendChild(el('br'));
+        what.appendChild(el('span', pin.title, 'sub'));
+      }
+      tr.appendChild(what);
+      var act = el('td');
+      var note = el('span', '', 'muted');
+      var go = el('button', 'Archive now');
+      go.addEventListener('click', function () {
+        go.disabled = true;
+        go.textContent = 'Archiving\\u2026';
+        api('/api/archive', { method: 'POST', body: JSON.stringify({ xr_id: pin.xr_id }) })
+          .then(function (r) {
+            if (!r.ok) {
+              note.className = 'muted warn';
+              note.textContent = (r.body && r.body.error) || 'archive failed';
+              go.disabled = false; go.textContent = 'Archive now';
+              return;
+            }
+            var d = r.body;
+            if (d.status !== 'written') {
+              note.className = 'muted warn';
+              note.textContent = d.message;
+              go.disabled = false; go.textContent = 'Archive now';
+              return;
+            }
+            // Re-read the state rather than trusting this row: the server is the record of what
+            // is archived, and one archived pin is one fewer row here.
+            refreshUnarchived();
+          })
+          .catch(function (err) {
+            note.className = 'muted warn';
+            note.textContent = 'request failed: ' + ((err && err.message) || String(err));
+            go.disabled = false; go.textContent = 'Archive now';
+          });
+      });
+      act.appendChild(go);
+      act.appendChild(note);
+      tr.appendChild(act);
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    unarchivedList.appendChild(table);
+  }
+
+  function refreshUnarchived() {
+    api('/api/state').then(function (r) {
+      if (r.ok && r.body && r.body.pins) { drawUnarchived(r.body.pins); }
+    }).catch(function () { /* the list is a convenience; a lost refresh is not news */ });
+  }
+
+  drawUnarchived(STATE.pins);
+
 })();
 """
 
@@ -1138,6 +1235,13 @@ def render_page(token: str, snapshot: dict[str, Any]) -> str:
         "</section>\n"
         '<section class="card hidden" id="resolve-card"></section>\n'
         '<section class="card hidden" id="outcome-card"></section>\n'
+        '<section class="card hidden" id="unarchived-card">\n'
+        "<h2>Pins with no archive copy</h2>\n"
+        '<p class="note">Archiving is a separate act with its own failure '
+        "mode, so a pin can be made now and archived when the service is up. The same code "
+        'path as <span class="mono">pin archive</span>.</p>\n'
+        '<div id="unarchived-list"></div>\n'
+        "</section>\n"
         f'<footer class="foot">{foot}</footer>\n'
         "</main>\n"
         f"<script>{_JS}</script>\n"

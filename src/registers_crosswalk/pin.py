@@ -25,6 +25,7 @@ import zlib
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlencode, urljoin
@@ -266,8 +267,14 @@ _SPN2_POLL_SECONDS = 5.0
 # "Temporarily Offline" blips are short — one on 2026-09-20 was over inside a minute — so the
 # schedule is shaped to outlast one without making a failed pin take appreciably longer to fail.
 _ARCHIVE_RETRY_WAITS: tuple[float, ...] = (10.0, 20.0, 30.0)
-# Where to ask whether a capture already exists. Read-only, and not part of Save Page Now:
-# asking costs nothing and takes no capture.
+# 429 is a different animal from 5xx and gets its own budget. It is not a fault, it is the service
+# telling us the rate: the wait comes from Retry-After when the response carries one, so the only
+# number we invent is the fallback. Three tries, because a rate limit that has not lifted after two
+# waits is not going to lift inside this pin.
+_RATE_LIMIT_TRIES = 3
+_RATE_LIMIT_WAIT = 60.0
+# Where to ask whether a capture already exists. Read-only, and not part of Save Page Now: asking
+# costs nothing and takes no capture.
 _WAYBACK_AVAILABLE = "https://archive.org/wayback/available"
 
 
@@ -331,32 +338,72 @@ def _spn2_reason(payload: Mapping[str, object]) -> str:
     return ", ".join(bits) if bits else "no reason given"
 
 
+def _retry_after(exc: urllib.error.HTTPError) -> float | None:
+    """The Retry-After header as seconds, accepting both forms the spec allows.
+
+    Delta-seconds is what Wayback sends in practice; the HTTP-date form is parsed too rather than
+    ignored, because ignoring it would silently substitute our own number for the one the service
+    actually asked for, which is the opposite of honouring it.
+    """
+    value = (exc.headers.get("Retry-After") if exc.headers else None) or ""
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        return max(0.0, float(int(value)))
+    except ValueError:
+        pass
+    try:
+        when = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)
+    return max(0.0, (when - datetime.now(tz=UTC)).total_seconds())
+
+
 def _retrying(
     call: Callable[[], object],
     *,
     sleep_fn: SleepFn,
     waits: Sequence[float] = _ARCHIVE_RETRY_WAITS,
+    rate_limit_tries: int = _RATE_LIMIT_TRIES,
 ) -> object:
-    """Run `call`, retrying a 5xx a few times over about a minute.
+    """Run `call`, retrying a 5xx or a 429. Each has its own budget, because each means something
+    different.
 
-    Save Page Now answers 503 with an HTML "Internet Archive: Temporarily Offline" page during
-    short outages — one was observed lasting under a minute on 2026-09-20, with the very next
-    request succeeding. Before this, that blip propagated as a bare failure and refused an
+    **5xx.** Save Page Now answers 503 with an HTML "Internet Archive: Temporarily Offline" page
+    during short outages — one was observed lasting under a minute on 2026-09-20, with the very
+    next request succeeding. Before this, that blip propagated as a bare failure and refused an
     otherwise good pin, which for `uscode` (where --archive is required) meant the pin could not
     be made at all until someone tried again by hand.
 
-    Only 5xx is retried. A 4xx is Wayback saying no — a url it will not take, a bad credential —
-    and asking again cannot change the answer.
+    **429.** Not a fault but a rate: the service is telling us when to come back, so `Retry-After`
+    is honoured when it is sent and `_RATE_LIMIT_WAIT` used only when it is not.
+
+    Any other 4xx is Wayback saying no — a url it will not take, a bad credential — and asking
+    again cannot change the answer.
     """
-    attempts = len(waits) + 1
-    for attempt in range(1, attempts + 1):
+    server_failures = 0
+    rate_limit_tries_used = 0
+    while True:
         try:
             return call()
         except urllib.error.HTTPError as exc:
-            if exc.code < 500 or attempt == attempts:
+            if exc.code == 429:
+                rate_limit_tries_used += 1
+                if rate_limit_tries_used >= rate_limit_tries:
+                    raise
+                sleep_fn(_retry_after(exc) or _RATE_LIMIT_WAIT)
+                continue
+            if exc.code < 500:
                 raise
-            sleep_fn(waits[attempt - 1])
-    raise AssertionError("unreachable")  # pragma: no cover
+            server_failures += 1
+            if server_failures > len(waits):
+                raise
+            sleep_fn(waits[server_failures - 1])
 
 
 def _existing_capture(
@@ -474,7 +521,7 @@ def archive(
     Best-effort by design: archiving is a courtesy copy, not the pin. No failure raises — a slow
     or broken archive can't cost you a good fetch — but every failure now says what it was, so
     `add_source` can print a reason the operator can act on rather than one sentence for all of
-    them. A transient 5xx is retried first; see `_retrying`.
+    them. A transient 5xx or a 429 is retried first; see `_retrying`.
 
     With `expected_sha256`, an existing capture whose bytes hash to it is returned as-is and no
     capture is requested at all — see `_existing_capture`. Without it there is no reuse, because
@@ -539,7 +586,12 @@ def archive(
             captured_at=captured_at,
         )
     except urllib.error.HTTPError as exc:
-        # The 5xx case has already been retried by the time it reaches here.
+        # 5xx and 429 have already been retried by the time they reach here.
+        if exc.code == 429:
+            return ArchiveFailure(
+                f"HTTP 429 from the Wayback Machine for {url}: still rate limited after "
+                f"{_RATE_LIMIT_TRIES} tries"
+            )
         return ArchiveFailure(f"HTTP {exc.code} from the Wayback Machine for {url}")
     except Exception as exc:  # noqa: BLE001 - best-effort contract: nothing here may raise
         return ArchiveFailure(f"{type(exc).__name__}: {exc}")

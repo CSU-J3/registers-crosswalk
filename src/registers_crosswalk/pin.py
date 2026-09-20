@@ -946,6 +946,74 @@ def add_source(
     )
 
 
+def archive_source(
+    xr_id: str,
+    *,
+    data_dir: Path,
+    archive_fn: ArchiveFn = archive,
+) -> AddOutcome:
+    """Archive a pin that has none, after the fact. The other half of `--archive`.
+
+    `add --archive` is all-or-nothing: the capture has to succeed or the pin is not written at all.
+    That is right when the archive is a requirement — a `uscode` pin without one drifts straight to
+    "DRIFT unrecoverable" — but it means a Wayback outage can cost a good fetch of a document that
+    only wants an archive as a matter of practice. This is the other order: pin now, archive when
+    the service is up, without re-fetching the document or re-deciding anything about it.
+
+    It goes through the SAME `archive_fn` the CLI hands `add_source`, so the reuse-or-capture path
+    is one implementation: an existing capture whose bytes hash to this artifact is adopted without
+    asking Save Page Now for anything, exactly as it would be at pin time.
+
+    Only the `archives` field is rewritten. Everything else in the file is left as the bytes it
+    already was — this is an amendment to one fact about a record, not a re-serialisation of it,
+    and a command that quietly reformatted a record while adding an archive would make every such
+    run unreviewable.
+    """
+    xw = Crosswalk(data_dir)
+    source = xw.sources.get(xr_id)
+    if source is None:
+        return AddOutcome(status="refused", message=f"unknown source {xr_id!r}")
+    if source.archives:
+        held = source.archives[0]
+        return AddOutcome(
+            status="refused",
+            message=f"{xr_id} already has an archive copy: {held.url}",
+        )
+
+    result = archive_fn(source.canonical_url, expected_sha256=source.artifact.sha256)
+    if not isinstance(result, ArchiveCopy):
+        reason = (
+            result.reason
+            if isinstance(result, ArchiveFailure)
+            else f"no capture returned for {source.canonical_url}; nothing written"
+        )
+        return AddOutcome(status="archive_failed", message=f"archive step failed: {reason}")
+
+    updated = Source.model_validate(source.model_copy(update={"archives": [result]}).model_dump())
+    # The read path is the authority here too: an archive can make a record invalid (a cited
+    # source is REQUIRED to carry one, and the rules about what an archive may be live in the
+    # same place), so the amended record goes through the same gate `add` uses before it is
+    # written, against every existing source with this one replaced.
+    try:
+        check_source_invariants({**xw.sources, xr_id: updated}, xw.nodes)
+    except ValueError as exc:
+        return AddOutcome(status="refused", message=str(exc))
+
+    path = _sources_dir(data_dir) / f"{xr_id}.json"
+    # Read, touch one key, write. Not `model_dump_json` of the whole node: that would rewrite
+    # every field and turn a one-fact amendment into a diff nobody can read.
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["archives"] = [result.model_dump(mode="json")]
+    path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return AddOutcome(
+        status="written",
+        message=f"archived {xr_id}: {result.url}",
+        source=updated,
+        path=path,
+        ledger=to_ledger_markdown(updated),
+    )
+
+
 def _cmd_add(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
     """argparse in, exit code out. The guards and the write live in `add_source`."""
     from . import fetchers
@@ -983,6 +1051,18 @@ def _cmd_add(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) ->
         fetch=fetch,
         archive_fn=archive_fn,
     )
+    if outcome.status != "written":
+        print(outcome.message, file=sys.stderr)
+        return 1
+    print(outcome.message)
+    print(outcome.ledger)
+    return 0
+
+
+def _cmd_archive(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
+    """argparse in, exit code out. The guards and the write live in `archive_source`."""
+    del fetch  # the document is not re-fetched: this amends a record, it does not re-pin one
+    outcome = archive_source(args.xr_id, data_dir=args.data_dir, archive_fn=archive_fn)
     if outcome.status != "written":
         print(outcome.message, file=sys.stderr)
         return 1
@@ -1120,6 +1200,12 @@ def _build_parser() -> argparse.ArgumentParser:
             metavar="register:local_id",
             help="a register record that cites this document (repeatable)",
         )
+
+    archive_parser = sub.add_parser(
+        "archive", help="add an archive copy to a pin that has none (does not re-fetch)"
+    )
+    archive_parser.set_defaults(handler=_cmd_archive)
+    archive_parser.add_argument("xr_id", type=_src_id_arg, metavar="xr_src_NNNN")
 
     check_parser = sub.add_parser("check", help="re-fetch pinned documents and report drift")
     check_parser.set_defaults(handler=_cmd_check)

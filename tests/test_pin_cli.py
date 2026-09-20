@@ -1,10 +1,12 @@
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from registers_crosswalk.models import ArchiveCopy
-from registers_crosswalk.pin import main, sha256_hex
+from registers_crosswalk.pin import ArchiveFailure, main, sha256_hex
+from registers_crosswalk.registry import Crosswalk
 
 ARCHIVED = ArchiveCopy(service="wayback", url="https://web.archive.org/web/1/x")
 
@@ -605,3 +607,169 @@ def test_the_url_rule_still_fires_first_and_before_the_hashing_fetch(tmp_path, c
     # only spec()'s read: no second hashing fetch, no capture requested
     assert calls == {"fetch": 3, "archive": 1}
     assert _sources(tmp_path) == ["xr_src_0001.json"]
+
+
+# ------------------------------------------------- `pin archive`: the other half of --archive
+
+
+CAPTURE = ArchiveCopy(
+    service="wayback",
+    url="https://web.archive.org/web/20260920190851/x",
+    captured_at=datetime(2026, 9, 20, 19, 8, 51, tzinfo=UTC),
+)
+
+
+def _record(tmp_path, xr_id="xr_src_0001"):
+    return json.loads((tmp_path / "sources" / f"{xr_id}.json").read_text(encoding="utf-8"))
+
+
+def _archive(tmp_path, xr_id="xr_src_0001", archive_fn=None):
+    def capturing(url, **_):
+        return CAPTURE
+
+    return main(
+        ["--data-dir", str(tmp_path), "archive", xr_id],
+        fetch=_fetch(),
+        archive_fn=archive_fn or capturing,
+    )
+
+
+def test_archive_adds_a_capture_to_a_pin_that_has_none(tmp_path, capsys):
+    assert _add(tmp_path) == 0  # `add` with no --archive: a pin, unarchived
+    capsys.readouterr()
+    assert _record(tmp_path)["archives"] == []
+
+    assert _archive(tmp_path) == 0
+    out = capsys.readouterr().out
+    assert "archived xr_src_0001: https://web.archive.org/web/20260920190851/x" in out
+    # the ledger is reprinted with the archive on it, which is the point of doing this at all
+    assert "Archive: https://web.archive.org/web/20260920190851/x" in out
+
+    archives = _record(tmp_path)["archives"]
+    assert archives == [
+        {
+            "service": "wayback",
+            "url": "https://web.archive.org/web/20260920190851/x",
+            "captured_at": "2026-09-20T19:08:51Z",
+        }
+    ]
+
+
+def test_archive_is_handed_the_artifact_hash_so_a_matching_capture_is_reused(tmp_path, capsys):
+    """Same reuse-or-capture path `add` uses: one implementation, not two."""
+    assert _add(tmp_path) == 0
+    capsys.readouterr()
+    seen = {}
+
+    def archive_fn(url, *, expected_sha256=None):
+        seen["url"] = url
+        seen["expected_sha256"] = expected_sha256
+        return CAPTURE
+
+    assert _archive(tmp_path, archive_fn=archive_fn) == 0
+    assert seen["url"] == URL
+    assert seen["expected_sha256"] == sha256_hex(BODY)
+
+
+def test_archive_changes_only_the_archives_field(tmp_path, capsys):
+    """An amendment to one fact, not a re-serialisation of the record.
+
+    The record on disk is deliberately perturbed first — its keys are reordered, which is valid
+    JSON and loads identically — because a re-serialisation would snap the order back to the
+    model's and this test would otherwise pass whether or not the write was surgical. With the
+    perturbation it can tell the two apart, which is the whole claim being made.
+    """
+    assert _add(tmp_path) == 0
+    capsys.readouterr()
+    path = tmp_path / "sources" / "xr_src_0001.json"
+
+    original = json.loads(path.read_text(encoding="utf-8"))
+    shuffled = {k: original[k] for k in reversed(list(original))}
+    path.write_text(json.dumps(shuffled, indent=2) + "\n", encoding="utf-8")
+    before = json.loads(path.read_text(encoding="utf-8"))
+    assert list(before) != list(original)  # the perturbation took
+
+    assert _archive(tmp_path) == 0
+    after = json.loads(path.read_text(encoding="utf-8"))
+
+    # same keys in the same (perturbed) order: nothing was re-serialised
+    assert list(after) == list(before)
+    assert after["archives"] != before["archives"]
+    for key in before:
+        if key != "archives":
+            assert after[key] == before[key], key
+
+
+def test_archive_refuses_a_pin_that_already_has_one(tmp_path, capsys):
+    assert _add(tmp_path, extra=("--archive",)) == 0
+    capsys.readouterr()
+    before = _record(tmp_path)
+
+    def must_not_archive(url, **_):
+        raise AssertionError("archive was called for a pin that already has one")
+
+    assert _archive(tmp_path, archive_fn=must_not_archive) == 1
+    err = capsys.readouterr().err
+    assert "xr_src_0001 already has an archive copy: https://web.archive.org/web/1/x" in err
+    assert _record(tmp_path) == before  # and nothing was written
+
+
+def test_archive_refuses_an_unknown_id(tmp_path, capsys):
+    assert _add(tmp_path) == 0
+    capsys.readouterr()
+    assert _archive(tmp_path, xr_id="xr_src_0404") == 1
+    assert "unknown source 'xr_src_0404'" in capsys.readouterr().err
+
+
+def test_archive_reports_the_reason_when_the_capture_fails(tmp_path, capsys):
+    assert _add(tmp_path) == 0
+    capsys.readouterr()
+    before = _record(tmp_path)
+
+    def failing(url, **_):
+        return ArchiveFailure("HTTP 429 from the Wayback Machine for " + url)
+
+    assert _archive(tmp_path, archive_fn=failing) == 1
+    err = capsys.readouterr().err
+    assert err.strip() == ("archive step failed: HTTP 429 from the Wayback Machine for " + URL)
+    assert _record(tmp_path) == before  # a failed capture writes nothing
+
+
+def test_archive_keeps_the_old_wording_for_an_archiver_with_no_reason(tmp_path, capsys):
+    assert _add(tmp_path) == 0
+    capsys.readouterr()
+    assert _archive(tmp_path, archive_fn=_failing_archive) == 1
+    err = capsys.readouterr().err
+    assert f"archive step failed: no capture returned for {URL}" in err
+
+
+def test_archive_does_not_re_fetch_the_document(tmp_path, capsys):
+    """It amends a record; it does not re-pin one. The bytes are not read again."""
+    assert _add(tmp_path) == 0
+    capsys.readouterr()
+
+    def must_not_fetch(url, headers=None):
+        raise AssertionError("the document was re-fetched")
+
+    def capturing(url, **_):
+        return CAPTURE
+
+    assert (
+        main(
+            ["--data-dir", str(tmp_path), "archive", "xr_src_0001"],
+            fetch=must_not_fetch,
+            archive_fn=capturing,
+        )
+        == 0
+    )
+
+
+def test_an_archived_record_still_loads(tmp_path, capsys):
+    """The file this writes has to be readable by everything downstream of it."""
+    assert _add(tmp_path) == 0
+    capsys.readouterr()
+    assert _archive(tmp_path) == 0
+    xw = Crosswalk(tmp_path)
+    source = xw.sources["xr_src_0001"]
+    assert source.archives[0].url == "https://web.archive.org/web/20260920190851/x"
+    assert source.archives[0].captured_at == datetime(2026, 9, 20, 19, 8, 51, tzinfo=UTC)

@@ -611,6 +611,55 @@ def test_ledger_markdown_adds_as_of_when_the_title_does_not_carry_it():
     assert "11 CFR Part 114. Retrieved 2026-09-17, as of 2026-09-14;" in line
 
 
+def test_ledger_markdown_leaves_a_title_that_already_carries_its_citation_alone():
+    # The ecfr shape, and the uscode one with it: the title opens with the citation, so appending
+    # the citation would set it down twice. Note the two spell it differently — the title says
+    # "11 CFR", the citation "11 C.F.R." — which is the case the normalized comparison exists for
+    # and the one a raw prefix test would get wrong.
+    line = to_ledger_markdown(_pinned()).splitlines()[0]
+    assert "— 11 CFR Part 114, as of 2026-09-14. Retrieved" in line
+    assert "11 C.F.R. Part 114" not in line
+
+
+def test_ledger_markdown_appends_the_citation_to_a_federal_register_title():
+    # A Federal Register title is the document's own name and never states its citation, so
+    # without the rule the entry would name a document it never cites.
+    source = _pinned().model_copy(
+        update={
+            "fetcher": "federalregister",
+            "citation": "60 FR 7862",
+            "title": (
+                "Expenditures; Reports by Political Committees; Personal Use of Campaign Funds"
+            ),
+            "published_at": date(1995, 2, 9),
+            "point_in_time": None,
+        }
+    )
+    line = to_ledger_markdown(source).splitlines()[0]
+    assert "— Expenditures; Reports by Political Committees; " in line
+    assert "Personal Use of Campaign Funds, 60 FR 7862. Retrieved 2026-09-17;" in line
+
+
+def test_ledger_markdown_appends_the_citation_to_a_case_name():
+    # The courtlistener shape. Same rule, and the one that prompted it: a case name cites nothing.
+    source = _pinned().model_copy(
+        update={
+            "fetcher": "courtlistener",
+            "citation": "138 F.2d 137",
+            "title": "Dunne v. United States",
+            "publisher": "Court of Appeals for the Eighth Circuit",
+            "published_at": date(1943, 9, 20),
+            "point_in_time": None,
+        }
+    )
+    line = to_ledger_markdown(source).splitlines()[0]
+    assert line == (
+        "- **Court of Appeals for the Eighth Circuit, 1943-09-20 (A1)** — "
+        "Dunne v. United States, 138 F.2d 137. "
+        f"Retrieved 2026-09-17; sha256 {sha256_hex(BODY)[:16]}…; xr_src_0001."
+    )
+
+
 def test_ledger_markdown_uses_the_archive_when_there_is_one():
     source = _pinned().model_copy(
         update={"archives": [ArchiveCopy(service="wayback", url="https://web.archive.org/web/1/x")]}

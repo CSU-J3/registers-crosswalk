@@ -47,6 +47,7 @@ from .registry import (
     duplicate_of,
     normalize_citation,
     same_document_of,
+    title_adds_anything,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -523,8 +524,15 @@ def to_ledger_markdown(source: Source) -> str:
     if source.point_in_time is not None and source.point_in_time.isoformat() not in source.title:
         retrieved += f", as of {source.point_in_time.isoformat()}"
     archive_url = source.archives[0].url if source.archives else "pending"
+    # A title that already opens with its citation carries it ("11 CFR Part 114, as of
+    # 2026-09-14"), and appending it again would print it twice. A title that does not — a Federal
+    # Register document's name, a case name — would otherwise leave the entry naming a document it
+    # never cites, which is the one thing a source-links entry has to do. Same predicate as the
+    # status page's document cell, from one definition, so the page and the ledger cannot end up
+    # describing the same pin two ways.
+    document = f"{source.title}, {source.citation}" if title_adds_anything(source) else source.title
     return (
-        f"- **{head} ({source.grade.code()})** — {source.title}. "
+        f"- **{head} ({source.grade.code()})** — {document}. "
         f"{retrieved}; sha256 {source.artifact.sha256[:16]}…; {source.xr_id}.\n"
         f"  {source.canonical_url}\n"
         f"  Archive: {archive_url}"

@@ -21,10 +21,10 @@ import json
 import os
 from collections.abc import Mapping
 from datetime import date
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 
 from ..models import Grade
-from ..pin import FetchFn, MissingKey, PinSpec, default_fetch, sha256_hex
+from ..pin import FetchFn, MissingKey, PinSpec, SearchHit, default_fetch, sha256_hex
 
 NAME = "openfec"
 HELP = "an FEC advisory opinion or MUR document (OpenFEC legal search)"
@@ -103,6 +103,65 @@ def spec(
 
 def drift_value(body: bytes) -> str:
     return sha256_hex(body)
+
+
+# --------------------------------------------------------------------------- search
+
+# NOT exercised against the live API (2026-09-20): the ledger this repo pins for cites no MUR and
+# no advisory opinion, so there was no document to run a first search against and no capture to
+# test the parse on. Same standing as `spec` above, and the same `VERIFIED = False` covers both —
+# a record minted through this module still says on its face that nobody has run it. What IS
+# tested offline is the one thing a capture is not needed for: that the query URL is built
+# correctly and that the key never leaves it for a hit.
+SEARCH_TYPES = ("advisory_opinions", "murs")
+
+
+def free_text_search_url(query: str, doc_type: str, key: str) -> str:
+    """The free-text query. Carries the key, like `search_url`, and is likewise never stored."""
+    return f"{SEARCH}?{urlencode({'q': query, 'type': doc_type, 'api_key': key})}"
+
+
+def _hit(record: dict, doc_type: str) -> SearchHit:
+    # Defensive throughout, for the same reason as courtlistener's: this is somebody else's index.
+    number = record.get("no") or record.get("ao_no") or record.get("mur_no") or ""
+    # The hit's own public page on fec.gov, built from the record's relative url when it has one.
+    # NEVER the search URL: that one carries the api_key.
+    relative = record.get("url")
+    return SearchHit(
+        identifier=str(number),
+        label=record.get("name") or record.get("description") or "",
+        court_or_office=PUBLISHER,
+        date=record.get("issue_date") or record.get("date") or None,
+        docket_or_number=str(number) or None,
+        citation=_CITATION[doc_type].format(number) if number else None,
+        url=urljoin(FEC_BASE, relative) if relative else None,
+    )
+
+
+def search(
+    query: str,
+    *,
+    doc_type: str = "advisory_opinions",
+    fetch: FetchFn = default_fetch,
+    env: Mapping[str, str] | None = None,
+) -> list[SearchHit]:
+    """Respondent or matter name in, AO/MUR numbers out. Never writes, never pins."""
+    key = _key(os.environ if env is None else env)
+    body, _ = fetch(free_text_search_url(query, doc_type, key), None)
+    return [_hit(r, doc_type) for r in _records(json.loads(body), doc_type)]
+
+
+def add_command(hit: SearchHit, doc_type: str = "advisory_opinions") -> str | None:
+    """The `pin add` that would pin this hit.
+
+    A MUR carries several documents and `add` needs to be told which, so the command it prints
+    leaves `--category` for the caller to fill from what the search showed. Advisory opinions have
+    a settled default (`Final Opinion`), so theirs is complete as printed.
+    """
+    if not hit.identifier:
+        return None
+    base = f"pin add openfec --number {hit.identifier} --type {doc_type}"
+    return base if doc_type == "advisory_opinions" else f'{base} --category "<category>"'
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

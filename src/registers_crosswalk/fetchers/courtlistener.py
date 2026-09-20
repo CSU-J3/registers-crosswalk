@@ -21,10 +21,10 @@ import json
 import os
 from collections.abc import Mapping
 from datetime import date
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 
 from ..models import Grade
-from ..pin import FetchFn, MissingKey, PinSpec, default_fetch, sha256_hex
+from ..pin import FetchFn, MissingKey, PinSpec, SearchHit, default_fetch, sha256_hex
 
 NAME = "courtlistener"
 HELP = "a court opinion by CourtListener cluster id"
@@ -37,7 +37,8 @@ VERIFIED = False
 VERIFIED_AT = None
 PUBLISHER = "CourtListener (Free Law Project)"
 ENV_KEY = "COURTLISTENER_TOKEN"
-API = "https://www.courtlistener.com/api/rest/v4"
+SITE = "https://www.courtlistener.com"
+API = f"{SITE}/api/rest/v4"
 STORAGE = "https://storage.courtlistener.com/"
 
 
@@ -111,6 +112,76 @@ def spec(
 
 def drift_value(body: bytes) -> str:
     return sha256_hex(body)
+
+
+# --------------------------------------------------------------------------- search
+
+# What `pin search courtlistener <query> --type X` accepts, and the single letter v4's search
+# endpoint wants for it. Opinions are the default because an opinion is the thing this fetcher
+# can actually pin; a docket is a lookup aid — it tells you the case exists and what it is called,
+# and its id is not a cluster id.
+SEARCH_TYPES = ("opinions", "dockets")
+_SEARCH_TYPE_PARAM = {"opinions": "o", "dockets": "d"}
+
+
+def search_url(query: str, doc_type: str = "opinions") -> str:
+    return f"{API}/search/?{urlencode({'q': query, 'type': _SEARCH_TYPE_PARAM[doc_type]})}"
+
+
+def _first_citation(result: dict) -> str | None:
+    """v4 search returns `citation` as a list of reporter strings; tolerate a bare string too."""
+    cite = result.get("citation")
+    if isinstance(cite, list):
+        return next((c for c in cite if c), None)
+    return cite or None
+
+
+def _hit(result: dict, doc_type: str) -> SearchHit:
+    # Read every field defensively. A search result is somebody else's index, and a shape change
+    # there should degrade a column to blank rather than blow up the command.
+    if doc_type == "dockets":
+        identifier = result.get("docket_id")
+    else:
+        identifier = result.get("cluster_id") or result.get("id")
+    # Opinion results carry `absolute_url`; docket results call the same thing
+    # `docket_absolute_url` (observed 2026-09-20). One key per result type, so read both.
+    absolute = result.get("absolute_url") or result.get("docket_absolute_url")
+    return SearchHit(
+        identifier="" if identifier is None else str(identifier),
+        label=result.get("caseName") or result.get("case_name") or "",
+        court_or_office=result.get("court") or result.get("court_id"),
+        date=(result.get("dateFiled") or result.get("date_filed") or None),
+        docket_or_number=result.get("docketNumber") or result.get("docket_number"),
+        citation=_first_citation(result),
+        url=urljoin(SITE, absolute) if absolute else None,
+    )
+
+
+def search(
+    query: str,
+    *,
+    doc_type: str = "opinions",
+    fetch: FetchFn = default_fetch,
+    env: Mapping[str, str] | None = None,
+) -> list[SearchHit]:
+    """Case name or docket number in, identifiers out. Never writes, never pins."""
+    headers = auth_headers(os.environ if env is None else env)
+    body, _ = fetch(search_url(query, doc_type), headers)
+    payload = json.loads(body)
+    results = payload.get("results") or []
+    return [_hit(r, doc_type) for r in results if isinstance(r, dict)]
+
+
+def add_command(hit: SearchHit, doc_type: str = "opinions") -> str | None:
+    """The `pin add` that would pin this hit, or None when the hit is not directly pinnable.
+
+    A docket hit carries a docket id, and `add` takes a CLUSTER id — the two are different keys
+    into CourtListener, so offering an `add` built from one would hand back a command that pins
+    the wrong thing or nothing. Searching again with the case name and no `--type` is the route.
+    """
+    if doc_type == "dockets" or not hit.identifier:
+        return None
+    return f"pin add courtlistener --cluster-id {hit.identifier} --archive"
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

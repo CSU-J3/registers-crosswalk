@@ -12,6 +12,12 @@ A fetcher module exposes:
     content_request(url, *, env) -> (url, headers)   optional; re-attaches an API key at fetch time
     amended_since(source, *, fetch) -> date | None   optional; eCFR only
 
+A fetcher that can look a document UP as well as fetch it also exposes:
+
+    SEARCH_TYPES    the --type values its search accepts; absent means it has no search
+    search(query, *, doc_type, fetch, env) -> list[SearchHit]
+    add_command(hit, doc_type) -> str | None   the `pin add` that would pin that hit
+
 Every metadata call goes through the same injectable `FetchFn` the pin itself uses, so tests never
 touch the network. Endpoint behaviour recorded in these modules was verified live on 2026-09-17
 unless a comment says otherwise.
@@ -24,7 +30,7 @@ from datetime import date
 from types import ModuleType
 
 from ..models import DriftKey
-from ..pin import MissingKey
+from ..pin import MissingKey, SearchHit
 from . import courtlistener, ecfr, federalregister, govinfo, manual, openfec, uscode
 
 # CLI subcommand order: most-used first, `manual` last as the escape hatch.
@@ -32,15 +38,22 @@ _MODULES: dict[str, ModuleType] = {
     m.NAME: m for m in (ecfr, federalregister, govinfo, uscode, openfec, courtlistener, manual)
 }
 NAMES: tuple[str, ...] = tuple(_MODULES)
+# The subset `pin search` offers. Derived, never hand-listed, so adding SEARCH_TYPES to a module
+# is the only thing a new searchable fetcher has to do.
+SEARCHABLE: tuple[str, ...] = tuple(n for n, m in _MODULES.items() if hasattr(m, "SEARCH_TYPES"))
 
 __all__ = [
     "NAMES",
+    "SEARCHABLE",
     "MissingKey",
+    "add_command",
     "amended_since",
     "content_request",
     "drift_key",
     "drift_value",
     "get",
+    "search",
+    "search_types",
 ]
 
 
@@ -49,6 +62,32 @@ def get(name: str) -> ModuleType:
         return _MODULES[name]
     except KeyError:
         raise ValueError(f"unknown fetcher {name!r} (have {', '.join(NAMES)})") from None
+
+
+def search_types(name: str) -> tuple[str, ...]:
+    """The `--type` values this fetcher's search accepts; empty when it has no search at all."""
+    return tuple(getattr(get(name), "SEARCH_TYPES", ()))
+
+
+def search(
+    name: str,
+    query: str,
+    *,
+    doc_type: str,
+    fetch: Callable[..., tuple[bytes, str]],
+    env: Mapping[str, str],
+) -> list[SearchHit]:
+    """Look a document up by name or number. Read-only: no fetcher's search writes anything."""
+    fn = getattr(get(name), "search", None)
+    if fn is None:
+        raise ValueError(f"{name} has no search (searchable: {', '.join(SEARCHABLE)})")
+    return fn(query, doc_type=doc_type, fetch=fetch, env=env)
+
+
+def add_command(name: str, hit: SearchHit, doc_type: str) -> str | None:
+    """The `pin add` that would pin `hit`, or None when the hit is not directly pinnable."""
+    fn = getattr(get(name), "add_command", None)
+    return None if fn is None else fn(hit, doc_type)
 
 
 def content_request(name: str, url: str, *, env: Mapping[str, str]) -> tuple[str, dict[str, str]]:

@@ -5,7 +5,7 @@ that resolves inside the repo root, and a `Source` holds only facts about the do
 (where it lives, when it was fetched, what it hashes to, who published it, when). Blobs live in the
 consuming project or in the archive copy; the artifact hash verifies either.
 
-CLI: `python -m registers_crosswalk.pin {add,check,ledger}`.
+CLI: `python -m registers_crosswalk.pin {add,search,check,ledger}`.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import time
 import urllib.request
 import zlib
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Literal
@@ -147,6 +147,31 @@ class PinSpec:
     point_in_time: date | None = None
     published_at: date | None = None
     headers: Mapping[str, str] | None = None
+
+
+@dataclass(frozen=True)
+class SearchHit:
+    """One candidate document from a fetcher's search, in the shape `add` needs next.
+
+    The point of `search` is the round trip: a case name or a respondent goes in, and what comes
+    back is the identifier `add` takes — a cluster id, an AO or MUR number. Everything else on the
+    hit is there so a human can tell two hits apart before pinning one.
+
+    A frozen dataclass for the same reason as `PinSpec`: it never serializes to `data/`. It is a
+    view of somebody else's search index, not a fact this repo stores.
+
+    `url` is the hit's own public page where the API gives one. It is NEVER a URL carrying a key:
+    openfec's search call is authenticated, and the key is used for the query and then forgotten
+    (decision 1, `docs/operations.md`).
+    """
+
+    identifier: str
+    label: str
+    court_or_office: str | None = None
+    date: str | None = None
+    docket_or_number: str | None = None
+    citation: str | None = None
+    url: str | None = None
 
 
 def _extension(media_type: str) -> str:
@@ -702,6 +727,51 @@ def _cmd_check(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) 
     return max((_EXIT_CODES[r.status] for r in reports), default=0, key=_EXIT_RANK.get)
 
 
+def _cmd_search(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
+    """Look a document up and print the `add` that would pin it. Reads; never writes.
+
+    Deliberately does NOT touch `data/`: search answers "what is this document called and what is
+    its id", which is a question about the publisher's index, not about what this repo holds.
+    """
+    del archive_fn  # search never archives
+    from . import fetchers
+
+    doc_type = args.doc_type or fetchers.search_types(args.fetcher)[0]
+    try:
+        hits = fetchers.search(
+            args.fetcher, args.query, doc_type=doc_type, fetch=fetch, env=os.environ
+        )
+    except MissingKey as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(json.dumps([asdict(h) for h in hits], indent=2))
+    else:
+        for hit in hits:
+            print(
+                "  ".join(
+                    (
+                        hit.identifier or "-",
+                        hit.date or "-",
+                        hit.label or "-",
+                        hit.docket_or_number or "-",
+                        hit.citation or "-",
+                    )
+                )
+            )
+    if not hits:
+        print(f"no {doc_type} matched {args.query!r}", file=sys.stderr)
+        return 1
+    # The round trip, and the reason this subcommand exists: the last line is the command that
+    # pins the first hit, ready to paste. A hit with no pinnable identifier says so instead of
+    # printing a command that would pin the wrong document.
+    command = fetchers.add_command(args.fetcher, hits[0], doc_type)
+    print()
+    print(command or f"{len(hits)} hit(s); a {doc_type} hit is not pinnable directly")
+    return 0
+
+
 def _cmd_ledger(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
     del fetch, archive_fn  # offline command; it only reads what is already pinned
     xw = Crosswalk(args.data_dir)
@@ -757,6 +827,19 @@ def _build_parser() -> argparse.ArgumentParser:
         "--all", action="store_true", help="check every pin, not just the latest per citation"
     )
     check_parser.add_argument("--json", action="store_true")
+
+    search_parser = sub.add_parser("search", help="find a document's identifier by name or number")
+    search_parser.set_defaults(handler=_cmd_search)
+    search_parser.add_argument("fetcher", choices=fetchers.SEARCHABLE)
+    search_parser.add_argument("query", help="case name, docket number, respondent or matter name")
+    search_parser.add_argument(
+        "--type",
+        dest="doc_type",
+        default=None,
+        metavar="KIND",
+        help="; ".join(f"{n}: {'|'.join(fetchers.search_types(n))}" for n in fetchers.SEARCHABLE),
+    )
+    search_parser.add_argument("--json", action="store_true")
 
     ledger = sub.add_parser("ledger", help="emit entries for the New Gray ledgers")
     ledger.set_defaults(handler=_cmd_ledger)

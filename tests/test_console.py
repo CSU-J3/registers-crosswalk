@@ -577,6 +577,94 @@ def test_the_page_never_renders_api_json_as_markup(client):
     assert "<" not in page[start + len('<script type="application/json" id="s">') : end]
 
 
+# ------------------------------------------------------- the keys actually reach the archiver
+
+
+SENTINEL_WB_ACCESS = "wb-access-sentinel-5Kd3vN"
+SENTINEL_WB_SECRET = "wb-secret-sentinel-6Tj8qB"
+ENV_WITH_WAYBACK = {
+    **ENV,
+    "WAYBACK_ACCESS_KEY": SENTINEL_WB_ACCESS,
+    "WAYBACK_SECRET_KEY": SENTINEL_WB_SECRET,
+}
+
+
+def test_a_console_pin_archives_with_the_keys_from_its_own_env(tmp_path, monkeypatch):
+    """The bug: Console defaulted archive_fn to the bare `archive`, which reads os.environ.
+
+    `add_source` calls `archive_fn(url)` and passes nothing else, so `env` stayed None, `archive`
+    looked in an environment this module deliberately never writes to, found no Wayback keys, and
+    took the ANONYMOUS path — with the operator's keys sitting unused in `.env`. Every console pin
+    failed that way.
+
+    Driven end to end through /api/pin with the real `archive` underneath and only its transport
+    faked, so what is asserted is the header that actually went out.
+    """
+    monkeypatch.delenv("WAYBACK_ACCESS_KEY", raising=False)
+    monkeypatch.delenv("WAYBACK_SECRET_KEY", raising=False)
+    seen = []
+
+    def fake_json_call(url, headers=None, data=None, *, timeout=90):
+        seen.append((url, dict(headers or {}), data))
+        if data is not None:
+            return {"job_id": "spn2-console"}
+        return {"status": "success", "timestamp": "20260920190851"}
+
+    def no_anonymous(url, headers=None, *, timeout=90):
+        raise AssertionError(f"the anonymous Wayback path was taken for {url}")
+
+    # The seams one level below `archive`: its own default transports. Patching here means the
+    # console's default archive_fn — the thing under test — is the code that runs. The anonymous
+    # one is stubbed to fail loudly rather than left to reach the network, so this test stays
+    # offline whichever path the code takes, and names the bug if it takes the wrong one.
+    monkeypatch.setattr("registers_crosswalk.pin._json_call", fake_json_call)
+    monkeypatch.setattr("registers_crosswalk.pin._response_headers", no_anonymous)
+
+    (tmp_path / "sources").mkdir()
+    console = Console(data_dir=tmp_path, env=ENV_WITH_WAYBACK, fetch=cl_fetch())
+    server = serve(console, port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        c = Client(console, server)
+        _, resolved = c.post(
+            "/api/resolve", {"fetcher": "courtlistener", "args": {"cluster_id": "1481640"}}
+        )
+        _, body = c.post("/api/pin", {"resolve_id": resolved["resolve_id"], "archive": True})
+        assert body["status"] == "written", body
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    post = next((call for call in seen if call[2] is not None), None)
+    assert post is not None, "the keyed SPN2 POST never happened; the anonymous path was taken"
+    url, headers, _ = post
+    assert url == "https://web.archive.org/save"
+    assert headers["Authorization"] == f"LOW {SENTINEL_WB_ACCESS}:{SENTINEL_WB_SECRET}"
+
+    # and the environment was never written to on the way
+    import os
+
+    assert os.environ.get("WAYBACK_ACCESS_KEY") is None
+    assert os.environ.get("WAYBACK_SECRET_KEY") is None
+
+
+def test_the_console_archive_default_is_bound_to_its_own_env(tmp_path):
+    """Belt and braces on the binding itself, so a refactor cannot silently unbind it."""
+    (tmp_path / "sources").mkdir()
+    console = Console(data_dir=tmp_path, env=ENV_WITH_WAYBACK, fetch=cl_fetch())
+    assert console.archive_fn.keywords["env"] is console.env
+
+
+def test_an_explicit_archive_fn_still_wins(tmp_path):
+    """The tests' own fake archive must still override the default."""
+    (tmp_path / "sources").mkdir()
+    fake = fake_archive()
+    console = Console(data_dir=tmp_path, env=ENV_WITH_WAYBACK, fetch=cl_fetch(), archive_fn=fake)
+    assert console.archive_fn is fake
+
+
 # ------------------------------------------------------- the policy the page runs under
 
 

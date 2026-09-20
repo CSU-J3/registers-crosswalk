@@ -20,6 +20,7 @@ CLI: `python -m registers_crosswalk.console [--data-dir DIR] [--port N] [--no-br
 from __future__ import annotations
 
 import argparse
+import functools
 import html
 import json
 import secrets
@@ -259,12 +260,18 @@ class Console:
         data_dir: Path,
         env: Mapping[str, str],
         fetch: FetchFn,
-        archive_fn: Callable[..., Any] = archive,
+        archive_fn: Callable[..., Any] | None = None,
     ) -> None:
         self.data_dir = data_dir
         self.env = env
         self.fetch = fetch
-        self.archive_fn = archive_fn
+        # `add_source` calls `archive_fn(url)` and nothing else, so an unbound `archive` would
+        # take `env=None` and read `os.environ` — which is exactly what this module refuses to
+        # put the keys in. Every console pin therefore took the ANONYMOUS Wayback path with the
+        # operator's keys sitting unused in `.env`, and failed. Binding the private mapping here
+        # is the whole fix, and the reason this default is computed rather than written in the
+        # signature: it needs `self.env`.
+        self.archive_fn = functools.partial(archive, env=env) if archive_fn is None else archive_fn
         self.token = secrets.token_urlsafe(32)
         self._specs: dict[str, PinSpec] = {}
         self._lock = threading.Lock()

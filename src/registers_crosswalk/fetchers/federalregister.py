@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Mapping
 from datetime import date
 
 from ..models import Grade
@@ -77,5 +78,10 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--document-number", required=True, help="FR document number, e.g. 95-3162")
 
 
-def spec_from_args(args: argparse.Namespace, *, fetch: FetchFn = default_fetch) -> PinSpec:
+def spec_from_args(
+    args: argparse.Namespace,
+    *,
+    fetch: FetchFn = default_fetch,
+    env: Mapping[str, str] | None = None,
+) -> PinSpec:
     return spec(document_number=args.document_number, fetch=fetch)

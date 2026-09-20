@@ -172,5 +172,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--category", default="Final Opinion", help="documents[].category to pin")
 
 
-def spec_from_args(args: argparse.Namespace, *, fetch: FetchFn = default_fetch) -> PinSpec:
-    return spec(number=args.number, doc_type=args.doc_type, category=args.category, fetch=fetch)
+def spec_from_args(
+    args: argparse.Namespace,
+    *,
+    fetch: FetchFn = default_fetch,
+    env: Mapping[str, str] | None = None,
+) -> PinSpec:
+    return spec(
+        number=args.number, doc_type=args.doc_type, category=args.category, fetch=fetch, env=env
+    )

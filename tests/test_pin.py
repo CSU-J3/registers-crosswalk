@@ -2,7 +2,8 @@ import gzip
 import json
 import socket
 import urllib.error
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
+from email.utils import format_datetime
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
@@ -896,6 +897,85 @@ def test_add_source_hands_the_artifact_hash_to_the_archiver(tmp_path):
     assert seen["url"] == ECFR_URL
     assert seen["expected_sha256"] == sha256_hex(BODY)
     assert seen["expected_sha256"] == outcome.source.artifact.sha256
+
+
+# ------------------------------------------------------------------- 429 is a rate, not a fault
+
+
+def _rate_limited(retry_after=None):
+    headers = {} if retry_after is None else {"Retry-After": retry_after}
+    return urllib.error.HTTPError(ECFR_URL, 429, "slow down", headers, None)
+
+
+def test_archive_honours_retry_after_on_a_429():
+    slept = []
+    attempts = []
+
+    def json_fn(url, headers=None, data=None):
+        attempts.append(url)
+        if len(attempts) == 1:
+            raise _rate_limited("7")
+        return _spn2_success(url, data)
+
+    copy = archive(ECFR_URL, json_fn=json_fn, sleep_fn=slept.append, env=KEYS)
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+    assert slept[0] == 7.0  # the service's own number, not ours
+
+
+def test_archive_waits_a_minute_on_a_429_with_no_retry_after():
+    slept = []
+    attempts = []
+
+    def json_fn(url, headers=None, data=None):
+        attempts.append(url)
+        if len(attempts) == 1:
+            raise _rate_limited()
+        return _spn2_success(url, data)
+
+    archive(ECFR_URL, json_fn=json_fn, sleep_fn=slept.append, env=KEYS)
+    assert slept[0] == 60.0
+
+
+def test_archive_gives_up_after_three_429s_and_says_why():
+    slept = []
+
+    def json_fn(url, headers=None, data=None):
+        raise _rate_limited("5")
+
+    result = archive(ECFR_URL, json_fn=json_fn, sleep_fn=slept.append, env=KEYS)
+    assert isinstance(result, ArchiveFailure)
+    assert "HTTP 429" in result.reason
+    assert "still rate limited after 3 tries" in result.reason
+    assert slept == [5.0, 5.0]  # three tries, two waits between them
+
+
+def test_retry_after_accepts_the_http_date_form():
+    """The spec allows a date as well as a count of seconds; ignoring it would substitute our own
+    number for the one the service actually asked for."""
+    when = datetime.now(tz=UTC) + timedelta(seconds=30)
+    exc = urllib.error.HTTPError(
+        ECFR_URL, 429, "slow down", {"Retry-After": format_datetime(when, usegmt=True)}, None
+    )
+    seconds = pinmod._retry_after(exc)
+    assert 20 <= seconds <= 31
+
+
+def test_a_429_and_a_5xx_do_not_share_a_budget():
+    """Each means something different, so each gets its own count of attempts."""
+    slept = []
+    seen = []
+
+    def json_fn(url, headers=None, data=None):
+        seen.append(len(seen))
+        if len(seen) == 1:
+            raise _rate_limited("5")
+        if len(seen) == 2:
+            raise urllib.error.HTTPError(url, 503, "offline", {}, None)
+        return _spn2_success(url, data)
+
+    copy = archive(ECFR_URL, json_fn=json_fn, sleep_fn=slept.append, env=KEYS)
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+    assert slept[:2] == [5.0, 10.0]  # the 429's own wait, then the first 5xx wait
 
 
 # --------------------------------------------------------------------------- emitting

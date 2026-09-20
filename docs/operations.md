@@ -495,11 +495,13 @@ availability API cannot refuse a pin — it just means the long way round.
 Archive: Temporarily Offline" page at 19:22 UTC on 2026-09-20 and was serving normally by 19:23.
 Before the retry, a blip that short refused an otherwise good pin — and for `uscode`, where
 `--archive` is required, the pin could not be made at all until someone ran it again by hand.
-`archive()` now retries a 5xx three times over about a minute. A 4xx is Wayback saying no — a URL
-it will not take, a credential it will not accept — and asking again cannot change that answer, so
-it is not retried. When it does give up, the reason travels back: `add_source` prints `archive step
-failed: <status, status_ext and message as SPN2 gave them, or the HTTP code>`, so a transient
-outage and a permanently refused URL no longer read identically.
+`archive()` now retries a 5xx three times over about a minute. **429 is retried too, on its own
+budget:** it is not a fault but a rate, so `Retry-After` is honoured when the response carries one
+and 60 seconds used only when it does not, for up to three tries. Any other 4xx is Wayback saying
+no — a URL it will not take, a credential it will not accept — and asking again cannot change that
+answer, so it is not retried. When it does give up, the reason travels back: `add_source` prints
+`archive step failed: <status, status_ext and message as SPN2 gave them, or the HTTP code>`, so a
+transient outage and a permanently refused URL no longer read identically.
 
 ## The console is `add` with a page on it, not a second way to pin
 

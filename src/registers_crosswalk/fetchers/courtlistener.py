@@ -1,17 +1,38 @@
 """CourtListener — a court opinion, by opinion-cluster id.
 
-UNVERIFIED (decision 9, 2026-09-17): no COURTLISTENER_TOKEN was available when this was written,
-so nothing below was exercised against the live API. Two things in particular are assumptions:
-  * that `date_filed` sits on the cluster (read defensively here — absent gives published_at=None
-    rather than raising);
-  * that `local_path` resolves under `https://storage.courtlistener.com/`.
-Confirm both on the first real pin and delete this notice.
+Verified live 2026-09-20 on cluster 1481640, Dunne v. United States, 138 F.2d 137 (8th Cir. 1943),
+whose four captured responses the tests read. What the run established:
 
-What is intended:
-  * `https://www.courtlistener.com/api/rest/v4/clusters/{id}/` with `Authorization: Token {t}`.
-  * `sub_opinions[]` holds URLs, not objects, so the opinion itself costs a second call each.
-  * Prefer the court's own `download_url` (A1 — the publisher of record) over CourtListener's
-    `local_path` mirror (B2 — a faithful copy, but a copy).
+  * `{API}/clusters/{id}/` with `Authorization: Token {t}` returns the cluster. `date_filed` does
+    sit on it ("1943-09-20"), confirming the first of the two 2026-09-17 assumptions. It is still
+    read defensively: absent gives `published_at=None` rather than raising.
+  * `sub_opinions[]` holds URLs, not objects, so the opinion costs a second call.
+  * `citations[]` carries volume/reporter/page, and `citations[0]` gave "138 F.2d 137" — the
+    ledger's own citation, unedited.
+
+Two things the run corrected.
+
+**A cluster carries no `court` key at all.** The deciding court is reachable only as
+`cluster.docket`, a URL to the docket, whose own `court` is another URL. So the publisher costs
+two further calls, ending at the court's `full_name` ("Court of Appeals for the Eighth Circuit").
+Before this, every record would have been published by "CourtListener (Free Law Project)" — the
+archive that served the file, not the court that decided the case. `PUBLISHER` survives only as
+the fallback for a broken chain.
+
+**An opinion can have no file at all.** Dunne's carries `download_url: null` AND
+`local_path: null`; its text lives in the database (`html_lawbox`, `xml_harvard`) and text is not
+a document. The document was on the CLUSTER, under `filepath_pdf_harvard` — the Harvard Caselaw
+Access Project's page scan of the reporter volume. So the second 2026-09-17 assumption, that
+`local_path` resolves under `storage.courtlistener.com/`, is STILL UNTESTED: nothing has yet been
+pinned through that branch. It is left as written.
+
+This is the normal case, not an edge: across the twenty hits of the Dunne search, every pre-1980
+opinion had both file fields null, and only 1982-and-later ones carried a `download_url`. A 1943
+opinion has no court PDF because in 1943 there was no such thing. See `_document` for the three
+branches and their grades, and "Pre-1980 opinions" in docs/operations.md.
+
+Four API calls per pin: cluster, opinion, docket, court. The account ceiling observed in this run
+was 5 requests a minute.
 """
 
 from __future__ import annotations
@@ -29,12 +50,12 @@ from ..pin import FetchFn, MissingKey, PinSpec, SearchHit, default_fetch, sha256
 NAME = "courtlistener"
 HELP = "a court opinion by CourtListener cluster id"
 DRIFT_KEY = "sha256"
-# Decision 9: NOT exercised against the live API — no token was available. Every record this
-# module mints says so on its face (`fetcher_verified: false`), so an unverified parse can never
-# pass for a checked one. Flip both constants on the first confirmed pin and delete the notice
-# above.
-VERIFIED = False
-VERIFIED_AT = None
+# Exercised live 2026-09-20: a scratch `add --cluster-id 1481640 --archive` outside the repo ran
+# the current code path end to end, and every field of the record it minted was compared against
+# the four captured responses. Editing `spec()` voids this and resets it to False — the convention
+# in docs/operations.md.
+VERIFIED = True
+VERIFIED_AT = date(2026, 9, 20)
 PUBLISHER = "CourtListener (Free Law Project)"
 ENV_KEY = "COURTLISTENER_TOKEN"
 SITE = "https://www.courtlistener.com"
@@ -65,6 +86,67 @@ def _cite(cluster: dict) -> str | None:
     return None
 
 
+def _document(cluster: dict, opinion: dict, cluster_id: int | str) -> tuple[str, Grade]:
+    """Where the document lives, and what its provenance is worth.
+
+    Three sources, in descending order of proximity to the publisher of record:
+
+    * `opinion.download_url` — the court's own file. **A1**: the publisher of record itself.
+    * `opinion.local_path` — CourtListener's mirror of a file it fetched from the court. **B2**:
+      B because the Free Law Project is not the publisher, 2 because what it holds is a copy of
+      whatever the court served on the day it was fetched, and nothing in the record lets a reader
+      confirm that against the authority.
+    * `cluster.filepath_pdf_harvard` — the Harvard Caselaw Access Project scan, served by the
+      Free Law Project. **B1**: B for the same reason as `local_path`, an institutional archive
+      rather than the publisher — but 1 rather than 2, because the document is a page image of the
+      very reporter the citation names. "138 F.2d 137" resolves to a photograph of page 137 of
+      volume 138 of the Federal Reporter, which a reader can check against any other copy of that
+      volume. That is what separates the two B grades: a re-served file versus an image of the
+      cited text.
+
+    Pre-1980 opinions reach the third branch as a rule, not an exception — there is no court PDF
+    because in 1943 there was no such thing (observed 2026-09-20, see docs/operations.md).
+    """
+    if opinion.get("download_url"):
+        return opinion["download_url"], Grade(reliability="A", credibility=1)
+    if opinion.get("local_path"):
+        return urljoin(STORAGE, opinion["local_path"]), Grade(reliability="B", credibility=2)
+    if cluster.get("filepath_pdf_harvard"):
+        return (
+            urljoin(STORAGE, cluster["filepath_pdf_harvard"]),
+            Grade(reliability="B", credibility=1),
+        )
+    raise ValueError(
+        f"cluster {cluster_id} has no document: the opinion carries neither download_url nor "
+        "local_path, and the cluster has no filepath_pdf_harvard"
+    )
+
+
+def _court_name(cluster: dict, *, fetch: FetchFn, headers: Mapping[str, str]) -> str | None:
+    """The deciding court's full name, or None when the chain to it is broken.
+
+    A v4 cluster has no `court` key at all (observed 2026-09-20); the court is reachable only
+    through `cluster.docket`, a URL to the docket, whose own `court` is a URL. Two more API
+    calls, and they earn their place: without them every record this fetcher mints is published by
+    "CourtListener (Free Law Project)", which is the archive that served the file, not the court
+    that decided the case — a publisher field that is quietly wrong on every row.
+
+    Returns None rather than guessing if either link is missing, so the caller can fall back
+    visibly instead of inventing a court.
+    """
+    docket_url = cluster.get("docket")
+    if not isinstance(docket_url, str) or not docket_url:
+        return None
+    docket = json.loads(fetch(docket_url, headers)[0])
+    court = docket.get("court")
+    # Tolerate either shape: a URL to fetch, or the court already inlined.
+    if isinstance(court, str) and court:
+        court = json.loads(fetch(court, headers)[0])
+    if not isinstance(court, dict):
+        return None
+    return court.get("full_name") or None
+
+
 def spec(
     *,
     cluster_id: int | str,
@@ -72,6 +154,11 @@ def spec(
     fetch: FetchFn = default_fetch,
     env: Mapping[str, str] | None = None,
 ) -> PinSpec:
+    """Four API calls: cluster, opinion, docket, court.
+
+    The document is settled before the last two are spent, so a cluster with nothing pinnable
+    costs two calls rather than four.
+    """
     headers = auth_headers(os.environ if env is None else env)
     body, _ = fetch(cluster_url(cluster_id), headers)
     cluster = json.loads(body)
@@ -82,16 +169,7 @@ def spec(
     body, _ = fetch(sub_opinions[0], headers)
     opinion = json.loads(body)
 
-    download_url = opinion.get("download_url")
-    if download_url:
-        # The court's own PDF: the publisher of record.
-        url, grade = download_url, Grade(reliability="A", credibility=1)
-    elif opinion.get("local_path"):
-        url, grade = urljoin(STORAGE, opinion["local_path"]), Grade(reliability="B", credibility=2)
-    else:
-        raise ValueError(
-            f"opinion for cluster {cluster_id} has neither download_url nor local_path"
-        )
+    url, grade = _document(cluster, opinion, cluster_id)
 
     filed = cluster.get("date_filed")
     case_name = cluster.get("case_name") or f"cluster {cluster_id}"
@@ -100,7 +178,7 @@ def spec(
         canonical_url=url,
         citation=citation or _cite(cluster) or case_name,
         title=case_name,
-        publisher=cluster.get("court") or PUBLISHER,
+        publisher=_court_name(cluster, fetch=fetch, headers=headers) or PUBLISHER,
         published_at=date.fromisoformat(filed[:10]) if filed else None,
         grade=grade,
         drift_key=DRIFT_KEY,

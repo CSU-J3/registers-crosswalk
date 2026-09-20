@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0007",
+  "kind": "source",
+  "citation": "294 U.S. 103",
+  "title": "Mooney v. Holohan",
+  "publisher": "Supreme Court of the United States",
+  "canonical_url": "https://storage.courtlistener.com/harvard_pdf/102372.pdf",
+  "fetcher": "courtlistener",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-20",
+  "point_in_time": null,
+  "published_at": "1935-01-21",
+  "artifact": {
+    "sha256": "cac87c154faba9afc3525a7dc2b06c2fe0577939dd5f50d975e31d00fdccd8d5",
+    "byte_length": 383684,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-20T23:37:35.767756Z",
+    "drift_key": "sha256",
+    "drift_value": "cac87c154faba9afc3525a7dc2b06c2fe0577939dd5f50d975e31d00fdccd8d5"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

@@ -471,6 +471,27 @@ one. Neither key belongs in CI: nothing in the workflows archives, so an unkeyed
 the anonymous path and never needs it. Perma.cc stays a TODO in `archive()` rather than the next
 step — a keyed capture now works, so there is nothing for it to rescue.
 
+**Save Page Now reuses a capture under an hour old, so an archive may predate its fetch by up to an
+hour.** Ask SPN2 to capture a URL it captured within the last hour and it does not capture it
+again: it answers `success` with the OLDER capture's timestamp and says so in `message` ("The same
+snapshot had been made 18 minutes ago. You can make new capture of this URL after 1 hour").
+Observed on 2026-09-20 against `harvard_pdf/102372.pdf` — `duration_sec: 0.52`, `resources: []`,
+nothing fetched. `archive()` accepts that answer, because it points at a real capture of the same
+document, which is all the pin needs. But it means `archives[0].captured_at` can be up to an hour
+EARLIER than `artifact.fetched_at` on a freshly written record, and a second pin of one document
+inside that hour carries the first pin's capture. Neither is a fault; read a capture that predates
+its fetch as "this is the copy Wayback already had", not as a clock problem.
+
+**A 5xx from Wayback is retried; a 4xx is not.** `POST /save` answered 503 with an HTML "Internet
+Archive: Temporarily Offline" page at 19:22 UTC on 2026-09-20 and was serving normally by 19:23.
+Before the retry, a blip that short refused an otherwise good pin — and for `uscode`, where
+`--archive` is required, the pin could not be made at all until someone ran it again by hand.
+`archive()` now retries a 5xx three times over about a minute. A 4xx is Wayback saying no — a URL
+it will not take, a credential it will not accept — and asking again cannot change that answer, so
+it is not retried. When it does give up, the reason travels back: `add_source` prints `archive step
+failed: <status, status_ext and message as SPN2 gave them, or the HTTP code>`, so a transient
+outage and a permanently refused URL no longer read identically.
+
 ## The console is `add` with a page on it, not a second way to pin
 
 `python -m registers_crosswalk.console` serves one page on `127.0.0.1:8765` over the code paths
@@ -508,6 +529,13 @@ on **every** fetcher module, whether or not its `spec()` reads a key, so a calle
 adapter a private mapping without knowing which fetchers need one; `None` means `os.environ`,
 which is what the CLI passes and why its behaviour is unchanged.
 
+The mapping is bound into the archiver too. `add_source` calls `archive_fn(url)` and passes
+nothing else, so an unbound `archive` would take `env=None`, read `os.environ`, find no Wayback
+keys there — this module never puts them there — and fall back to the anonymous save. Every console
+pin did exactly that until `Console` began defaulting `archive_fn` to `functools.partial(archive,
+env=self.env)`. If you add another call that needs a key, bind it the same way and give it a test
+that asserts the credential actually went out.
+
 The page shows a key's variable NAME and whether it is set. No value reaches the page, any API
 response, or the log — the request logger is silenced outright, because a request line carries the
 search query and the headers carry the session token. `tests/test_console.py` puts sentinel values
@@ -525,6 +553,15 @@ ceiling is enforced in code: `PACING = {"www.courtlistener.com": 12.0}` seconds,
 because the server is threaded. `storage.courtlistener.com` serves the pinned PDF, is not the API,
 is not counted against the quota, and is not paced. The clock and sleep are injectable, so the
 test asserts the spacing without spending it.
+
+The wait is reported while it happens. A resolve is one blocking POST that can sit for forty
+seconds, which looked exactly like a hang, so the page polls `/api/progress` on a second channel
+and shows `call 2 of 4, waiting 12 s for CourtListener's rate limit`. The record is scratch state
+for one request, keyed by an id the page mints and dropped when the resolve ends; the resolve is
+identified by a thread-local, because two browser tabs must not write into one another's record.
+`PACED_LABEL` and `SPEC_CALLS` in `console.py` are display only — an unknown host falls back to its
+hostname and an unknown call count drops the "of N", while pacing itself is driven entirely by
+`PACING`.
 
 **`data/` is written only by a click.** Starting the console writes nothing. Resolving writes
 nothing — it builds a `PinSpec` and holds it in memory so Pin can reuse it without spending four

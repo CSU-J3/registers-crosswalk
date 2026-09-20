@@ -405,65 +405,265 @@ def test_openfec_without_a_key_raises_missing_key():
 
 
 # --------------------------------------------------------------------------- courtlistener
+#
+# Captured live 2026-09-20 from cluster 1481640 — Dunne v. United States, 138 F.2d 137
+# (8th Cir. 1943), the first court opinion New Gray's source-links ledger cites. Four responses,
+# one per call `spec()` makes. Untrimmed, per docs/operations.md.
 
-CL_CLUSTER = {
-    "case_name": "Citizens United v. FEC",
-    "date_filed": "2010-01-21",
-    "citations": [{"volume": 558, "reporter": "U.S.", "page": "310"}],
-    "sub_opinions": ["https://www.courtlistener.com/api/rest/v4/opinions/1/"],
-    "court": "Supreme Court of the United States",
+CL_CLUSTER_STEM = "courtlistener_cluster_1481640"
+CL_OPINION_STEM = "courtlistener_opinion_1481640"
+CL_DOCKET_STEM = "courtlistener_docket_2577633"
+CL_COURT_STEM = "courtlistener_court_ca8"
+
+CL_CLUSTER_URL = "https://www.courtlistener.com/api/rest/v4/clusters/1481640/"
+CL_OPINION_URL = "https://www.courtlistener.com/api/rest/v4/opinions/1481640/"
+CL_DOCKET_URL = "https://www.courtlistener.com/api/rest/v4/dockets/2577633/"
+CL_COURT_URL = "https://www.courtlistener.com/api/rest/v4/courts/ca8/"
+CL_TOKEN = {"COURTLISTENER_TOKEN": "T"}
+
+# Every top-level key each live endpoint returned on 2026-09-20.
+LIVE_CL_CLUSTER_KEYS = {
+    "absolute_url",
+    "arguments",
+    "attorneys",
+    "blocked",
+    "case_name",
+    "case_name_full",
+    "case_name_short",
+    "citation_count",
+    "citations",
+    "cluster_redirections",
+    "correction",
+    "cross_reference",
+    "date_blocked",
+    "date_created",
+    "date_filed",
+    "date_filed_is_approximate",
+    "date_modified",
+    "disposition",
+    "docket",
+    "docket_id",
+    "filepath_json_harvard",
+    "filepath_pdf_harvard",
+    "filepath_pdf_scan",
+    "filepath_xml_scan",
+    "headmatter",
+    "headnotes",
+    "history",
+    "id",
+    "judges",
+    "nature_of_suit",
+    "non_participating_judges",
+    "other_dates",
+    "panel",
+    "posture",
+    "precedential_status",
+    "procedural_history",
+    "resource_uri",
+    "scdb_decision_direction",
+    "scdb_id",
+    "scdb_votes_majority",
+    "scdb_votes_minority",
+    "slug",
+    "source",
+    "sub_opinions",
+    "summary",
+    "syllabus",
+}
+LIVE_CL_OPINION_KEYS = {
+    "absolute_url",
+    "author",
+    "author_id",
+    "author_str",
+    "cluster",
+    "cluster_id",
+    "date_created",
+    "date_modified",
+    "download_url",
+    "extracted_by_ocr",
+    "html",
+    "html_anon_2020",
+    "html_columbia",
+    "html_lawbox",
+    "html_with_citations",
+    "id",
+    "joined_by",
+    "joined_by_str",
+    "local_path",
+    "main_version",
+    "opinions_cited",
+    "ordering_key",
+    "page_count",
+    "per_curiam",
+    "plain_text",
+    "resource_uri",
+    "sha1",
+    "type",
+    "xml_harvard",
+    "xml_scan",
+}
+LIVE_CL_COURT_KEYS = {
+    "appeals_to",
+    "citation_string",
+    "date_last_pacer_contact",
+    "date_modified",
+    "end_date",
+    "fjc_court_id",
+    "full_name",
+    "has_opinion_scraper",
+    "has_oral_argument_scraper",
+    "id",
+    "in_use",
+    "jurisdiction",
+    "pacer_court_id",
+    "pacer_has_rss_feed",
+    "pacer_rss_entry_types",
+    "parent_court",
+    "position",
+    "resource_uri",
+    "short_name",
+    "start_date",
+    "url",
 }
 
 
-def _cl_fetch(cluster, opinion):
+def _cl_fetch(cluster=None, opinion=None, docket=None, court=None):
+    """Route the four calls `spec()` makes to the four captured responses.
+
+    Any of them can be overridden with a mutated copy, which is how a branch the live payload
+    cannot reach gets exercised — the same device as the federalregister fallback test above.
+    """
+    payloads = {
+        "/clusters/": load_fixture(CL_CLUSTER_STEM) if cluster is None else cluster,
+        "/opinions/": load_fixture(CL_OPINION_STEM) if opinion is None else opinion,
+        "/dockets/": load_fixture(CL_DOCKET_STEM) if docket is None else docket,
+        "/courts/": load_fixture(CL_COURT_STEM) if court is None else court,
+    }
     calls = []
 
     def fetch(url, headers=None):
         calls.append((url, headers))
-        payload = opinion if "/opinions/" in url else cluster
-        return json.dumps(payload).encode(), "application/json"
+        for marker, payload in payloads.items():
+            if marker in url:
+                return json.dumps(payload).encode(), "application/json"
+        raise AssertionError(f"spec() asked for an unexpected URL: {url}")
 
     fetch.calls = calls
     return fetch
 
 
+def _cl_spec(fetch, **over):
+    return courtlistener.spec(cluster_id=1481640, fetch=fetch, env=CL_TOKEN, **over)
+
+
+@pytest.mark.parametrize(
+    ("stem", "keys"),
+    [
+        (CL_CLUSTER_STEM, LIVE_CL_CLUSTER_KEYS),
+        (CL_OPINION_STEM, LIVE_CL_OPINION_KEYS),
+        (CL_COURT_STEM, LIVE_CL_COURT_KEYS),
+    ],
+)
+def test_captured_courtlistener_fixture_matches_the_observed_live_key_set(stem, keys):
+    # Guards both directions: an invented field fails, a dropped field fails. If CourtListener
+    # really does change its payload, this is where it surfaces, and the fixture must be
+    # RE-CAPTURED rather than edited by hand.
+    assert set(load_fixture(stem)) == keys
+
+
+def test_courtlistener_pins_the_harvard_scan_when_there_is_no_court_pdf():
+    # The real 2026-09-20 run, unmutated. A 1943 opinion has no court PDF and no CourtListener
+    # mirror: the document is the Harvard Caselaw Access Project scan, named on the CLUSTER.
+    fetch = _cl_fetch()
+    spec = _cl_spec(fetch)
+    assert [c[0] for c in fetch.calls] == [
+        CL_CLUSTER_URL,
+        CL_OPINION_URL,
+        CL_DOCKET_URL,
+        CL_COURT_URL,
+    ]
+    assert all(c[1] == {"Authorization": "Token T"} for c in fetch.calls)
+    assert spec.canonical_url == "https://storage.courtlistener.com/harvard_pdf/1481640.pdf"
+    assert spec.citation == "138 F.2d 137"  # the ledger's own citation, unedited
+    assert spec.title == "Dunne v. United States"
+    assert spec.published_at == date(1943, 9, 20)
+    assert spec.grade.code() == "B1"
+
+
+def test_courtlistener_names_the_deciding_court_not_the_archive():
+    # A v4 cluster has no court key at all, so the publisher costs two more calls. Without them
+    # this reads "CourtListener (Free Law Project)" on every record — the archive, not the court.
+    assert "court" not in load_fixture(CL_CLUSTER_STEM)
+    assert _cl_spec(_cl_fetch()).publisher == "Court of Appeals for the Eighth Circuit"
+
+
 def test_courtlistener_prefers_the_courts_own_pdf():
-    fetch = _cl_fetch(CL_CLUSTER, {"download_url": "https://supremecourt.gov/opinions/08-205.pdf"})
-    spec = courtlistener.spec(cluster_id=1, fetch=fetch, env={"COURTLISTENER_TOKEN": "T"})
-    assert fetch.calls[0] == (
-        "https://www.courtlistener.com/api/rest/v4/clusters/1/",
-        {"Authorization": "Token T"},
-    )
-    assert fetch.calls[1][0] == CL_CLUSTER["sub_opinions"][0]
-    assert spec.canonical_url == "https://supremecourt.gov/opinions/08-205.pdf"
-    assert spec.citation == "558 U.S. 310"
-    assert spec.published_at == date(2010, 1, 21)
-    assert spec.grade.code() == "A1"
+    # The live capture cannot reach this branch — Dunne has no court PDF — so the opinion is
+    # mutated to carry one. That tests OUR code, not their API; the claim that the API really
+    # serves download_url this way is still owed a pin through a modern opinion.
+    opinion = {
+        **load_fixture(CL_OPINION_STEM),
+        "download_url": "https://www.ca8.uscourts.gov/x.pdf",
+    }
+    assert set(opinion) == LIVE_CL_OPINION_KEYS  # the mutation stayed inside the observed shape
+    spec = _cl_spec(_cl_fetch(opinion=opinion))
+    assert spec.canonical_url == "https://www.ca8.uscourts.gov/x.pdf"
+    assert spec.grade.code() == "A1"  # the publisher of record
 
 
 def test_courtlistener_falls_back_to_the_mirror_at_a_lower_grade():
-    fetch = _cl_fetch(CL_CLUSTER, {"local_path": "pdf/2010/01/21/citizens_united.pdf"})
-    spec = courtlistener.spec(cluster_id=1, fetch=fetch, env={"COURTLISTENER_TOKEN": "T"})
-    assert spec.canonical_url == (
-        "https://storage.courtlistener.com/pdf/2010/01/21/citizens_united.pdf"
-    )
-    assert spec.grade.code() == "B2"  # a faithful copy is still a copy
+    # Same caveat: local_path has never been exercised against the live API, so this pins the
+    # branch's behaviour, not the claim that storage.courtlistener.com is where it resolves.
+    opinion = {**load_fixture(CL_OPINION_STEM), "local_path": "pdf/2003/04/01/dunne.pdf"}
+    assert set(opinion) == LIVE_CL_OPINION_KEYS
+    spec = _cl_spec(_cl_fetch(opinion=opinion))
+    assert spec.canonical_url == "https://storage.courtlistener.com/pdf/2003/04/01/dunne.pdf"
+    assert spec.grade.code() == "B2"  # a re-served copy, not an image of the cited page
+
+
+def test_courtlistener_grades_the_harvard_scan_above_the_mirror():
+    # The whole point of the third branch: both are served by the Free Law Project, so both are B,
+    # but a page image of the reporter the citation names is better evidence than a re-served file.
+    harvard = _cl_spec(_cl_fetch()).grade
+    mirror = _cl_spec(
+        _cl_fetch(opinion={**load_fixture(CL_OPINION_STEM), "local_path": "pdf/x.pdf"})
+    ).grade
+    assert harvard.reliability == mirror.reliability == "B"
+    assert harvard.credibility < mirror.credibility
+
+
+def test_courtlistener_raises_when_no_branch_has_a_document():
+    cluster = {**load_fixture(CL_CLUSTER_STEM), "filepath_pdf_harvard": None}
+    assert set(cluster) == LIVE_CL_CLUSTER_KEYS
+    with pytest.raises(ValueError, match="no document"):
+        _cl_spec(_cl_fetch(cluster=cluster))
+
+
+def test_courtlistener_falls_back_to_the_archive_when_the_court_chain_breaks():
+    cluster = {**load_fixture(CL_CLUSTER_STEM), "docket": None}
+    fetch = _cl_fetch(cluster=cluster)
+    spec = _cl_spec(fetch)
+    assert spec.publisher == courtlistener.PUBLISHER
+    # And it did not spend the two calls it could not use.
+    assert [c[0] for c in fetch.calls] == [CL_CLUSTER_URL, CL_OPINION_URL]
 
 
 def test_courtlistener_tolerates_a_missing_date_filed():
-    # Decision 9: date_filed placement is unverified, so its absence must not raise.
-    cluster = {k: v for k, v in CL_CLUSTER.items() if k != "date_filed"}
-    spec = courtlistener.spec(
-        cluster_id=1,
-        fetch=_cl_fetch(cluster, {"download_url": "https://supremecourt.gov/x.pdf"}),
-        env={"COURTLISTENER_TOKEN": "T"},
+    # date_filed IS on the cluster (confirmed 2026-09-20), but absence must still not raise.
+    cluster = {**load_fixture(CL_CLUSTER_STEM), "date_filed": None}
+    assert set(cluster) == LIVE_CL_CLUSTER_KEYS
+    assert _cl_spec(_cl_fetch(cluster=cluster)).published_at is None
+
+
+def test_courtlistener_takes_an_explicit_citation_over_the_reporter():
+    assert _cl_spec(_cl_fetch(), citation="Dunne v. United States (8th Cir. 1943)").citation == (
+        "Dunne v. United States (8th Cir. 1943)"
     )
-    assert spec.published_at is None
 
 
 def test_courtlistener_without_a_token_raises_missing_key():
     with pytest.raises(MissingKey, match="COURTLISTENER_TOKEN"):
-        courtlistener.spec(cluster_id=1, fetch=_cl_fetch(CL_CLUSTER, {}), env={})
+        courtlistener.spec(cluster_id=1481640, fetch=_cl_fetch(), env={})
 
 
 def test_courtlistener_check_refetches_the_document_without_a_token():
@@ -552,7 +752,7 @@ def test_no_built_canonical_url_carries_a_key():
         ),
         courtlistener.spec(
             cluster_id=1,
-            fetch=_cl_fetch(CL_CLUSTER, {"download_url": "https://supremecourt.gov/x.pdf"}),
+            fetch=_cl_fetch(),
             env={"COURTLISTENER_TOKEN": "SECRET"},
         ),
     ]
@@ -588,17 +788,14 @@ def test_every_fetcher_declares_its_verification_state():
         assert (module.VERIFIED_AT is not None) == module.VERIFIED, name
 
 
-def test_courtlistener_ships_unverified():
-    # Decision 9: no token was available, so its field mapping was never exercised.
-    assert courtlistener.VERIFIED is False
-    assert courtlistener.VERIFIED_AT is None
-    spec = courtlistener.spec(
-        cluster_id=1,
-        fetch=_cl_fetch(CL_CLUSTER, {"download_url": "https://supremecourt.gov/x.pdf"}),
-        env={"COURTLISTENER_TOKEN": "T"},
-    )
-    assert spec.fetcher_verified is False
-    assert spec.verified_at is None
+def test_courtlistener_stamps_its_live_run_onto_every_record():
+    # Exercised live 2026-09-20 on cluster 1481640, whose four captured responses these tests read.
+    # Editing spec() voids the run and resets this to False — the convention in docs/operations.md.
+    assert courtlistener.VERIFIED is True
+    assert courtlistener.VERIFIED_AT == date(2026, 9, 20)
+    spec = _cl_spec(_cl_fetch())
+    assert spec.fetcher_verified is True
+    assert spec.verified_at == date(2026, 9, 20)
 
 
 @pytest.mark.parametrize(
@@ -614,6 +811,9 @@ def test_courtlistener_ships_unverified():
         # uscode: a scratch `add --title 52 --section 30116 --archive` on 2026-09-19 (UTC), the
         # first capture this tree took through the keyed SPN2 path.
         (uscode, date(2026, 9, 19)),
+        # courtlistener: a scratch `add --cluster-id 1481640 --archive` on 2026-09-20 (UTC), the
+        # first run with a token in this tree. It corrected two things — see the module docstring.
+        (courtlistener, date(2026, 9, 20)),
     ],
 )
 def test_exercised_fetchers_ship_verified(module, verified_on):
@@ -621,7 +821,7 @@ def test_exercised_fetchers_ship_verified(module, verified_on):
     assert module.VERIFIED_AT == verified_on
 
 
-@pytest.mark.parametrize("module", [govinfo, openfec, courtlistener])
+@pytest.mark.parametrize("module", [govinfo, openfec])
 def test_unexercised_fetchers_ship_unverified(module):
     # A claim recorded in a handoff or a docstring is not a verification. These flip one at a
     # time, each on its own live `add` in this tree, dated the day it ran.
@@ -632,11 +832,12 @@ def test_unexercised_fetchers_ship_unverified(module):
 def test_the_stamp_reaches_the_minted_record():
     from registers_crosswalk.pin import pin
 
+    # openfec is the unverified example now: courtlistener flipped to True on 2026-09-20.
     unverified = pin(
-        courtlistener.spec(
-            cluster_id=1,
-            fetch=_cl_fetch(CL_CLUSTER, {"download_url": "https://supremecourt.gov/x.pdf"}),
-            env={"COURTLISTENER_TOKEN": "T"},
+        openfec.spec(
+            number="2023-01",
+            fetch=_json_fetch(OPENFEC_SEARCH),
+            env={"OPENFEC_API_KEY": "K"},
         ),
         next_id="xr_src_0001",
         fetch=lambda u, h=None: (b"%PDF fake", "application/pdf"),

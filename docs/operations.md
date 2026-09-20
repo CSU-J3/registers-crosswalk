@@ -301,8 +301,24 @@ A pin through a modern opinion would close it.
 
 **courtlistener pins are archived by policy, not by code.** `REQUIRES_ARCHIVE` stays off — a court
 PDF is static, like a Federal Register one — but court websites reorganise URLs often and the
-Harvard scan is served by a third party, so these pins are made with `--archive` as a matter of
-practice. The 8th Circuit's 1943 volume is not going to change; where it lives might.
+Harvard scan is served by a third party, so these pins carry an archive as a matter of practice:
+**archived at pin time with `--archive`, or with `pin archive` promptly after.** The 8th Circuit's
+1943 volume is not going to change; where it lives might.
+
+The second route exists because `add --archive` is all-or-nothing — the capture must succeed or
+the pin is not written — and a Wayback outage should not cost a good fetch of a document whose
+archive is practice rather than requirement. `pin archive xr_src_NNNN` adds the capture afterwards
+without re-fetching the document or re-deciding anything about it, through the same
+reuse-or-capture path `add` uses, and rewrites only the record's `archives` field. It refuses a
+pin that already has one. "Promptly" is the whole of the discipline here: a courtlistener pin left
+unarchived is a pin whose URL may move before anyone notices, and nothing enforces it but this
+sentence and the console's list of pins with no archive copy.
+
+**`uscode` keeps `--archive` at pin time, and that is not negotiable.** Its URL serves whatever is
+current, with no version axis, so the canonical URL cannot reproduce the text that was pinned: an
+unarchived uscode pin is unrecoverable the moment the section is amended, and there is no later
+moment at which `pin archive` could capture what it should have captured. `REQUIRES_ARCHIVE`
+refuses the pin up front for exactly that reason.
 
 **`openfec` remains unverified.** The ledger cites no MUR and no advisory opinion — its only FEC
 citation is a committee data page, which the legal-search endpoint does not serve — so there was

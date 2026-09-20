@@ -65,6 +65,13 @@ DEFAULT_PORT = 8765
 # reason.
 PACING: dict[str, float] = {"www.courtlistener.com": 12.0}
 
+# Display only, both of them. The label is what the page calls a paced host; the call count is how
+# many API calls that fetcher's `spec()` is expected to make, so a wait can be reported as "call 2
+# of 4" rather than "call 2". Neither is load-bearing: an unknown host falls back to its hostname,
+# an unknown or exceeded count drops the "of N", and pacing itself is driven entirely by PACING.
+PACED_LABEL: dict[str, str] = {"www.courtlistener.com": "CourtListener"}
+SPEC_CALLS: dict[str, int] = {"courtlistener": 4}
+
 
 def paced(
     fetch: FetchFn = default_fetch,
@@ -72,6 +79,7 @@ def paced(
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
     pacing: Mapping[str, float] = PACING,
+    on_call: Callable[[str, float], None] | None = None,
 ) -> FetchFn:
     """Wrap `fetch` so calls to a paced host are spaced by at least the table's interval.
 
@@ -88,14 +96,21 @@ def paced(
         interval = pacing.get(host)
         with lock:
             counts[host] = counts.get(host, 0) + 1
+            wait = 0.0
+            now = clock()
             if interval is not None:
                 previous = last.get(host)
-                now = clock()
                 if previous is not None:
-                    wait = interval - (now - previous)
-                    if wait > 0:
-                        sleep(wait)
-                        now = clock()
+                    wait = max(0.0, interval - (now - previous))
+            # Reported BEFORE the sleep, not after, because the whole point is to say what the
+            # page is waiting for while it is still waiting. A caller that reports after the
+            # sleep describes a wait that has already ended, which is no better than silence.
+            if on_call is not None:
+                on_call(host, wait)
+            if interval is not None:
+                if wait > 0:
+                    sleep(wait)
+                    now = clock()
                 last[host] = now
         return fetch(url, headers)
 
@@ -261,10 +276,22 @@ class Console:
         env: Mapping[str, str],
         fetch: FetchFn,
         archive_fn: Callable[..., Any] | None = None,
+        pacing: Mapping[str, float] | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.data_dir = data_dir
         self.env = env
-        self.fetch = fetch
+        # `pacing` is opt-in rather than on by default so a test can hand in a fake fetch and get
+        # it back unwrapped; `main` passes PACING. Wrapping here rather than in `main` is what
+        # lets the wait be reported into this console's own progress record.
+        self._progress: dict[str, dict[str, Any]] = {}
+        self._local = threading.local()
+        self.fetch = (
+            paced(fetch, clock=clock, sleep=sleep, pacing=pacing, on_call=self.note_call)
+            if pacing
+            else fetch
+        )
         # `add_source` calls `archive_fn(url)` and nothing else, so an unbound `archive` would
         # take `env=None` and read `os.environ` — which is exactly what this module refuses to
         # put the keys in. Every console pin therefore took the ANONYMOUS Wayback path with the
@@ -276,7 +303,41 @@ class Console:
         self._specs: dict[str, PinSpec] = {}
         self._lock = threading.Lock()
 
-    # -- the four endpoints, each returning (status, payload) ------------------
+    # -- progress -------------------------------------------------------------
+
+    def note_call(self, host: str, wait: float) -> None:
+        """One paced call is about to happen; record it against the resolve that caused it.
+
+        A resolve is one blocking POST, so without this the page has nothing to say for the
+        forty-odd seconds CourtListener's rate limit costs — it sat on "Resolving..." looking
+        indistinguishable from a hang, which is the same complaint the uncaught fetch rejection
+        drew. The resolve is identified by a thread-local, because ThreadingHTTPServer gives each
+        request its own thread and two browser tabs must not write into one another's record.
+        """
+        progress_id = getattr(self._local, "progress_id", None)
+        if progress_id is None:
+            return
+        with self._lock:
+            record = self._progress.setdefault(progress_id, {"calls": 0, "fetcher": None})
+            record["calls"] += 1
+            expected = SPEC_CALLS.get(record.get("fetcher") or "")
+            where = f"call {record['calls']}"
+            if expected and record["calls"] <= expected:
+                where += f" of {expected}"
+            if wait > 0:
+                label = PACED_LABEL.get(host, host)
+                record["message"] = f"{where}, waiting {wait:.0f} s for {label}'s rate limit"
+            else:
+                record["message"] = where
+            record["waiting"] = wait > 0
+
+    def api_progress(self, query: dict[str, list[str]]) -> tuple[int, dict[str, Any]]:
+        progress_id = (query.get("id") or [""])[0]
+        with self._lock:
+            record = self._progress.get(progress_id)
+        return 200, (dict(record) if record else {})
+
+    # -- the endpoints, each returning (status, payload) -----------------------
 
     def api_state(self) -> tuple[int, dict[str, Any]]:
         return 200, state(self.data_dir, self.env)
@@ -309,6 +370,25 @@ class Console:
         }
 
     def api_resolve(self, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        progress_id = str(body.get("progress_id") or "") or None
+        if progress_id is not None:
+            with self._lock:
+                self._progress[progress_id] = {
+                    "calls": 0,
+                    "fetcher": str(body.get("fetcher") or ""),
+                    "message": "starting",
+                    "waiting": False,
+                }
+            self._local.progress_id = progress_id
+        try:
+            return self._resolve(body)
+        finally:
+            self._local.progress_id = None
+            if progress_id is not None:
+                with self._lock:
+                    self._progress.pop(progress_id, None)
+
+    def _resolve(self, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         name = str(body.get("fetcher") or "")
         try:
             module = fetchers.get(name)
@@ -509,6 +589,9 @@ def make_handler(console: Console) -> type[BaseHTTPRequestHandler]:
                 return
             if parsed.path == "/api/search":
                 self._json(*console.api_search(parse_qs(parsed.query)))
+                return
+            if parsed.path == "/api/progress":
+                self._json(*console.api_progress(parse_qs(parsed.query)))
                 return
             self._json(404, {"error": "no such path"})
 
@@ -788,8 +871,22 @@ _JS = """
     resolved = null;
     card.classList.remove('hidden');
     say(card, 'Resolving\\u2026');
-    api('/api/resolve', { method: 'POST', body: JSON.stringify({ fetcher: fetcher, args: args }) })
+    // A resolve is one blocking POST that can sit for forty seconds behind CourtListener's
+    // rate limit. The page opens a second, cheap channel and polls it, so the wait has a
+    // reason on screen while it is happening rather than after it ends.
+    var progressId = String(Date.now()) + '-' + Math.random().toString(36).slice(2);
+    var ticking = setInterval(function () {
+      api('/api/progress?id=' + encodeURIComponent(progressId)).then(function (p) {
+        if (!resolved && p.ok && p.body && p.body.message) { say(card, p.body.message); }
+      }).catch(function () { /* a lost tick is not news; the resolve reports its own end */ });
+    }, 1000);
+    function stop() { clearInterval(ticking); }
+    api('/api/resolve', {
+      method: 'POST',
+      body: JSON.stringify({ fetcher: fetcher, args: args, progress_id: progressId })
+    })
       .then(function (r) {
+        stop();
         if (!r.ok) { say(card, r.body.error || 'resolve failed', 'note warn'); return; }
         if (!r.body.pinnable) {
           say(card, 'No pinnable document: ' + r.body.message, 'note warn');
@@ -798,7 +895,7 @@ _JS = """
         resolved = r.body;
         drawResolved(r.body);
       })
-      .catch(function (err) { failed(card, err); });
+      .catch(function (err) { stop(); failed(card, err); });
   }
 
   function drawResolved(d) {
@@ -1064,7 +1161,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     env = load_dotenv(args.env_file)
-    console = Console(data_dir=args.data_dir, env=env, fetch=paced())
+    # `pacing` here rather than a pre-wrapped fetch: Console does the wrapping so each paced
+    # wait is reported into the progress record the page polls.
+    console = Console(data_dir=args.data_dir, env=env, fetch=default_fetch, pacing=PACING)
     try:
         server = serve(console, port=args.port)
     except OSError as exc:

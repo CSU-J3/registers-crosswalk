@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 from registers_crosswalk import console as consolemod
-from registers_crosswalk.console import Console, load_dotenv, paced, serve
+from registers_crosswalk.console import PACING, Console, load_dotenv, paced, serve
 from registers_crosswalk.models import ArchiveCopy
 from registers_crosswalk.pin import sha256_hex, to_ledger_markdown
 from registers_crosswalk.registry import Crosswalk
@@ -575,6 +575,114 @@ def test_the_page_never_renders_api_json_as_markup(client):
     start = page.index('<script type="application/json" id="s">')
     end = page.index("</script>", start)
     assert "<" not in page[start + len('<script type="application/json" id="s">') : end]
+
+
+# ------------------------------------------------------- the wait has a reason on screen
+
+
+def test_a_paced_resolve_reports_which_call_it_is_waiting_on(tmp_path):
+    """The forty seconds CourtListener costs used to look exactly like a hang.
+
+    Console builds its own paced fetch here, which is the wiring under test. The clock is fake and
+    the sleep records instead of waiting — and because the wait is announced BEFORE the sleep, the
+    sleep is exactly the moment to read the record back through /api/progress, which is the same
+    endpoint and the same message the page polls for.
+    """
+    (tmp_path / "sources").mkdir()
+    now = [0.0]
+    announced = []
+    console = None
+
+    def sleep(seconds):
+        # what the page would be showing while this wait is happening
+        _, record = console.api_progress({"id": ["p1"]})
+        announced.append((record.get("message"), seconds))
+        now[0] += seconds
+
+    console = Console(
+        data_dir=tmp_path,
+        env=ENV,
+        fetch=cl_fetch(),
+        archive_fn=fake_archive(),
+        pacing=PACING,
+        clock=lambda: now[0],
+        sleep=sleep,
+    )
+    server = serve(console, port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        c = Client(console, server)
+        status, body = c.post(
+            "/api/resolve",
+            {"fetcher": "courtlistener", "args": {"cluster_id": "1481640"}, "progress_id": "p1"},
+        )
+        assert status == 200, body
+        assert body["pinnable"] is True
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    # spec() makes four API calls; the first needs no wait, the other three do.
+    assert announced == [
+        ("call 2 of 4, waiting 12 s for CourtListener's rate limit", 12.0),
+        ("call 3 of 4, waiting 12 s for CourtListener's rate limit", 12.0),
+        ("call 4 of 4, waiting 12 s for CourtListener's rate limit", 12.0),
+    ]
+
+
+def test_the_first_call_of_a_resolve_reports_no_wait(tmp_path):
+    """Nothing to wait for yet, so the message is the position alone."""
+    (tmp_path / "sources").mkdir()
+    console = Console(data_dir=tmp_path, env=ENV, fetch=cl_fetch(), archive_fn=fake_archive())
+    console._local.progress_id = "p2"
+    console._progress["p2"] = {"calls": 0, "fetcher": "courtlistener"}
+    console.note_call("www.courtlistener.com", 0.0)
+    _, record = console.api_progress({"id": ["p2"]})
+    assert record["message"] == "call 1 of 4"
+    assert record["waiting"] is False
+
+
+def test_the_progress_record_is_dropped_when_the_resolve_ends(tmp_path):
+    """It is scratch state for one request, not something the server accumulates."""
+    (tmp_path / "sources").mkdir()
+    console = Console(data_dir=tmp_path, env=ENV, fetch=cl_fetch(), archive_fn=fake_archive())
+    server = serve(console, port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        c = Client(console, server)
+        c.post(
+            "/api/resolve",
+            {"fetcher": "courtlistener", "args": {"cluster_id": "1481640"}, "progress_id": "p9"},
+        )
+        status, body = c.get("/api/progress?id=p9")
+        assert status == 200
+        assert body == {}
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_progress_needs_the_token_like_every_other_api_call(client):
+    status, _ = client.raw("/api/progress?id=anything")
+    assert status == 401
+
+
+def test_an_unpaced_host_is_reported_without_a_wait():
+    """The count still moves for a host with no rate limit; there is just nothing to wait for."""
+    seen = []
+    wrapped = paced(
+        lambda u, h=None: (b"x", "application/pdf"),
+        clock=lambda: 0.0,
+        sleep=lambda _s: None,
+        pacing=PACING,
+        on_call=lambda host, wait: seen.append((host, wait)),
+    )
+    wrapped("https://storage.courtlistener.com/harvard_pdf/1481640.pdf")
+    assert seen == [("storage.courtlistener.com", 0.0)]
 
 
 # ------------------------------------------------------- the keys actually reach the archiver

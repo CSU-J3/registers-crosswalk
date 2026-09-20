@@ -54,6 +54,7 @@ read path would reject. `--blob-dir PATH` also writes the bytes to
 `PATH/<sha256><ext>` — **outside this repo**, which is enforced, not merely asked. Other fetchers:
 `federalregister`, `govinfo`, `uscode`, `openfec`, `courtlistener`, `manual`.
 
+    python -m registers_crosswalk.pin search <fetcher> <query>   # identifiers, then the add to paste
     python -m registers_crosswalk.pin check        # 0 clean, 1 drift, 2 missing key, 3 fetch failed
     python -m registers_crosswalk.pin ledger       # entries for the New Gray ledgers
 
@@ -65,6 +66,19 @@ mapping error could be sitting in the record. `validate` counts them.
 API keys (`GOVINFO_API_KEY`, `OPENFEC_API_KEY`, `COURTLISTENER_TOKEN`) come from the environment and
 never enter a stored URL — see `docs/operations.md`, which also explains what each drift status
 means and why a quiet repo can silently stop drift-checking.
+
+## Finding a document
+
+    python -m registers_crosswalk.pin search courtlistener "Dunne v. United States"
+
+    1481640  1943-09-20  Dunne v. United States  12195  138 F.2d 137
+    ...
+    pin add courtlistener --cluster-id 1481640 --archive
+
+Case name or docket number in, identifiers out, and the last line is the `add` that pins the first
+hit. `--type dockets` searches dockets instead of opinions (a lookup aid: a docket id is not a
+cluster id, so those hits print no `add`). `--json` prints the hits as JSON. `search` never writes
+anything and never touches `data/`; the API key is used for the query and then forgotten.
 
 ## Status page
 

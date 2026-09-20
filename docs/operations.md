@@ -231,6 +231,85 @@ fix by hand in a terminal proves it works today and nothing more. Two rules foll
 - Where the live capture cannot produce the case, mutate a copy to produce it, and assert the
   mutation stayed inside the observed key set so it cannot drift into fiction.
 
+## Searching: `pin search`
+
+    python -m registers_crosswalk.pin search courtlistener "Dunne v. United States"
+    python -m registers_crosswalk.pin search courtlistener "Phang v. Blanche" --type dockets
+
+A case name or a respondent goes in; the identifier `add` needs comes out. Each line is
+`identifier  date  label  docket_or_number  citation`, and the last line is the `pin add` that
+would pin the first hit, ready to paste. `--json` prints the hits instead.
+
+**It only reads.** `search` writes nothing, touches `data/` not at all, and answers a question
+about the publisher's index rather than about what this repo holds. The API key is used for the
+query and then forgotten: it is never stored, never printed, and never reaches a hit's `url` —
+the same rule as `canonical_url` (decision 1, above).
+
+Searchable fetchers are the ones that expose `SEARCH_TYPES`; `pin search --help` lists them and
+the `--type` values each accepts. `courtlistener` takes `opinions` (the default) and `dockets`.
+A docket hit is a lookup aid, not a pin: its id is a docket id and `add` wants a CLUSTER id, so
+the command prints "not pinnable directly" rather than an `add` that would fetch the wrong thing.
+`openfec` exposes `advisory_opinions` and `murs`, but its search has never been run — see below.
+
+## `courtlistener` was verified live on 2026-09-20, and 138 F.2d 137 is pinned
+
+A scratch `add courtlistener --cluster-id 1481640 --archive` outside the repo ran the current code
+path end to end against *Dunne v. United States*, 138 F.2d 137 (8th Cir. 1943) — the first court
+opinion New Gray's source-links ledger cites. Every field of the record it minted was compared
+against the four captured responses. The committed pin is `xr_src_0006`, archived, carrying the
+same sha256 as the scratch record. The fetcher now ships `VERIFIED = True`,
+`VERIFIED_AT = 2026-09-20`.
+
+The run cost two `spec()` corrections, which is exactly what a first live run is for.
+
+**A cluster has no `court` key.** Not null — absent. The deciding court is reachable only as
+`cluster.docket`, a URL to the docket, whose own `court` is a URL to the court, whose `full_name`
+is the answer. `spec()` therefore makes **four API calls**: cluster, opinion, docket, court. Before
+the fix, `cluster.get("court") or PUBLISHER` fell through silently and every courtlistener record
+would have been published by "CourtListener (Free Law Project)" — the archive that served the
+file, not the court that decided the case. That is the kind of wrong a test cannot catch, because
+the code did exactly what it said; it just said the wrong thing.
+
+**Pre-1980 opinions have no court PDF, and pin through the Harvard scan.** Dunne's opinion carries
+`download_url: null` *and* `local_path: null`. Its text is in CourtListener's database
+(`html_lawbox`, `xml_harvard`), and text in a database is not a document you can hash. The document
+was on the CLUSTER all along, under `filepath_pdf_harvard` — the Harvard Caselaw Access Project's
+page scan of the reporter volume, served from `storage.courtlistener.com`.
+
+This is the rule for old cases, not an edge. Across the twenty hits the Dunne search returned,
+**every pre-1980 opinion had both file fields null**; only 1982-and-later ones carried a
+`download_url`, and those pointed at `bulk.resource.org` or the court's own site. A 1943 opinion
+has no court PDF because in 1943 there was no such thing. Since the ledger's court citations are
+almost entirely historical — 1932 to 1969, plus one 1994 — without this branch `courtlistener`
+could pin essentially nothing the essay actually cites.
+
+So `_document` has three branches, and they are graded apart on purpose:
+
+| branch | grade | why |
+|---|---|---|
+| `opinion.download_url` | **A1** | the court's own file: the publisher of record |
+| `cluster.filepath_pdf_harvard` | **B1** | B — an institutional archive is not the publisher. 1 — the document is a page image of the very reporter the citation names, so "138 F.2d 137" resolves to a photograph of page 137 of volume 138, checkable against any other copy of that volume |
+| `opinion.local_path` | **B2** | B for the same reason. 2 — a copy of whatever the court served the day CourtListener fetched it, with nothing in the record letting a reader confirm it against the authority |
+
+The Harvard scan outranks the mirror on credibility, not reliability: same custodian, better
+evidence. A cluster with none of the three raises rather than pinning the case name.
+
+**`local_path` is still unverified.** Dunne did not reach that branch, so the 2026-09-17 assumption
+that it resolves under `storage.courtlistener.com/` has never been exercised against the live API.
+The tests cover the branch by mutating a copy of the capture, which tests our code, not theirs.
+A pin through a modern opinion would close it.
+
+**courtlistener pins are archived by policy, not by code.** `REQUIRES_ARCHIVE` stays off — a court
+PDF is static, like a Federal Register one — but court websites reorganise URLs often and the
+Harvard scan is served by a third party, so these pins are made with `--archive` as a matter of
+practice. The 8th Circuit's 1943 volume is not going to change; where it lives might.
+
+**`openfec` remains unverified.** The ledger cites no MUR and no advisory opinion — its only FEC
+citation is a committee data page, which the legal-search endpoint does not serve — so there was
+no document to run a first search or a first pin against. `search()` exists for it and is covered
+only by the test a capture is not needed for: that the query URL is built correctly and that the
+key never leaves it. Treat both halves of that module as unexercised until a real MUR turns up.
+
 ## `add` cannot write a record that fails to load
 
 Before writing, `pin add` runs the would-be record through

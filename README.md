@@ -80,6 +80,39 @@ hit. `--type dockets` searches dockets instead of opinions (a lookup aid: a dock
 cluster id, so those hits print no `add`). `--json` prints the hits as JSON. `search` never writes
 anything and never touches `data/`; the API key is used for the query and then forgotten.
 
+## Console
+
+    python -m registers_crosswalk.console
+
+A local page over `search` and `add`: type a case name, see what document would be pinned and at
+what grade, click Pin. It serves on `127.0.0.1:8765` and opens a browser; `--no-browser` skips
+that, `--port N` moves it, `--data-dir DIR` points it somewhere other than this repo's `data/`.
+
+**It is the write side, so it is local only.** The server binds the loopback interface and nothing
+else, the page is `noindex`, and every `/api/` request carries a session token minted at startup
+and rendered into the page — so a page on another origin cannot drive it. It is never run in CI
+and never exposed beyond `127.0.0.1`.
+
+**Nothing in it bypasses a rule `add` enforces.** Search goes through the same `fetchers.search`,
+resolving goes through the fetcher's own `spec_from_args`, and pinning goes through
+`pin.add_source` — the function `pin add` itself calls. Every refusal you see on the page is the
+CLI's own message, in the CLI's own words, because it is the same string. A fetcher that has not
+been verified live can be *searched* but not *pinned* through: the first live `spec()` run goes
+through the terminal, where its output is read.
+
+**It reads `.env` itself and never modifies the environment.** Keys are parsed into a private
+mapping that is passed to the calls that need one. The page shows only a variable's *name* and
+whether it is set, never a value.
+
+**A pin is still a commit.** Clicking Pin writes one record to `data/sources/` and nothing more;
+the page shows the ledger entry, the manifest line, and the `git add` that starts the commit. The
+footer lists anything uncommitted under `data/sources/`, so a pin made and then forgotten is
+visible on the page that made it.
+
+Requests to `www.courtlistener.com` are spaced 12 seconds apart, whatever the operator clicks —
+that is CourtListener's 5-a-minute ceiling for a free account, enforced by the code rather than by
+restraint. The PDF host is not the API and is not paced.
+
 ## Status page
 
     python -m registers_crosswalk.status --out build/status/index.html

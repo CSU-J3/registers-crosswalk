@@ -471,6 +471,67 @@ one. Neither key belongs in CI: nothing in the workflows archives, so an unkeyed
 the anonymous path and never needs it. Perma.cc stays a TODO in `archive()` rather than the next
 step — a keyed capture now works, so there is nothing for it to rescue.
 
+## The console is `add` with a page on it, not a second way to pin
+
+`python -m registers_crosswalk.console` serves one page on `127.0.0.1:8765` over the code paths
+that already exist. It is the write side of the register — it is the only thing in this repo that
+creates records without a terminal — so the rules it runs under are worth stating plainly.
+
+**One function, not two code paths.** `pin.add_source` holds everything `pin add` does from the
+`duplicate_of` early exit to the write: both duplicate rules, the archive step and its failure
+mode, `check_source_invariants`, and the write itself. `_cmd_add` is a thin caller that keeps only
+what is genuinely about the command line — the two refusals decided from flags alone, and turning
+`args` into a `PinSpec`. The console calls the same `add_source`. Every refusal the page shows is
+the CLI's own string, which is why `tests/test_pin_cli.py` asserts those messages and
+`tests/test_console.py` asserts the console reimplements none of them.
+
+The one guard the console owns rather than borrows is `REQUIRES_ARCHIVE`, because `_cmd_add`
+refuses that from the flags before there is a spec to hand over. The console **forces** the
+archive on rather than refusing the pin: the operator's intent is unambiguous, and refusing would
+only make them tick a box they were never offered a choice about. A `uscode` pin through the
+console is archived whatever the checkbox says, and there is a test that sends `archive: false`
+and asserts the capture happened anyway.
+
+**Unverified fetchers can be searched, not pinned through.** `/api/resolve` answers 409 for a
+fetcher whose `VERIFIED` is false, naming this file. Search is allowed for the same reason it is
+harmless: it reads somebody else's index and writes nothing. It is `spec()` — the call that
+decides *which* document gets pinned and at *what grade* — that a first live run has to witness,
+with a human reading the output. That is what the terminal is for, and it is why the console
+cannot be the place `govinfo` or `openfec` is exercised for the first time. See
+`fetcher_verified`: the convention for flipping it, above.
+
+**Keys: it reads `.env` itself and never modifies the environment.** `load_dotenv` parses the file
+into a private mapping that is passed as `env` to `fetchers.search`, to the fetcher's
+`spec_from_args`, and to `archive`. `os.environ` is untouched, so nothing the console runs leaks a
+key into a child process or into a later command in the same shell. `spec_from_args` takes `env`
+on **every** fetcher module, whether or not its `spec()` reads a key, so a caller can hand the
+adapter a private mapping without knowing which fetchers need one; `None` means `os.environ`,
+which is what the CLI passes and why its behaviour is unchanged.
+
+The page shows a key's variable NAME and whether it is set. No value reaches the page, any API
+response, or the log — the request logger is silenced outright, because a request line carries the
+search query and the headers carry the session token. `tests/test_console.py` puts sentinel values
+in a fake `.env` and asserts they appear in no byte the server sends.
+
+**The session token.** One `secrets.token_urlsafe(32)` per run, rendered into the page and required
+on every `/api/` request. A page on another origin can still send a request — the browser will —
+but it cannot read the token, so it cannot drive the console. Combined with binding the loopback
+interface, that is the whole of the defence, and for a server with one user on it that is enough.
+The console is never run in CI, never bound to another interface, and never put behind a tunnel.
+
+**Pacing.** CourtListener throttles a new free account to 5 API requests a minute; one resolve
+spends four. A page with buttons lets the operator click faster than typing ever did, so the
+ceiling is enforced in code: `PACING = {"www.courtlistener.com": 12.0}` seconds, held by a lock
+because the server is threaded. `storage.courtlistener.com` serves the pinned PDF, is not the API,
+is not counted against the quota, and is not paced. The clock and sleep are injectable, so the
+test asserts the spacing without spending it.
+
+**`data/` is written only by a click.** Starting the console writes nothing. Resolving writes
+nothing — it builds a `PinSpec` and holds it in memory so Pin can reuse it without spending four
+more API calls. Only Pin writes, and what it writes is one record; the page then shows the ledger
+entry, the manifest line, and the `git add` that starts the commit. The footer lists anything
+uncommitted under `data/sources/`, because the failure mode of a GUI is a pin made and forgotten.
+
 ## The status page is generated, never committed
 
 `.github/workflows/status-page.yml` runs `pin check --json`, feeds the JSON to

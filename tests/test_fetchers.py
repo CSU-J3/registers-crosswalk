@@ -690,6 +690,18 @@ def test_courtlistener_api_urls_still_need_a_token():
     )
 
 
+def test_the_committed_courtlistener_pin_needs_no_token_to_recheck():
+    # The rule above, tied to the record that actually depends on it.
+    from registers_crosswalk.registry import Crosswalk
+
+    source = Crosswalk(REPO / "data").sources["xr_src_0006"]
+    assert source.canonical_url.startswith(courtlistener.STORAGE)
+    assert courtlistener.content_request(source.canonical_url, env={}) == (
+        source.canonical_url,
+        {},
+    )
+
+
 # --------------------------------------------------------------------------- manual
 
 

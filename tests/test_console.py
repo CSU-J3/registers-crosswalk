@@ -128,6 +128,15 @@ class Client:
         assert status == 200
         return text
 
+    def headers(self, path):
+        """The response headers, which the CSP test needs and nothing else did."""
+        req = urllib.request.Request(self.url(path))
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310 - fixed localhost
+                return resp.status, dict(resp.headers)
+        except urllib.error.HTTPError as exc:
+            return exc.code, dict(exc.headers)
+
 
 @pytest.fixture
 def client(tmp_path):
@@ -566,6 +575,93 @@ def test_the_page_never_renders_api_json_as_markup(client):
     start = page.index('<script type="application/json" id="s">')
     end = page.index("</script>", start)
     assert "<" not in page[start + len('<script type="application/json" id="s">') : end]
+
+
+# ------------------------------------------------------- the policy the page runs under
+
+
+def _csp(header: str) -> dict[str, list[str]]:
+    """Content-Security-Policy into {directive: [sources]}."""
+    out = {}
+    for part in header.split(";"):
+        bits = part.split()
+        if bits:
+            out[bits[0]] = bits[1:]
+    return out
+
+
+def test_the_csp_lets_the_page_call_its_own_api(client):
+    """The bug that made the console do nothing at all on its first run.
+
+    `default-src 'none'` covers fetch(), so without `connect-src 'self'` the browser blocked every
+    request the page makes to /api/ — and blocked it silently: the page sat on 'Searching...' and
+    the only evidence was a CSP line in the Network tab. The server was fine, the tests were
+    green, and nothing worked. Parsed rather than matched as a substring so that reordering or
+    rewording the policy cannot pass this by accident.
+    """
+    status, headers = client.headers("/")
+    assert status == 200
+    policy = _csp(headers["Content-Security-Policy"])
+    assert policy["connect-src"] == ["'self'"]
+
+
+def test_the_csp_is_still_strict_everywhere_else(client):
+    """Widening connect-src must not widen the rest: the page loads nothing off any machine."""
+    _, headers = client.headers("/")
+    policy = _csp(headers["Content-Security-Policy"])
+    assert policy["default-src"] == ["'none'"]
+    assert policy["img-src"] == ["'self'"]
+    assert policy["form-action"] == ["'none'"]
+    assert policy["base-uri"] == ["'none'"]
+    # No remote origin is reachable from this page, by any directive.
+    for sources in policy.values():
+        for source in sources:
+            assert "//" not in source, f"{source} would reach off this machine"
+
+
+def test_the_csp_is_sent_on_api_responses_too(client):
+    status, headers = client.headers("/api/state")
+    assert status == 401
+    assert "connect-src 'self'" in headers["Content-Security-Policy"]
+
+
+def test_favicon_is_an_empty_204(client):
+    """Browsers ask for it unprompted; 204 keeps one red line out of the console on every load."""
+    status, headers = client.headers("/favicon.ico")
+    assert status == 204
+    assert headers.get("Content-Length") == "0"
+
+
+# ------------------------------------------------------- the page's own defaults and failure text
+
+
+def test_the_search_select_defaults_to_a_verified_fetcher(client):
+    """Module order puts openfec first — unverified, keyless, and unable to pin.
+
+    Only the default moves; the options stay in module order. If openfec is ever verified it
+    becomes the default again by being first, with no change here.
+    """
+    page = client.page()
+    start = page.index('<select id="search-fetcher">')
+    end = page.index("</select>", start)
+    block = page[start:end]
+    assert 'value="openfec"' in block and 'value="courtlistener"' in block
+    assert block.index('value="openfec"') < block.index('value="courtlistener"')
+    assert 'value="courtlistener" selected' in block
+    assert 'value="openfec" selected' not in block
+
+
+def test_every_api_caller_handles_a_request_that_never_landed(client):
+    """A rejected fetch used to leave the last status line on screen with no reason given.
+
+    api() resolves only when a response arrived; a request that never got one rejects. Asserted on
+    the page source because the three callers live in the browser, and an offline test can still
+    hold the line that none of them is left without a catch.
+    """
+    page = client.page()
+    assert page.count(".catch(function (err)") == 3
+    assert "function failed(node, err)" in page
+    assert "'request failed: '" in page
 
 
 def test_an_unknown_path_is_404(client):

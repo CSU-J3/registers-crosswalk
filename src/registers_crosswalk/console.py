@@ -441,11 +441,16 @@ def make_handler(console: Console) -> type[BaseHTTPRequestHandler]:
             self.send_response(code)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
-            # The page never loads anything off this machine or any other, so the strictest
-            # policy that still lets it run its own inline script and style is the right one.
+            # The page loads nothing off this machine or any other, so the policy is the
+            # strictest one that still lets it work. `connect-src 'self'` is load-bearing and was
+            # missing: `default-src 'none'` covers fetch(), so the browser blocked every call the
+            # page makes to its own /api/ and the console did nothing at all. There is a test on
+            # this header for that reason — the failure was silent everywhere but the Network tab.
+            # `img-src 'self'` is here so the favicon request is not a console error on every load.
             self.send_header(
                 "Content-Security-Policy",
-                "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
+                "default-src 'none'; connect-src 'self'; img-src 'self'; "
+                "style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
                 "form-action 'none'; base-uri 'none'",
             )
             self.send_header("Referrer-Policy", "no-referrer")
@@ -480,6 +485,11 @@ def make_handler(console: Console) -> type[BaseHTTPRequestHandler]:
             if parsed.path == "/":
                 page = render_page(console.token, state(console.data_dir, console.env))
                 self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
+                return
+            # Browsers ask for this unprompted. Answering 204 rather than 404 keeps one red line
+            # out of the console on every load; there is no icon to serve and none is wanted.
+            if parsed.path == "/favicon.ico":
+                self._send(204, b"", "image/x-icon")
                 return
             if not parsed.path.startswith("/api/"):
                 self._json(404, {"error": "no such path"})
@@ -639,6 +649,15 @@ _JS = """
     });
   }
 
+  // api() resolves only when a response ARRIVED. A request that never got one — the server
+  // stopped, the policy blocked it, the JSON did not parse — rejects, and an uncaught rejection
+  // left the last status line on screen forever. That is how a blocked fetch read as a console
+  // that hung: 'Searching...' and nothing else, with the reason only in the Network tab. Every
+  // caller ends in this, in its own status slot.
+  function failed(node, err) {
+    say(node, 'request failed: ' + ((err && err.message) || String(err)), 'note warn');
+  }
+
   function fetcherByName(name) {
     for (var i = 0; i < STATE.fetchers.length; i++) {
       if (STATE.fetchers[i].name === name) { return STATE.fetchers[i]; }
@@ -712,7 +731,7 @@ _JS = """
       });
       table.appendChild(body);
       searchResults.appendChild(table);
-    });
+    }).catch(function (err) { failed(searchResults, err); });
   });
 
   // -- pin by identifier ----------------------------------------------------
@@ -771,7 +790,8 @@ _JS = """
         }
         resolved = r.body;
         drawResolved(r.body);
-      });
+      })
+      .catch(function (err) { failed(card, err); });
   }
 
   function drawResolved(d) {
@@ -892,6 +912,12 @@ _JS = """
       outcome.appendChild(el('p', 'Next: git add ' + d.path, 'note mono'));
       resolved = null;
       card.classList.add('hidden');
+    }).catch(function (err) {
+      outcome.classList.remove('hidden');
+      failed(outcome, err);
+      // The pin may or may not have happened; the button goes back so the operator can look and
+      // retry, and add_source refuses a duplicate if it did.
+      if (go) { go.disabled = false; go.textContent = 'Pin'; }
     });
   }
 })();
@@ -924,8 +950,19 @@ def render_page(token: str, snapshot: dict[str, Any]) -> str:
         )
 
     searchable = [f for f in snapshot["fetchers"] if f["searchable"]]
+    # The select is in module order, which puts `openfec` first — unverified, keyless, and unable
+    # to pin, so the console opened on the one searchable fetcher that can do the least. The
+    # options stay in module order; only the DEFAULT moves, to the first searchable fetcher that
+    # has actually been run live. Nothing is hard-coded: if openfec is verified one day it becomes
+    # the default again by being first, and if nothing is verified the list falls back to its head.
+    default_search = next(
+        (f for f in searchable if f["verified"]), searchable[0] if searchable else None
+    )
     search_options = "".join(
-        f'<option value="{e(f["name"])}">{e(f["name"])}</option>' for f in searchable
+        f'<option value="{e(f["name"])}"'
+        f"{' selected' if default_search and f['name'] == default_search['name'] else ''}"
+        f">{e(f['name'])}</option>"
+        for f in searchable
     )
     id_options = "".join(
         f'<option value="{e(f["name"])}">{e(f["name"])} · {e(f["help"])}</option>'

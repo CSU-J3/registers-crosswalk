@@ -466,6 +466,30 @@ def test_courtlistener_without_a_token_raises_missing_key():
         courtlistener.spec(cluster_id=1, fetch=_cl_fetch(CL_CLUSTER, {}), env={})
 
 
+def test_courtlistener_check_refetches_the_document_without_a_token():
+    # What a courtlistener pin stores is a public file on storage.courtlistener.com, so re-fetching
+    # it asks for no credential. That is what keeps such a pin checkable from a CI runner with no
+    # secret set: an empty env must be fine here, and must not raise.
+    url = "https://storage.courtlistener.com/harvard_pdf/1481640.pdf"
+    assert url.startswith(courtlistener.STORAGE)
+    assert courtlistener.content_request(url, env={}) == (url, {})
+    # A court's own PDF is just as public.
+    court_pdf = "https://www.ca8.uscourts.gov/opinions/12195.pdf"
+    assert courtlistener.content_request(court_pdf, env={}) == (court_pdf, {})
+
+
+def test_courtlistener_api_urls_still_need_a_token():
+    # The other half of the rule: an API URL is authenticated, so a missing token stays an error
+    # there rather than becoming a silent 401.
+    api_url = courtlistener.cluster_url(1481640)
+    with pytest.raises(MissingKey, match="COURTLISTENER_TOKEN"):
+        courtlistener.content_request(api_url, env={})
+    assert courtlistener.content_request(api_url, env={"COURTLISTENER_TOKEN": "T"}) == (
+        api_url,
+        {"Authorization": "Token T"},
+    )
+
+
 # --------------------------------------------------------------------------- manual
 
 

@@ -114,6 +114,27 @@ def drift_value(body: bytes) -> str:
     return sha256_hex(body)
 
 
+def content_request(url: str, *, env: Mapping[str, str]) -> tuple[str, dict[str, str]]:
+    """What to request to re-fetch a stored `canonical_url`, and what to send with it.
+
+    **`check` needs no token.** A pinned document never lives under the API — what gets stored is
+    a court's own PDF or a file on `storage.courtlistener.com`, and both are public. So re-fetching
+    one asks for no credential, and a courtlistener pin stays checkable from a CI runner with no
+    secret set — the same standing as an eCFR or Federal Register pin.
+
+    That was already true by accident, because a fetcher with no `content_request` falls through
+    to `(url, {})`. Accidental is not a guarantee: nothing said it, nothing tested it, and the
+    first stored URL that happened to sit under the API would have started returning 401 in CI
+    with no explanation. This states the rule and the tests hold it.
+
+    The token is attached only to an API URL, where it is required. Nothing stores one today; the
+    branch is there so that if anything ever does, it is authenticated rather than quietly 401.
+    """
+    if url.startswith(f"{API}/"):
+        return url, auth_headers(env)
+    return url, {}
+
+
 # --------------------------------------------------------------------------- search
 
 # What `pin search courtlistener <query> --type X` accepts, and the single letter v4's search

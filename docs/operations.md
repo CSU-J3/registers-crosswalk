@@ -121,7 +121,7 @@ fetch time; in CI they are repo secrets wired into `.github/workflows/sources-dr
 |---|---|---|
 | `GOVINFO_API_KEY` | `govinfo` metadata **and** re-fetching the stored PDF | api.data.gov |
 | `OPENFEC_API_KEY` | `openfec` legal search (the metadata call only) | api.data.gov — the same key works for both |
-| `COURTLISTENER_TOKEN` | `courtlistener` cluster/opinion API | courtlistener.com account |
+| `COURTLISTENER_TOKEN` | `courtlistener` **search and `add`** — never `check` (see below) | courtlistener.com account |
 | `WAYBACK_ACCESS_KEY` + `WAYBACK_SECRET_KEY` | authenticated Save Page Now (SPN2) | archive.org account |
 
 **A key never enters a stored URL.** This repo is public, so an `?api_key=...` interpolated into a
@@ -138,6 +138,17 @@ then re-pin. Deleting the file is not enough — it is in the git history.
 
 Local use: export the keys in your shell, or keep them in an untracked `.env` you source. Never put
 a key on a command line you'll push, and never paste one into a PR or chat.
+
+**`COURTLISTENER_TOKEN` is a local key, not a CI one.** It is needed for `pin search
+courtlistener` and for `pin add courtlistener`, which read the v4 API. It is **not** needed by
+`check`: what a courtlistener pin stores is a public file — a court's own PDF, or a scan on
+`storage.courtlistener.com` — so re-fetching it sends no credential. `content_request` attaches
+the token only to URLs under the API, and nothing stores one of those. A courtlistener pin is
+therefore checkable from a CI runner with no secret set, the same as an eCFR or Federal Register
+pin, and `sources-drift` does not need this key to stay green.
+
+CourtListener throttles new accounts to **5 API requests a minute**, and a single `add` spends
+four (cluster, opinion, docket, court). Space runs accordingly; a `search` costs one.
 
 ## `fetcher_verified`: the convention for flipping it
 

@@ -77,7 +77,12 @@ def test_add_mints_sequential_ids(tmp_path, capsys):
 def test_add_prints_the_ledger_entry(tmp_path, capsys):
     _add(tmp_path)
     out = capsys.readouterr().out
-    assert "- **Federal Election Commission, 2023-05-11 (B2)** — Final Opinion." in out
+    # "Final Opinion" names no document on its own, so the citation is appended — the same
+    # branch the Federal Register and courtlistener entries take.
+    assert (
+        "- **Federal Election Commission, 2023-05-11 (B2)** — "
+        "Final Opinion, FEC Advisory Opinion 2023-01." in out
+    )
     assert URL in out
     assert "Archive: pending" in out
 

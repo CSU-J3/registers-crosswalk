@@ -21,6 +21,27 @@ def normalize_citation(citation: str) -> str:
     return _SPACE.sub(" ", _PUNCT.sub("", citation)).strip().casefold()
 
 
+def title_adds_anything(source: Source) -> bool:
+    """Whether the title says something the citation does not.
+
+    Most fetchers build the title as the citation plus the version qualifier — "11 CFR Part 114,
+    as of 2026-09-14", "52 U.S.C. § 30116 (prelim, laws in effect on 2026-09-18)" — so printing
+    both set the citation down twice on every ecfr and uscode row. A Federal Register title
+    ("Personal Use of Campaign Funds") or a case name ("Dunne v. United States") is the document's
+    own name and is the case this predicate exists to keep.
+
+    Compared through `normalize_citation`, not raw, because a title and its citation routinely
+    disagree on punctuation style — "11 C.F.R. Part 114" against "11 CFR Part 114, as of …" — and
+    a raw prefix test would call those two different strings and print the citation twice in two
+    spellings, which is the duplication at its worst.
+
+    Lives here, next to the comparison it is built on, because two callers ask this question of
+    the same source — the status page's document cell and `to_ledger_markdown` — and a page that
+    suppressed a title the ledger printed (or the reverse) would be describing one pin two ways.
+    """
+    return not normalize_citation(source.title).startswith(normalize_citation(source.citation))
+
+
 def duplicate_of(
     sources: Mapping[str, Source], canonical_url: str, point_in_time: date | None
 ) -> str | None:

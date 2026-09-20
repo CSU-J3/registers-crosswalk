@@ -22,7 +22,7 @@ import pytest
 from registers_crosswalk import console as consolemod
 from registers_crosswalk.console import PACING, Console, load_dotenv, paced, serve
 from registers_crosswalk.models import ArchiveCopy
-from registers_crosswalk.pin import sha256_hex, to_ledger_markdown
+from registers_crosswalk.pin import ArchiveFailure, sha256_hex, to_ledger_markdown
 from registers_crosswalk.registry import Crosswalk
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -577,6 +577,100 @@ def test_the_page_never_renders_api_json_as_markup(client):
     assert "<" not in page[start + len('<script type="application/json" id="s">') : end]
 
 
+# ------------------------------------------------------- archiving a pin that has none
+
+
+def test_api_archive_adds_a_capture_through_the_same_function_the_cli_uses(client, tmp_path):
+    """Pin without an archive, then archive it from the page. One code path, two front ends."""
+    resolved = _resolve_dunne(client)
+    _, written = client.post("/api/pin", {"resolve_id": resolved["resolve_id"], "archive": False})
+    assert written["status"] == "written"
+    assert written["archived"] is False
+    assert client.console.archive_fn.calls == []
+
+    status, body = client.post("/api/archive", {"xr_id": written["xr_id"]})
+    assert status == 200
+    assert body["status"] == "written", body
+    assert body["message"].startswith(f"archived {written['xr_id']}: ")
+    assert client.console.archive_fn.calls == [DUNNE_PDF]
+
+    source = Crosswalk(tmp_path).sources[written["xr_id"]]
+    assert source.archives[0].url.startswith("https://web.archive.org/web/1/")
+
+
+def test_api_archive_refuses_a_pin_that_already_has_one(client):
+    resolved = _resolve_dunne(client)
+    _, written = client.post("/api/pin", {"resolve_id": resolved["resolve_id"], "archive": True})
+    assert written["archived"] is True
+    before = len(client.console.archive_fn.calls)
+
+    status, body = client.post("/api/archive", {"xr_id": written["xr_id"]})
+    assert status == 200
+    assert body["status"] == "refused"
+    assert "already has an archive copy" in body["message"]
+    assert len(client.console.archive_fn.calls) == before  # and no capture was requested
+
+
+def test_api_archive_refuses_an_unknown_id(client):
+    status, body = client.post("/api/archive", {"xr_id": "xr_src_0404"})
+    assert status == 200
+    assert body["status"] == "refused"
+    assert body["message"] == "unknown source 'xr_src_0404'"
+
+
+def test_api_archive_reports_the_reason_when_the_capture_fails(tmp_path):
+    (tmp_path / "sources").mkdir()
+
+    def failing(url, **_):
+        return ArchiveFailure("HTTP 429 from the Wayback Machine for " + url)
+
+    console = Console(data_dir=tmp_path, env=ENV, fetch=cl_fetch(), archive_fn=failing)
+    server = serve(console, port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        c = Client(console, server)
+        _, resolved = c.post(
+            "/api/resolve", {"fetcher": "courtlistener", "args": {"cluster_id": "1481640"}}
+        )
+        _, written = c.post("/api/pin", {"resolve_id": resolved["resolve_id"], "archive": False})
+        assert written["status"] == "written"
+        _, body = c.post("/api/archive", {"xr_id": written["xr_id"]})
+        assert body["status"] == "archive_failed"
+        assert body["message"] == (
+            "archive step failed: HTTP 429 from the Wayback Machine for " + DUNNE_PDF
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_api_archive_needs_the_token(client):
+    status, _ = client.raw("/api/archive", method="POST", body={"xr_id": "xr_src_0001"})
+    assert status == 401
+
+
+def test_state_says_which_pins_have_no_archive(client):
+    resolved = _resolve_dunne(client)
+    _, written = client.post("/api/pin", {"resolve_id": resolved["resolve_id"], "archive": False})
+    _, state_body = client.get("/api/state")
+    pins = {p["xr_id"]: p for p in state_body["pins"]}
+    assert pins[written["xr_id"]]["archived"] is False
+
+    client.post("/api/archive", {"xr_id": written["xr_id"]})
+    _, after = client.get("/api/state")
+    assert {p["xr_id"]: p for p in after["pins"]}[written["xr_id"]]["archived"] is True
+
+
+def test_the_page_carries_the_unarchived_list(client):
+    page = client.page()
+    assert 'id="unarchived-card"' in page
+    assert "Pins with no archive copy" in page
+    assert "Archive now" in page
+    assert "/api/archive" in page
+
+
 # ------------------------------------------------------- the wait has a reason on screen
 
 
@@ -855,7 +949,12 @@ def test_every_api_caller_handles_a_request_that_never_landed(client):
     hold the line that none of them is left without a catch.
     """
     page = client.page()
-    assert page.count(".catch(function (err)") == 3
+    # Every api() call site chains a catch. Four report the error to the operator — search,
+    # resolve, pin, archive — and two are deliberately silent: the progress tick and the
+    # unarchived-list refresh, where a lost poll is not news and the operation that matters
+    # reports its own end.
+    assert page.count(".catch(function (err)") == 4
+    assert page.count(".catch(function ()") == 2
     assert "function failed(node, err)" in page
     assert "'request failed: '" in page
 

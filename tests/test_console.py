@@ -671,6 +671,121 @@ def test_the_page_carries_the_unarchived_list(client):
     assert "/api/archive" in page
 
 
+def _write_source(data_dir: Path, spec: dict) -> None:
+    """One pinned record on disk, in the shape `Crosswalk` loads. Same helper as test_status."""
+    spec = dict(spec)
+    xr_id = spec.pop("xr_id")
+    digest = xr_id[-1] * 64
+    record = {
+        "xr_id": xr_id,
+        "kind": "source",
+        "publisher": "Office of the Federal Register",
+        "fetcher_verified": True,
+        "verified_at": "2026-09-18",
+        "artifact": {
+            "sha256": digest,
+            "byte_length": 10,
+            "media_type": spec.pop("media_type", "application/xml"),
+            "fetched_at": "2026-09-18T18:56:07Z",
+            "drift_key": "sha256",
+            "drift_value": digest,
+        },
+        "grade": {"reliability": "A", "credibility": 1},
+        **spec,
+    }
+    (data_dir / "sources" / f"{xr_id}.json").write_text(json.dumps(record), encoding="utf-8")
+
+
+# An eCFR pin, whose title is its citation plus the version qualifier, and a Federal Register pin,
+# whose title is the document's own name. The two shapes the row has to tell apart.
+ECFR_PIN = {
+    "xr_id": "xr_src_9001",
+    "citation": "5 CFR 2640.202",
+    "title": "5 CFR 2640.202, as of 2026-09-15",
+    "canonical_url": "https://www.ecfr.gov/api/versioner/v1/full/2026-09-15/title-5.xml"
+    "?part=2640&section=2640.202",
+    "fetcher": "ecfr",
+    "point_in_time": "2026-09-15",
+}
+FR_PIN = {
+    "xr_id": "xr_src_9002",
+    "citation": "60 FR 7862",
+    "title": "Expenditures; Reports by Political Committees",
+    "canonical_url": "https://www.govinfo.gov/content/pkg/FR-1995-02-09/pdf/95-3162.pdf",
+    "fetcher": "federalregister",
+    "published_at": "1995-02-09",
+    "media_type": "application/pdf",
+}
+
+
+def test_an_unarchived_row_is_told_whether_its_title_says_anything(client):
+    """The row printed "5 CFR 2640.202" and then "5 CFR 2640.202, as of 2026-09-15" under it.
+
+    A `title !== citation` test in the browser is true for every eCFR and uscode pin, because that
+    is how those fetchers build a title. The predicate that knows better is the one the status
+    page's document cell already uses, and the answer travels with the pin rather than being
+    guessed at again on the page.
+    """
+    _write_source(client.console.data_dir, ECFR_PIN)
+    _write_source(client.console.data_dir, FR_PIN)
+    _, body = client.get("/api/state")
+    rows = {p["xr_id"]: p for p in body["pins"]}
+
+    assert rows["xr_src_9001"]["title"] == "5 CFR 2640.202, as of 2026-09-15"
+    assert rows["xr_src_9001"]["title_adds_anything"] is False
+    assert rows["xr_src_9002"]["title_adds_anything"] is True
+    # and the row is drawn from that flag, not from a comparison of its own
+    page = client.page()
+    assert "pin.title_adds_anything" in page
+    assert "pin.title !== pin.citation" not in page
+
+
+# ------------------------------------------------------- the page re-reads after it writes
+
+
+def _nothing_committed_yet(data_dir):
+    """What `git status --porcelain` says about a sources dir with no commit behind it.
+
+    The temp data dir is outside the repo, where git has nothing to say about it at all. Standing
+    in for git here keeps the test offline and holds the line either side of it: what the pin puts
+    in the state, and what the footer is drawn from.
+    """
+    records = sorted((data_dir / "sources").glob("*.json"))
+    return {"branch": "main", "pending": [f"data/sources/{p.name}" for p in records]}
+
+
+def test_a_pin_lands_in_the_state_the_page_reads_back(client, monkeypatch):
+    """After a pin the page re-reads /api/state. This is what that read has to contain."""
+    monkeypatch.setattr(consolemod, "_git_state", _nothing_committed_yet)
+    _, before = client.get("/api/state")
+    assert before["pins"] == []
+    assert before["git"]["pending"] == []
+
+    resolved = _resolve_dunne(client)
+    _, written = client.post("/api/pin", {"resolve_id": resolved["resolve_id"], "archive": False})
+    assert written["status"] == "written"
+
+    _, after = client.get("/api/state")
+    assert [p["xr_id"] for p in after["pins"] if not p["archived"]] == [written["xr_id"]]
+    assert after["git"]["pending"] == [f"data/sources/{written['xr_id']}.json"]
+
+
+def test_both_writes_redraw_the_page_from_that_state(client):
+    """The pin path ended without a re-read, so the page kept saying what was true before it.
+
+    Asserted on the page source, like the other browser-side rules here: the new pin was missing
+    from the unarchived list and the footer still reported nothing uncommitted until the operator
+    reloaded by hand. Both writes now end in the same re-read, and the footer is drawn from it.
+    """
+    page = client.page()
+    assert page.count("refreshState();") == 2  # one after a pin, one after an archive
+    assert "function refreshState()" in page
+    assert "drawFoot(r.body.git)" in page
+    # The footer is the script's, from the same state, so there is one renderer of it and not two.
+    assert '<footer class="foot" id="foot"></footer>' in page
+    assert "' under data/sources/ on branch '" in page
+
+
 # ------------------------------------------------------- the wait has a reason on screen
 
 
@@ -951,7 +1066,7 @@ def test_every_api_caller_handles_a_request_that_never_landed(client):
     page = client.page()
     # Every api() call site chains a catch. Four report the error to the operator — search,
     # resolve, pin, archive — and two are deliberately silent: the progress tick and the
-    # unarchived-list refresh, where a lost poll is not news and the operation that matters
+    # state re-read, where a lost poll is not news and the operation that matters
     # reports its own end.
     assert page.count(".catch(function (err)") == 4
     assert page.count(".catch(function ()") == 2

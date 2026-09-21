@@ -47,7 +47,7 @@ from .registry import (
     Crosswalk,
     check_source_invariants,
     duplicate_of,
-    normalize_citation,
+    live_sources,
     same_document_of,
     title_adds_anything,
 )
@@ -781,19 +781,20 @@ def _cited_in_arg(value: str) -> CitationRef:
         raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
-def _latest_per_citation(xw: Crosswalk) -> list[Source]:
-    """One pin per citation: the one resolve_source() would hand a consumer today."""
-    wanted: dict[str, Source] = {}
-    for source in xw.sources.values():
-        if source.merged_into is not None:
-            continue
-        key = normalize_citation(source.citation)
-        if key in wanted:
-            continue
-        latest = xw.resolve_source(source.citation)
-        if latest is not None:
-            wanted[key] = latest
-    return sorted(wanted.values(), key=lambda s: s.xr_id)
+def _live_pins(xw: Crosswalk) -> list[Source]:
+    """Every pin that still claims to be current, in id order: `check`'s default target set.
+
+    One pin per *citation* was the earlier rule, and it was wrong as soon as a citation named a
+    proceeding rather than a text. An FEC MUR is one citation over several documents — the
+    certification of the vote, the General Counsel's report, the closing notification — and they
+    are not versions of each other, so picking the "latest" silently dropped the other two from
+    every drift run. A pin nothing supersedes is a document this repo still stands behind, and
+    standing behind it is exactly what `check` re-tests.
+
+    Liveness is `registry.live_sources`, the same predicate the duplicate rule and the load-path
+    invariant use, so a pin `add` would refuse as a live duplicate is a pin `check` re-fetches.
+    """
+    return sorted(live_sources(xw.sources).values(), key=lambda s: s.xr_id)
 
 
 @dataclass(frozen=True)
@@ -1081,9 +1082,12 @@ def _cmd_check(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) 
             return 1
         targets: Iterable[Source] = [source]
     elif args.all:
+        # Literally every record on disk, superseded pins and `merged_into` losers alike: --all is
+        # for asking whether the documents behind the whole history are still there, which is a
+        # different question from whether what we stand behind today still matches.
         targets = sorted(xw.sources.values(), key=lambda s: s.xr_id)
     else:
-        targets = _latest_per_citation(xw)
+        targets = _live_pins(xw)
 
     reports = [check(s, fetch=fetch) for s in targets]
     if args.json:
@@ -1211,7 +1215,9 @@ def _build_parser() -> argparse.ArgumentParser:
     check_parser.set_defaults(handler=_cmd_check)
     check_parser.add_argument("--only", default=None, metavar="xr_src_NNNN")
     check_parser.add_argument(
-        "--all", action="store_true", help="check every pin, not just the latest per citation"
+        "--all",
+        action="store_true",
+        help="check superseded pins too, not just the live ones",
     )
     check_parser.add_argument("--json", action="store_true")
 

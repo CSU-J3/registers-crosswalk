@@ -160,11 +160,15 @@ def _check_cell(report: DriftReport | None, superseded: bool) -> str:
 
 def _document_cell(source: Source, superseded_by: str | None) -> str:
     bits = [f'<span class="cite">{_e(source.citation)}</span>']
+    # Notes and title answer different questions and both can be worth printing: `notes` says what
+    # this pin is FOR ("certification of the 6-0 vote to dismiss") and the title is the document's
+    # own name. A MUR has three pins under one citation, all three labelled, and two of them carry
+    # a real document name as well — so notes goes first and the title still follows it.
     if source.notes:
         bits.append(f' <span class="muted">· {_e(source.notes)}</span>')
-    # A pin whose title restates its citation but which still wants a label sets `notes`, which
-    # prints ahead of the title and is never suppressed by this rule.
-    elif title_adds_anything(source):
+    # The title half keeps its own rule: most fetchers build the title out of the citation, and a
+    # row should not set the same string down twice. `notes` is never suppressed by it.
+    if title_adds_anything(source):
         bits.append(f' <span class="muted">{_e(source.title)}</span>')
     if superseded_by is not None:
         bits.append(

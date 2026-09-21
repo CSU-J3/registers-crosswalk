@@ -10,8 +10,21 @@ Verified live 2026-09-17 for advisory opinions:
   * The key comes from `OPENFEC_API_KEY` (the same api.data.gov key as govinfo) and, per
     decision 1, is used for the SEARCH call only. It never enters canonical_url.
 
-MURs take the same shape with `type=murs`; the number parameter name for MURs is NOT verified
-(2026-09-17 — no MUR was pinned), so treat `--type murs` as provisional.
+MURs take the same shape with `type=murs`. Read live off MURs 8098 and 8111 on 2026-09-21,
+before any of them was pinned:
+  * the number parameter is `case_no`, NOT `mur_no`. `mur_no` is not rejected — it is ignored, and
+    the response comes back 200 with the unfiltered first page of all 7,670 matters.
+  * hits sit under `payload["murs"]`; `total_murs` is the count.
+  * a MUR's `documents[]` repeat their categories — both of 8098's certifications are
+    `Certifications` — so a document is named by `document_id`, which is what `--document` is for.
+  * the document's date is `documents[].document_date`. A MUR record has `open_date` and
+    `close_date` and no `issue_date` at all.
+  * the record's `name` is the primary respondent ("Cory Mills"), not a captioned matter name, and
+    it is the same string for both matters — which is why the citation stays `FEC MUR {n}` and
+    `--citation` exists for the cases where that is not enough.
+
+Reading an endpoint is not running one: `spec()` has still not been exercised end to end from this
+tree, so `VERIFIED` stays False until it is.
 """
 
 from __future__ import annotations
@@ -29,10 +42,10 @@ from ..pin import FetchFn, MissingKey, PinSpec, SearchHit, default_fetch, sha256
 NAME = "openfec"
 HELP = "an FEC advisory opinion or MUR document (OpenFEC legal search)"
 DRIFT_KEY = "sha256"
-# NOT yet exercised against the live API from this tree. The endpoint behaviour recorded in the
-# docstring above came from the spec work, not from a run here, and a secondhand claim is not a
-# verification — so every record this module mints says `fetcher_verified: false` on its face.
-# Flip to True, dated the day it ran, on the first live `add` through this fetcher.
+# NOT yet exercised against the live API from this tree. The MUR shapes recorded in the docstring
+# above were read off the search endpoint, which is not the same as running `spec()` and reading
+# what it minted — so every record this module mints still says `fetcher_verified: false` on its
+# face. Flip to True, dated the day it ran, on the first live `add` through this fetcher.
 VERIFIED = False
 VERIFIED_AT = None
 PUBLISHER = "Federal Election Commission"
@@ -40,7 +53,13 @@ ENV_KEY = "OPENFEC_API_KEY"
 SEARCH = "https://api.open.fec.gov/v1/legal/search/"
 FEC_BASE = "https://www.fec.gov"
 
-_NUMBER_PARAM = {"advisory_opinions": "ao_no", "murs": "mur_no"}
+# Observed 2026-09-21 on both MURs this module was first run against. `mur_no` is NOT rejected
+# by the endpoint, it is IGNORED: the response comes back 200 with the unfiltered first page of all
+# 7,670 matters, and `_pick_document` would have walked it and pinned a document belonging to some
+# other MUR under the citation it was asked for. That is the failure this module's `VERIFIED` flag
+# existed to catch, and it is why the parameter name is now the observed one rather than the
+# plausible one.
+_NUMBER_PARAM = {"advisory_opinions": "ao_no", "murs": "case_no"}
 _CITATION = {"advisory_opinions": "FEC Advisory Opinion {}", "murs": "FEC MUR {}"}
 
 
@@ -62,11 +81,25 @@ def _records(payload: dict, doc_type: str) -> list[dict]:
     return [h for h in hits if isinstance(h, dict)]
 
 
-def _pick_document(records: list[dict], category: str) -> tuple[dict, dict]:
+def _pick_document(
+    records: list[dict], *, category: str | None = None, document_id: str | None = None
+) -> tuple[dict, dict]:
+    """The one document to pin, by the API's own id or by category.
+
+    By id because a MUR's categories are not unique: the two matters this module was first run
+    against carry three categories between them and 47 documents, so "Certifications" names two
+    documents in each and the first-match rule could reach only one of them. An advisory opinion
+    has one `Final Opinion` and keeps the category default.
+    """
     for record in records:
         for document in record.get("documents", []):
-            if document.get("category") == category:
+            if document_id is not None:
+                if str(document.get("document_id")) == str(document_id):
+                    return record, document
+            elif document.get("category") == category:
                 return record, document
+    if document_id is not None:
+        raise ValueError(f"no document with document_id {document_id!r} in the search result")
     raise ValueError(f"no document with category {category!r} in the search result")
 
 
@@ -79,20 +112,30 @@ def spec(
     *,
     number: str,
     doc_type: str = "advisory_opinions",
-    category: str = "Final Opinion",
+    category: str | None = None,
+    document_id: str | None = None,
+    citation: str | None = None,
     fetch: FetchFn = default_fetch,
     env: Mapping[str, str] | None = None,
 ) -> PinSpec:
+    if document_id is None and category is None:
+        category = "Final Opinion"
     key = _key(os.environ if env is None else env)
     body, _ = fetch(search_url(number, doc_type, key), None)
-    record, document = _pick_document(_records(json.loads(body), doc_type), category)
+    records = _records(json.loads(body), doc_type)
+    record, document = _pick_document(records, category=category, document_id=document_id)
     return PinSpec(
         fetcher=NAME,
         canonical_url=urljoin(FEC_BASE, document["url"]),
-        citation=_CITATION[doc_type].format(number),
+        citation=citation or _CITATION[doc_type].format(number),
         title=document.get("description") or record.get("name") or f"{doc_type} {number}",
         publisher=PUBLISHER,
-        published_at=_as_date(document.get("date") or record.get("issue_date")),
+        # `document_date` is the MUR shape, observed 2026-09-21; `date` is what the advisory
+        # opinion fixture carries. `issue_date` is on the RECORD, not the document, and no MUR
+        # record has one — read all three rather than assert one shape.
+        published_at=_as_date(
+            document.get("document_date") or document.get("date") or record.get("issue_date")
+        ),
         grade=Grade(reliability="A", credibility=1),
         drift_key=DRIFT_KEY,
         fetcher_verified=VERIFIED,
@@ -107,12 +150,10 @@ def drift_value(body: bytes) -> str:
 
 # --------------------------------------------------------------------------- search
 
-# NOT exercised against the live API (2026-09-20): the ledger this repo pins for cites no MUR and
-# no advisory opinion, so there was no document to run a first search against and no capture to
-# test the parse on. Same standing as `spec` above, and the same `VERIFIED = False` covers both —
-# a record minted through this module still says on its face that nobody has run it. What IS
-# tested offline is the one thing a capture is not needed for: that the query URL is built
-# correctly and that the key never leaves it for a hit.
+# NOT exercised against the live API (2026-09-21): `q=` has never been asked of the live endpoint.
+# What the MUR captures do let these tests assert is `_hit`'s parse, since a search hit and a
+# `spec()` record read the same MUR record — so the fields are covered even though the query is
+# not.
 SEARCH_TYPES = ("advisory_opinions", "murs")
 
 
@@ -155,13 +196,15 @@ def add_command(hit: SearchHit, doc_type: str = "advisory_opinions") -> str | No
     """The `pin add` that would pin this hit.
 
     A MUR carries several documents and `add` needs to be told which, so the command it prints
-    leaves `--category` for the caller to fill from what the search showed. Advisory opinions have
-    a settled default (`Final Opinion`), so theirs is complete as printed.
+    leaves `--document` for the caller to fill from the `document_id` the search showed. It names
+    the id rather than the category because a MUR's categories repeat — both of 8098's
+    certifications are `Certifications` — so a category does not identify one document. Advisory
+    opinions have a settled default (`Final Opinion`), so theirs is complete as printed.
     """
     if not hit.identifier:
         return None
     base = f"pin add openfec --number {hit.identifier} --type {doc_type}"
-    return base if doc_type == "advisory_opinions" else f'{base} --category "<category>"'
+    return base if doc_type == "advisory_opinions" else f"{base} --document <document_id>"
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -169,7 +212,17 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--type", dest="doc_type", choices=tuple(_NUMBER_PARAM), default="advisory_opinions"
     )
-    parser.add_argument("--category", default="Final Opinion", help="documents[].category to pin")
+    # One document per record, named one of two ways. A MUR repeats its categories, so id is the
+    # only way to reach its second certification; an advisory opinion has one `Final Opinion` and
+    # keeps the category default. Mutually exclusive because naming both would mean deciding which
+    # one loses, and there is no reading of "this document and also that one" worth guessing at.
+    which = parser.add_mutually_exclusive_group()
+    which.add_argument("--category", help="documents[].category to pin (default: Final Opinion)")
+    which.add_argument("--document", dest="document_id", help="documents[].document_id to pin")
+    parser.add_argument(
+        "--citation",
+        help="override the citation (default: FEC Advisory Opinion {n} / FEC MUR {n})",
+    )
 
 
 def spec_from_args(
@@ -179,5 +232,11 @@ def spec_from_args(
     env: Mapping[str, str] | None = None,
 ) -> PinSpec:
     return spec(
-        number=args.number, doc_type=args.doc_type, category=args.category, fetch=fetch, env=env
+        number=args.number,
+        doc_type=args.doc_type,
+        category=args.category,
+        document_id=args.document_id,
+        citation=args.citation,
+        fetch=fetch,
+        env=env,
     )

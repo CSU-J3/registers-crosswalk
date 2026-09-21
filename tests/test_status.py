@@ -277,6 +277,58 @@ def test_a_title_that_only_restates_the_citation_is_not_shown(xw):
     assert html.escape(fr.title, quote=True) in _cell(_row(page, "xr_src_0004"), "document")
 
 
+def test_notes_print_ahead_of_a_title_that_adds_something(tmp_path):
+    # A MUR pin carries both: `notes` labels which document of the proceeding this is, and the
+    # title is the document's own name. Printing the notes INSTEAD of the title cost the row its
+    # name; printing the title alone cost it the label. It gets both, notes first.
+    _write_source(
+        tmp_path,
+        {
+            "xr_id": "xr_src_0001",
+            "citation": "FEC MUR 8098",
+            # Disjoint from the notes on purpose: a title the notes happened to quote would let
+            # both assertions below pass against the old `elif`, which printed no title at all.
+            "title": "Cory Mills; Cory Mills for Congress and David Satterfield",
+            "notes": "MUR 8098, Cory Mills (FL-07): certification of the 6-0 vote to dismiss",
+            "canonical_url": "https://www.fec.gov/files/legal/murs/8098/8098_12.pdf",
+            "fetcher": "openfec",
+            "media_type": "application/pdf",
+            "published_at": "2024-07-23",
+        },
+    )
+    source = Crosswalk(tmp_path).sources["xr_src_0001"]
+    page = render_html(Crosswalk(tmp_path), None, commit="c04befc", generated_at=NOW)
+    cell = _cell(_row(page, "xr_src_0001"), "document")
+
+    notes = html.escape(source.notes, quote=True)
+    title = html.escape(source.title, quote=True)
+    assert notes not in title and title not in notes, "the fixture stopped testing anything"
+    assert notes in cell and title in cell
+    assert cell.index(notes) < cell.index(title)
+
+
+def test_notes_survive_a_title_that_only_restates_the_citation(tmp_path):
+    # The other half: the title rule still suppresses a title built out of the citation, and it
+    # does not take the label down with it.
+    _write_source(
+        tmp_path,
+        {
+            "xr_id": "xr_src_0001",
+            "citation": "11 C.F.R. Part 114",
+            "title": "11 CFR Part 114, as of 2026-09-14",
+            "notes": "the corporate-contribution part, as cited by the AO",
+            "canonical_url": ECFR_URL.format(date="2026-09-14", title="11", part="114"),
+            "fetcher": "ecfr",
+            "point_in_time": "2026-09-14",
+        },
+    )
+    source = Crosswalk(tmp_path).sources["xr_src_0001"]
+    page = render_html(Crosswalk(tmp_path), None, commit="c04befc", generated_at=NOW)
+    cell = _cell(_row(page, "xr_src_0001"), "document")
+    assert html.escape(source.notes, quote=True) in cell
+    assert html.escape(source.title, quote=True) not in cell
+
+
 # --------------------------------------------------------------------------- which pins show
 
 

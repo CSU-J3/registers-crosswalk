@@ -404,6 +404,235 @@ def test_openfec_without_a_key_raises_missing_key():
         openfec.spec(number="2023-01", fetch=_json_fetch(OPENFEC_SEARCH), env={})
 
 
+# The MUR path, on the two responses captured live 2026-09-21 — FEC MURs 8098 and 8111, the Cory
+# Mills matters the claims ledger cites. Untrimmed, per docs/operations.md. These are the first
+# captured openfec fixtures; the advisory-opinion dict above is still the authored one it always
+# was, and the AO path is unchanged by this work.
+
+MUR_8098_STEM = "openfec_search_murs_8098"
+MUR_8111_STEM = "openfec_search_murs_8111"
+
+# Observed on both captures.
+LIVE_MUR_RECORD_KEYS = {
+    "case_serial",
+    "close_date",
+    "commission_votes",
+    "dispositions",
+    "doc_id",
+    "document_highlights",
+    "documents",
+    "election_cycles",
+    "highlights",
+    "mur_type",
+    "name",
+    "no",
+    "open_date",
+    "participants",
+    "published_flg",
+    "respondents",
+    "source",
+    "subjects",
+    "type",
+    "url",
+}
+LIVE_MUR_DOCUMENT_KEYS = {
+    "category",
+    "description",
+    "doc_order_id",
+    "document_date",
+    "document_id",
+    "filename",
+    "length",
+    "url",
+}
+
+# The 2024-07-23 certification of the 6-0 dismissal vote, and the First General Counsel's Report.
+CERT_8098 = "100512215"
+FGCR_8098 = "100512224"
+CERT_8111 = "100512230"
+
+
+def _mur_fetch(stem):
+    return _json_fetch(load_fixture(stem))
+
+
+@pytest.mark.parametrize("stem", [MUR_8098_STEM, MUR_8111_STEM])
+def test_captured_openfec_mur_fixture_matches_the_observed_live_key_set(stem):
+    # Guards both directions: an invented field fails, a dropped field fails. If OpenFEC really
+    # does change its payload, this is where it surfaces, and the fixture must be RE-CAPTURED
+    # rather than edited by hand.
+    payload = load_fixture(stem)
+    assert set(payload) == {"murs", "total_all", "total_murs"}
+    assert payload["total_murs"] == 1
+    record = payload["murs"][0]
+    assert set(record) == LIVE_MUR_RECORD_KEYS
+    assert {k for d in record["documents"] for k in d} == LIVE_MUR_DOCUMENT_KEYS
+
+
+def test_openfec_murs_query_by_case_no_not_mur_no():
+    """`mur_no` is not rejected by the endpoint, it is ignored.
+
+    Asked with `mur_no` the API answers 200 with the unfiltered first page of all 7,670 matters,
+    and `_pick_document` would have pinned a document belonging to another MUR under the citation
+    it was asked for. Observed 2026-09-21; this test is the guard on the parameter name.
+    """
+    fetch = _mur_fetch(MUR_8098_STEM)
+    openfec.spec(
+        number="8098",
+        doc_type="murs",
+        document_id=CERT_8098,
+        fetch=fetch,
+        env={"OPENFEC_API_KEY": "SECRET"},
+    )
+    assert fetch.calls[0][0] == (
+        "https://api.open.fec.gov/v1/legal/search/?type=murs&case_no=8098&api_key=SECRET"
+    )
+
+
+def test_openfec_selects_a_mur_document_by_id():
+    spec = openfec.spec(
+        number="8098",
+        doc_type="murs",
+        document_id=CERT_8098,
+        fetch=_mur_fetch(MUR_8098_STEM),
+        env={"OPENFEC_API_KEY": "SECRET"},
+    )
+    assert spec.canonical_url == "https://www.fec.gov/files/legal/murs/8098/8098_12.pdf"
+    assert spec.citation == "FEC MUR 8098"
+    assert spec.title.startswith("Cory Mills; Cory Mills for Congress")
+    assert spec.published_at == date(2024, 7, 23)  # from documents[].document_date
+    assert spec.publisher == "Federal Election Commission"
+    assert spec.grade.code() == "A1"
+
+
+def test_openfec_reaches_both_documents_of_one_category_by_id():
+    """A MUR repeats its categories; selection by category could reach only the first.
+
+    Both of 8098's certifications are `Certifications`: the 2024-07-23 certification of the 6-0
+    dismissal, and the 2024-08-06 substitution of a treasurer's name. The category rule returns
+    whichever the capture lists first, which is why `--document` exists.
+    """
+    record = load_fixture(MUR_8098_STEM)["murs"][0]
+    certs = [d for d in record["documents"] if d["category"] == "Certifications"]
+    assert len(certs) == 2
+
+    urls = {}
+    for document in certs:
+        spec = openfec.spec(
+            number="8098",
+            doc_type="murs",
+            document_id=document["document_id"],
+            fetch=_mur_fetch(MUR_8098_STEM),
+            env={"OPENFEC_API_KEY": "SECRET"},
+        )
+        urls[str(document["document_id"])] = spec.canonical_url
+    assert len(set(urls.values())) == 2
+    assert urls[CERT_8098].endswith("8098_12.pdf")
+
+
+def test_openfec_refuses_an_unknown_document_id():
+    with pytest.raises(ValueError, match="no document with document_id"):
+        openfec.spec(
+            number="8098",
+            doc_type="murs",
+            document_id="not-a-document",
+            fetch=_mur_fetch(MUR_8098_STEM),
+            env={"OPENFEC_API_KEY": "SECRET"},
+        )
+
+
+def test_openfec_selection_by_category_still_works_on_a_mur():
+    spec = openfec.spec(
+        number="8098",
+        doc_type="murs",
+        category="Certifications",
+        fetch=_mur_fetch(MUR_8098_STEM),
+        env={"OPENFEC_API_KEY": "SECRET"},
+    )
+    assert "/files/legal/murs/8098/" in spec.canonical_url
+
+
+def test_openfec_stores_a_key_free_url_on_www_fec_gov():
+    """The key is for the search call only; `check` re-fetches the stored URL without one."""
+    for stem, number, document_id in [
+        (MUR_8098_STEM, "8098", CERT_8098),
+        (MUR_8111_STEM, "8111", CERT_8111),
+    ]:
+        spec = openfec.spec(
+            number=number,
+            doc_type="murs",
+            document_id=document_id,
+            fetch=_mur_fetch(stem),
+            env={"OPENFEC_API_KEY": "SECRET"},
+        )
+        assert spec.canonical_url.startswith("https://www.fec.gov/files/legal/murs/")
+        assert "api_key" not in spec.canonical_url
+        assert "SECRET" not in spec.canonical_url
+
+
+def test_openfec_citation_override_lands():
+    spec = openfec.spec(
+        number="8098",
+        doc_type="murs",
+        document_id=CERT_8098,
+        citation="FEC MUR 8098 (Cory Mills)",
+        fetch=_mur_fetch(MUR_8098_STEM),
+        env={"OPENFEC_API_KEY": "SECRET"},
+    )
+    assert spec.citation == "FEC MUR 8098 (Cory Mills)"
+
+
+def test_openfec_mur_default_citation_is_the_number():
+    spec = openfec.spec(
+        number="8111",
+        doc_type="murs",
+        document_id=CERT_8111,
+        fetch=_mur_fetch(MUR_8111_STEM),
+        env={"OPENFEC_API_KEY": "SECRET"},
+    )
+    assert spec.citation == "FEC MUR 8111"
+
+
+def test_openfec_reads_the_document_date_not_a_record_date():
+    """`document_date` is the MUR shape. No MUR record carries `issue_date` at all.
+
+    The First General Counsel's Report is dated 2024-06-13 while the matter opened 2023-01-11 and
+    closed 2024-09-05, so a fallback onto a record-level date would be visibly wrong here.
+    """
+    record = load_fixture(MUR_8098_STEM)["murs"][0]
+    assert "issue_date" not in record
+    assert record["open_date"].startswith("2023-01-11")
+    spec = openfec.spec(
+        number="8098",
+        doc_type="murs",
+        document_id=FGCR_8098,
+        fetch=_mur_fetch(MUR_8098_STEM),
+        env={"OPENFEC_API_KEY": "SECRET"},
+    )
+    assert spec.title == "First General Counsel's Report"
+    assert spec.published_at == date(2024, 6, 13)
+
+
+def test_openfec_murs_without_a_key_raises_missing_key():
+    with pytest.raises(MissingKey, match="OPENFEC_API_KEY"):
+        openfec.spec(
+            number="8098",
+            doc_type="murs",
+            document_id=CERT_8098,
+            fetch=_mur_fetch(MUR_8098_STEM),
+            env={},
+        )
+
+
+def test_openfec_add_command_for_a_mur_names_the_document_flag():
+    hit = openfec._hit(load_fixture(MUR_8098_STEM)["murs"][0], "murs")
+    assert hit.identifier == "8098"
+    assert hit.citation == "FEC MUR 8098"
+    assert openfec.add_command(hit, "murs") == (
+        "pin add openfec --number 8098 --type murs --document <document_id>"
+    )
+
+
 # --------------------------------------------------------------------------- courtlistener
 #
 # Captured live 2026-09-20 from cluster 1481640 — Dunne v. United States, 138 F.2d 137

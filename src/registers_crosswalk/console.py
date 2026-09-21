@@ -48,7 +48,7 @@ from .pin import (
     default_fetch,
     to_manifest_line,
 )
-from .registry import DATA_DIR, Crosswalk, normalize_citation
+from .registry import DATA_DIR, Crosswalk, normalize_citation, title_adds_anything
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HOST = "127.0.0.1"
@@ -232,6 +232,11 @@ def state(data_dir: Path, env: Mapping[str, str]) -> dict[str, Any]:
             "xr_id": s.xr_id,
             "citation": s.citation,
             "title": s.title,
+            # Decided here, by the predicate the status page's document cell uses, rather than by
+            # a `title !== citation` test in the browser: most fetchers build the title as the
+            # citation plus a version qualifier, so that test was true on every eCFR row and
+            # printed "5 CFR 2640.202" and then "5 CFR 2640.202, as of 2026-09-15" under it.
+            "title_adds_anything": title_adds_anything(s),
             "archived": bool(s.archives),
         }
         for s in sorted(xw.sources.values(), key=lambda s: s.xr_id)
@@ -1038,6 +1043,10 @@ _JS = """
       outcome.appendChild(el('p', 'Next: git add ' + d.path, 'note mono'));
       resolved = null;
       card.classList.add('hidden');
+      // The write landed, so what the page says about the register is now stale in two places:
+      // this pin belongs in the unarchived list if it was not archived, and its record file is
+      // uncommitted. Both come from the server, the same re-read the archive button does.
+      refreshState();
     }).catch(function (err) {
       outcome.classList.remove('hidden');
       failed(outcome, err);
@@ -1068,7 +1077,7 @@ _JS = """
       tr.appendChild(el('td', pin.xr_id)).className = 'mono';
       var what = el('td');
       what.appendChild(el('span', pin.citation, 'cite'));
-      if (pin.title && pin.title !== pin.citation) {
+      if (pin.title && pin.title_adds_anything) {
         what.appendChild(el('br'));
         what.appendChild(el('span', pin.title, 'sub'));
       }
@@ -1096,7 +1105,7 @@ _JS = """
             }
             // Re-read the state rather than trusting this row: the server is the record of what
             // is archived, and one archived pin is one fewer row here.
-            refreshUnarchived();
+            refreshState();
           })
           .catch(function (err) {
             note.className = 'muted warn';
@@ -1113,13 +1122,48 @@ _JS = """
     unarchivedList.appendChild(table);
   }
 
-  function refreshUnarchived() {
+  // -- what is uncommitted --------------------------------------------------
+  //
+  // Drawn here rather than by the server so there is one implementation of it. The footer's whole
+  // job is to say what has not left this machine yet, which every write the page makes changes,
+  // so it is redrawn from the same /api/state read as the list above.
+
+  var foot = byId('foot');
+
+  function drawFoot(git) {
+    git = git || {};
+    clear(foot);
+    if (git.branch === undefined) {
+      foot.appendChild(el('p', 'Not a git checkout, or git is unavailable.'));
+      return;
+    }
+    var pending = git.pending || [];
+    var line = el('p', null, pending.length ? 'warn' : null);
+    line.appendChild(document.createTextNode(
+      (pending.length ? 'Uncommitted' : 'Nothing uncommitted') +
+      ' under data/sources/ on branch '
+    ));
+    line.appendChild(el('span', git.branch || '?', 'mono'));
+    line.appendChild(document.createTextNode(pending.length ? ':' : '.'));
+    foot.appendChild(line);
+    if (!pending.length) { return; }
+    var list = el('ul');
+    pending.forEach(function (path) { list.appendChild(el('li', path)); });
+    foot.appendChild(list);
+  }
+
+  // -- the page's one re-read -----------------------------------------------
+
+  function refreshState() {
     api('/api/state').then(function (r) {
-      if (r.ok && r.body && r.body.pins) { drawUnarchived(r.body.pins); }
-    }).catch(function () { /* the list is a convenience; a lost refresh is not news */ });
+      if (!r.ok || !r.body) { return; }
+      if (r.body.pins) { drawUnarchived(r.body.pins); }
+      drawFoot(r.body.git);
+    }).catch(function () { /* a redraw is a convenience; a lost refresh is not news */ });
   }
 
   drawUnarchived(STATE.pins);
+  drawFoot(STATE.git);
 
 })();
 """
@@ -1170,22 +1214,6 @@ def render_page(token: str, snapshot: dict[str, Any]) -> str:
         for f in snapshot["fetchers"]
     )
 
-    git = snapshot.get("git") or {}
-    pending = git.get("pending") or []
-    if not git:
-        foot = "<p>Not a git checkout, or git is unavailable.</p>"
-    elif pending:
-        items = "".join(f"<li>{e(p)}</li>" for p in pending)
-        foot = (
-            f'<p class="warn">Uncommitted under data/sources/ on branch '
-            f'<span class="mono">{e(git.get("branch") or "?")}</span>:</p><ul>{items}</ul>'
-        )
-    else:
-        foot = (
-            f"<p>Nothing uncommitted under data/sources/ on branch "
-            f'<span class="mono">{e(git.get("branch") or "?")}</span>.</p>'
-        )
-
     # The snapshot rides in a JSON script block rather than in the script body: `</script>` inside
     # a string would end the block early, and `<` is escaped here so no value from data/ or from a
     # fetcher's HELP can do that.
@@ -1193,6 +1221,10 @@ def render_page(token: str, snapshot: dict[str, Any]) -> str:
         {
             "fetchers": [{**f, "fields": _form_fields(f["name"])} for f in snapshot["fetchers"]],
             "pins": snapshot["pins"],
+            # The footer is the script's too, drawn from this at load and from /api/state after
+            # every write, so what is uncommitted has one renderer rather than two that can differ
+            # in wording while both claim to be reporting the same git status.
+            "git": snapshot.get("git") or {},
         }
     ).replace("<", "\\u003c")
 
@@ -1242,7 +1274,7 @@ def render_page(token: str, snapshot: dict[str, Any]) -> str:
         'path as <span class="mono">pin archive</span>.</p>\n'
         '<div id="unarchived-list"></div>\n'
         "</section>\n"
-        f'<footer class="foot">{foot}</footer>\n'
+        '<footer class="foot" id="foot"></footer>\n'
         "</main>\n"
         f"<script>{_JS}</script>\n"
         "</body>\n</html>\n"

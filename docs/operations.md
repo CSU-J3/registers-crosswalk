@@ -320,11 +320,85 @@ unarchived uscode pin is unrecoverable the moment the section is amended, and th
 moment at which `pin archive` could capture what it should have captured. `REQUIRES_ARCHIVE`
 refuses the pin up front for exactly that reason.
 
-**`openfec` remains unverified.** The ledger cites no MUR and no advisory opinion — its only FEC
-citation is a committee data page, which the legal-search endpoint does not serve — so there was
-no document to run a first search or a first pin against. `search()` exists for it and is covered
-only by the test a capture is not needed for: that the query URL is built correctly and that the
-key never leaves it. Treat both halves of that module as unexercised until a real MUR turns up.
+## `openfec` was verified live on 2026-09-21, and MURs 8098 and 8111 are pinned
+
+A scratch `add openfec --number 8098 --type murs --document 100512215` outside the repo ran the
+current code path end to end against the FEC's certification of the 6-0 dismissal vote in MUR 8098,
+one of the two Cory Mills (FL-07) matters the claims ledger cites as "dismissed 6-0, documents A1"
+with no pin behind them. Every mapped field was compared against the captured search response, and
+`check` came back clean. Six documents are committed, `xr_src_0008` through `xr_src_0013`, three per
+matter; the certification carries the same sha256 as the scratch record. The fetcher now ships
+`VERIFIED = True`, `VERIFIED_AT = 2026-09-21`.
+
+**The MUR number parameter is `case_no`, and `mur_no` was worse than wrong.** `mur_no` is what the
+module had carried since 2026-09-17, marked unverified because no MUR had been pinned. The endpoint
+does not reject it. It **ignores** it, answers 200, and returns the unfiltered first page of all
+7,670 matters — twenty records, none of them the one asked for. `_pick_document` walks whatever it
+is handed, so the pin would have gone through: a document belonging to some unrelated MUR, stored
+under the citation `FEC MUR 8098`, with a real hash and a real URL and nothing anywhere on the
+record to say it was the wrong document. Nothing would have failed. `check` would have stayed green
+forever, because the hash of the wrong document is stable too.
+
+This is the strongest case in this repo for why `fetcher_verified` is a flag on the *record* rather
+than a note in a docstring. A silent filter failure produces a confident, self-consistent, durable
+lie, and the only thing standing between that and the ledger is somebody running the thing once and
+reading the answer.
+
+**A MUR repeats its categories, so documents are selected by id.** `--document <document_id>` names
+`documents[].document_id`; `--category` stays for advisory opinions, whose `Final Opinion` is
+unique, and the two flags are mutually exclusive. The reason is visible in both matters: each one's
+`Certifications` category holds two documents — the certification of the 6-0 dismissal and a later
+certification substituting a treasurer's name — and the first-match rule could reach only one of
+them. `add_command` prints `--document <document_id>` for MURs for the same reason.
+
+**The three categories a MUR actually has**, observed across both matters (15 documents in 8098, 32
+in 8111):
+
+| category | what it holds | what a claim needs it for |
+|---|---|---|
+| `Certifications` | the Commission's vote certifications | **the vote** — the disposition and its date and tally |
+| `General Counsel Reports, Briefs, Notifications and Responses` | the First General Counsel's Report, and the `Notification to …` letters closing the file | **the reasoning** (the FGCR) and **the disposition as served** (the notifications) |
+| `Complaint, Responses, Designation of Counsel and Extensions of Time` | the complaint, notifications of complaint, designations of counsel, extensions, respondents' responses | the allegations as made — one party's assertion, not the Commission's finding |
+
+Two things a reader expecting FEC practice will look for and not find. **There is no Factual and
+Legal Analysis and no Statement of Reasons** in either matter's `documents[]`, although the 6-0 vote
+expressly approves an FLA. **There is no closing-letter category**: the letters closing the file are
+`Notification to …` documents dated 2024-09-05, sitting in the General Counsel bucket beside the
+FGCR. So "the vote, the reasoning and the disposition" is three documents from two categories, which
+is what each matter's three pins are.
+
+**Dates come from `documents[].document_date`.** A MUR record carries `open_date` and `close_date`
+and no `issue_date` at all, so the advisory opinion's record-level fallback never fires. Reading the
+record date instead would have dated the First General Counsel's Report 2023-01-11, the day the
+matter opened, rather than 2024-06-13, the day it was written.
+
+**`documents[].length` is a free cross-check.** It equalled the fetched byte length exactly on all
+six documents. Nothing in the code reads it; it is worth knowing when a fetch looks wrong.
+
+**The record's `name` is not a caption.** It is the primary respondent — `Cory Mills` — and it is
+the same string for both matters, so it distinguishes nothing. The citation therefore stays
+`FEC MUR {n}`, which is how the matters are cited anyway, and the respondents ride onto the ledger
+line through each document's own description. `--citation` exists for the cases where that is not
+enough.
+
+**`check` re-fetches fec.gov with no key, and CI needs no new secret.** The key authorizes the
+legal-search call and nothing else: `documents[].url` is relative, joins against
+`https://www.fec.gov`, and the PDF is served anonymously. This was proved before anything was
+pinned — a keyless fetch of both certifications returned 200, `application/pdf`, and byte lengths
+matching the API's own. `openfec` has no `content_request` for exactly this reason, unlike
+`govinfo`, which must re-attach its key.
+
+**The key itself is worth a note.** `OPENFEC_API_KEY` is an api.data.gov key and any api.data.gov
+key works — but they are account-level and can be disabled account-wide. The first attempt at this
+run used the same value as `CONGRESS_API_KEY` and got `403 API_KEY_DISABLED` on every call. The
+value now in `.env` is the one `GOVINFO_API_KEY` uses. If openfec starts returning 403, read the
+body before assuming anything about the endpoint: api.data.gov says which of "invalid", "disabled"
+and "over rate limit" it means.
+
+**The free-text `search()` is still unexercised.** The run went through `spec()` by number, which is
+a different query shape; `q=` has never been asked of the live endpoint. What the captures do cover
+is `_hit`'s parse, since a search hit and a `spec()` record read the same MUR record. Treat the
+query itself as unproven.
 
 ## `add` cannot write a record that fails to load
 

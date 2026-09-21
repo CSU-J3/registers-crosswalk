@@ -54,6 +54,16 @@ read path would reject. `--blob-dir PATH` also writes the bytes to
 `PATH/<sha256><ext>` — **outside this repo**, which is enforced, not merely asked. Other fetchers:
 `federalregister`, `govinfo`, `uscode`, `openfec`, `courtlistener`, `manual`.
 
+An FEC matter carries several documents and repeats their categories, so one is named by the
+API's own id:
+
+    python -m registers_crosswalk.pin add openfec --number 8098 --type murs         --document 100512215 --notes "MUR 8098: the certification of the 6-0 dismissal"
+
+`pin search openfec <name> --type murs` prints the matter numbers; the ids are in each matter's
+`documents[]`. `--category` is the other way to name a document and is what advisory opinions use
+(`--type advisory_opinions`, one `Final Opinion` each); the two are mutually exclusive. The
+citation defaults to `FEC MUR 8098` and `--citation` overrides it.
+
     python -m registers_crosswalk.pin search <fetcher> <query>   # identifiers, then the add to paste
     python -m registers_crosswalk.pin check        # 0 clean, 1 drift, 2 missing key, 3 fetch failed
     python -m registers_crosswalk.pin ledger       # entries for the New Gray ledgers

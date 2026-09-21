@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0011",
+  "kind": "source",
+  "citation": "FEC MUR 8111",
+  "title": "Cory Mills; Cory Mills for Congress and David Satterfield in his official capacity as treasurer; The Mills Victory Fund and David Satterfield in his official capacity as treasurer; Pacem Solution International LLC; Pacem Defense LLC, 1198 Windrock LLC, Pacem Estate Holdings LLC; ALS, Inc.; Waygar Capital Inc.; Unknown Persons",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://www.fec.gov/files/legal/murs/8111/8111_28.pdf",
+  "fetcher": "openfec",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-21",
+  "point_in_time": null,
+  "published_at": "2024-07-23",
+  "artifact": {
+    "sha256": "848a5915b8b3e20d9acea7540598c12013ff38cc0d4d525287dbdbd21fae24fb",
+    "byte_length": 750389,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-21T00:57:25.833920Z",
+    "drift_key": "sha256",
+    "drift_value": "848a5915b8b3e20d9acea7540598c12013ff38cc0d4d525287dbdbd21fae24fb"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "MUR 8111, Cory Mills (FL-07): certification of the 6-0 vote to dismiss, 2024-07-23, per commission_votes"
+}

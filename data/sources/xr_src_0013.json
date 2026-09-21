@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0013",
+  "kind": "source",
+  "citation": "FEC MUR 8111",
+  "title": "Notification to Cory Mills, Cory Mills for Congress and David Satterfield in his official capacity as treasurer, and The Mills Victory Fund and David Satterfield in his official capacity as treasurer",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://www.fec.gov/files/legal/murs/8111/8111_33.pdf",
+  "fetcher": "openfec",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-21",
+  "point_in_time": null,
+  "published_at": "2024-09-05",
+  "artifact": {
+    "sha256": "88c139b40aa0af5500f9ff61d39bd2fb5e7a6a7577b93103014bf48a2e156d95",
+    "byte_length": 1011450,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-21T00:57:26.346090Z",
+    "drift_key": "sha256",
+    "drift_value": "88c139b40aa0af5500f9ff61d39bd2fb5e7a6a7577b93103014bf48a2e156d95"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "MUR 8111, Cory Mills (FL-07): notification to Cory Mills and his committees closing the file, 2024-09-05"
+}

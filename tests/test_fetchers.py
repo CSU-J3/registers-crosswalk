@@ -1055,6 +1055,9 @@ def test_courtlistener_stamps_its_live_run_onto_every_record():
         # courtlistener: a scratch `add --cluster-id 1481640 --archive` on 2026-09-20 (UTC), the
         # first run with a token in this tree. It corrected two things — see the module docstring.
         (courtlistener, date(2026, 9, 20)),
+        # openfec: a scratch `add --number 8098 --type murs --document 100512215` on 2026-09-21
+        # (UTC). It corrected the MUR number parameter, which was ignored rather than rejected.
+        (openfec, date(2026, 9, 21)),
     ],
 )
 def test_exercised_fetchers_ship_verified(module, verified_on):
@@ -1062,7 +1065,7 @@ def test_exercised_fetchers_ship_verified(module, verified_on):
     assert module.VERIFIED_AT == verified_on
 
 
-@pytest.mark.parametrize("module", [govinfo, openfec])
+@pytest.mark.parametrize("module", [govinfo])
 def test_unexercised_fetchers_ship_unverified(module):
     # A claim recorded in a handoff or a docstring is not a verification. These flip one at a
     # time, each on its own live `add` in this tree, dated the day it ran.
@@ -1073,12 +1076,12 @@ def test_unexercised_fetchers_ship_unverified(module):
 def test_the_stamp_reaches_the_minted_record():
     from registers_crosswalk.pin import pin
 
-    # openfec is the unverified example now: courtlistener flipped to True on 2026-09-20.
+    # govinfo is the unverified example now: openfec flipped to True on 2026-09-21.
     unverified = pin(
-        openfec.spec(
-            number="2023-01",
-            fetch=_json_fetch(OPENFEC_SEARCH),
-            env={"OPENFEC_API_KEY": "K"},
+        govinfo.spec(
+            package="USCODE-2023-title52",
+            fetch=_json_fetch(GOVINFO_SUMMARY),
+            env={"GOVINFO_API_KEY": "K"},
         ),
         next_id="xr_src_0001",
         fetch=lambda u, h=None: (b"%PDF fake", "application/pdf"),

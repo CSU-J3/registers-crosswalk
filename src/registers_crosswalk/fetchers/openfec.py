@@ -10,21 +10,27 @@ Verified live 2026-09-17 for advisory opinions:
   * The key comes from `OPENFEC_API_KEY` (the same api.data.gov key as govinfo) and, per
     decision 1, is used for the SEARCH call only. It never enters canonical_url.
 
-MURs take the same shape with `type=murs`. Read live off MURs 8098 and 8111 on 2026-09-21,
-before any of them was pinned:
+Verified live 2026-09-21 for MURs, on FEC MURs 8098 and 8111:
   * the number parameter is `case_no`, NOT `mur_no`. `mur_no` is not rejected — it is ignored, and
-    the response comes back 200 with the unfiltered first page of all 7,670 matters.
+    the response comes back 200 with the unfiltered first page of all 7,670 matters. A pin made
+    that way would have carried a document from an unrelated MUR under the citation it was asked
+    for, with nothing on the record to say so.
   * hits sit under `payload["murs"]`; `total_murs` is the count.
   * a MUR's `documents[]` repeat their categories — both of 8098's certifications are
     `Certifications` — so a document is named by `document_id`, which is what `--document` is for.
+    The three categories observed across both matters are `Certifications`,
+    `General Counsel Reports, Briefs, Notifications and Responses`, and `Complaint, Responses,
+    Designation of Counsel and Extensions of Time`. Neither matter publishes a Factual and Legal
+    Analysis or a Statement of Reasons, and there is no closing-letter category: the letters
+    closing the file are `Notification to …` documents in the General Counsel bucket.
   * the document's date is `documents[].document_date`. A MUR record has `open_date` and
-    `close_date` and no `issue_date` at all.
+    `close_date` and no `issue_date` at all, so the advisory opinion's record-level fallback never
+    fires here.
+  * `documents[].length` equalled the fetched byte length on all six documents pinned.
   * the record's `name` is the primary respondent ("Cory Mills"), not a captioned matter name, and
     it is the same string for both matters — which is why the citation stays `FEC MUR {n}` and
     `--citation` exists for the cases where that is not enough.
-
-Reading an endpoint is not running one: `spec()` has still not been exercised end to end from this
-tree, so `VERIFIED` stays False until it is.
+  * fec.gov served every PDF with no key, as for advisory opinions.
 """
 
 from __future__ import annotations
@@ -42,12 +48,12 @@ from ..pin import FetchFn, MissingKey, PinSpec, SearchHit, default_fetch, sha256
 NAME = "openfec"
 HELP = "an FEC advisory opinion or MUR document (OpenFEC legal search)"
 DRIFT_KEY = "sha256"
-# NOT yet exercised against the live API from this tree. The MUR shapes recorded in the docstring
-# above were read off the search endpoint, which is not the same as running `spec()` and reading
-# what it minted — so every record this module mints still says `fetcher_verified: false` on its
-# face. Flip to True, dated the day it ran, on the first live `add` through this fetcher.
-VERIFIED = False
-VERIFIED_AT = None
+# Exercised against the live API from this tree on 2026-09-21: a scratch `add --number 8098
+# --type murs --document 100512215` into a data dir outside the repo, every mapped field compared
+# against the captured search response, then `check` clean. Editing `spec()` voids that run and
+# resets this to False — the convention in docs/operations.md.
+VERIFIED = True
+VERIFIED_AT = date(2026, 9, 21)
 PUBLISHER = "Federal Election Commission"
 ENV_KEY = "OPENFEC_API_KEY"
 SEARCH = "https://api.open.fec.gov/v1/legal/search/"
@@ -150,10 +156,10 @@ def drift_value(body: bytes) -> str:
 
 # --------------------------------------------------------------------------- search
 
-# NOT exercised against the live API (2026-09-21): `q=` has never been asked of the live endpoint.
-# What the MUR captures do let these tests assert is `_hit`'s parse, since a search hit and a
-# `spec()` record read the same MUR record — so the fields are covered even though the query is
-# not.
+# The free-text query is still NOT exercised against the live API (2026-09-21): the MUR run went
+# through `spec()` by number, which is a different endpoint shape, and `q=` has never been asked.
+# What the captures do let these tests assert is `_hit`'s parse, since a search hit and a `spec()`
+# record read the same MUR record — so the fields are covered even though the query is not.
 SEARCH_TYPES = ("advisory_opinions", "murs")
 
 

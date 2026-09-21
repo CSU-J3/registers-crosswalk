@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0009",
+  "kind": "source",
+  "citation": "FEC MUR 8098",
+  "title": "First General Counsel's Report",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://www.fec.gov/files/legal/murs/8098/8098_09.pdf",
+  "fetcher": "openfec",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-21",
+  "point_in_time": null,
+  "published_at": "2024-06-13",
+  "artifact": {
+    "sha256": "3b9cf6ca8598c26348af6b0210ca7a1ef4cbc353ca7663432b7766c1c42abc8d",
+    "byte_length": 1041368,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-21T00:57:25.422243Z",
+    "drift_key": "sha256",
+    "drift_value": "3b9cf6ca8598c26348af6b0210ca7a1ef4cbc353ca7663432b7766c1c42abc8d"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "MUR 8098, Cory Mills (FL-07): First General Counsel's Report, 2024-06-13"
+}

@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0008",
+  "kind": "source",
+  "citation": "FEC MUR 8098",
+  "title": "Cory Mills; Cory Mills for Congress and David Satterfield in his official capacity as treasurer; Laura Loomer for Congress, inc. and Laure Loomer in her official capacity as treasurer",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://www.fec.gov/files/legal/murs/8098/8098_12.pdf",
+  "fetcher": "openfec",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-21",
+  "point_in_time": null,
+  "published_at": "2024-07-23",
+  "artifact": {
+    "sha256": "a1a57c8e17e4bc9d08f31f34c1b77c5c210077ba048941b06e13a518cfb46618",
+    "byte_length": 721900,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-21T00:57:24.986103Z",
+    "drift_key": "sha256",
+    "drift_value": "a1a57c8e17e4bc9d08f31f34c1b77c5c210077ba048941b06e13a518cfb46618"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "MUR 8098, Cory Mills (FL-07): certification of the 6-0 vote to dismiss, 2024-07-23, per commission_votes"
+}

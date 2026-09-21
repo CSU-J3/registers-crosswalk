@@ -200,8 +200,29 @@ def test_check_unknown_id(tmp_path, capsys):
     assert "unknown source" in capsys.readouterr().err
 
 
-def test_check_defaults_to_the_latest_pin_per_citation(tmp_path, capsys):
-    # Two pins of ONE citation: the default run checks the current one only, --all checks both.
+def test_check_defaults_to_every_live_pin_sharing_a_citation(tmp_path, capsys):
+    # Three documents of ONE citation, the shape an FEC MUR has: a certification, a General
+    # Counsel's report and a closing notification are not versions of each other, so none of them
+    # may be dropped from a drift run in favour of whichever one sorts latest.
+    for n, body in ((1, b"certification"), (2, b"gc report"), (3, b"notification")):
+        assert (
+            _add(
+                tmp_path,
+                url=URL.replace("2023-01.pdf", f"mur-8098-{n}.pdf"),
+                citation="FEC MUR 8098",
+                fetch=_fetch(body=body),
+                extra=["--published-at", f"2024-0{n}-01"],
+            )
+            == 0
+        )
+    capsys.readouterr()  # drop what `add` printed
+
+    assert main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"certification")) == 1
+    default_run = capsys.readouterr().out
+    assert all(x in default_run for x in ("xr_src_0001", "xr_src_0002", "xr_src_0003"))
+
+
+def test_check_skips_a_superseded_pin_by_default_and_all_includes_it(tmp_path, capsys):
     _add(tmp_path, extra=["--point-in-time", "2023-05-11"])
     _add(
         tmp_path,

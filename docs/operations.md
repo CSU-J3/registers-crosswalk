@@ -444,8 +444,17 @@ Consequences worth knowing:
 ## Source drift: what red means
 
 `.github/workflows/sources-drift.yml` runs `python -m registers_crosswalk.pin check` weekly
-(Mondays 12:00 UTC) and on `workflow_dispatch`. By default it checks the **latest pin per citation**
-(superseded pins and `merged_into` losers are skipped); `--all` forces every pin.
+(Mondays 12:00 UTC) and on `workflow_dispatch`. By default it checks **every live pin** — live as
+`registry.live_sources` defines it, the same predicate the duplicate rule and the load-path
+invariants use: not a `merged_into` loser, and not named by another pin's `supersedes`. `--all`
+adds the ones that default skips, so a run can ask whether the documents behind the history are
+still reachable.
+
+It used to check the *latest pin per citation*, and that was wrong for any citation naming a
+proceeding rather than a text. One FEC MUR is one citation over several documents — the
+certification of the vote, the First General Counsel's Report, the notification closing the file —
+which are not versions of each other, so "latest" silently dropped all but one of them from every
+drift run. On the six MUR pins currently in `data/`, four were going unchecked.
 
 **Exit code → cause.**
 - **0 — clean.** Every checked pin still matches. Nothing to do.

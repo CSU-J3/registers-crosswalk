@@ -64,6 +64,28 @@ def superseded_ids(sources: Mapping[str, Source]) -> set[str]:
     return {s.supersedes for s in sources.values() if s.supersedes is not None}
 
 
+def live_sources(sources: Mapping[str, Source]) -> dict[str, Source]:
+    """The pins that still assert something about the world today, keyed by xr_id.
+
+    The single definition of LIVE, because three readers ask it and a pin that counted as live for
+    one and not another would mean the duplicate rule, the load-path invariant and `pin check` were
+    each describing a different repo. A pin drops out for one of two reasons, and they are not the
+    same reason: a `merged_into` loser was *wrong* (two records for one document, and this is the
+    one we do not keep), while a pin another one names in `supersedes` was *right when it was made*
+    and is now history. Neither still claims to be the current text, which is what live means.
+
+    Liveness is a property of the whole set, never of a record on its own: nothing in a superseded
+    pin's own file says it was retired — only the later pin's `supersedes` does — so every caller
+    has to hand over every source, not the subset it happens to be walking.
+    """
+    superseded = superseded_ids(sources)
+    return {
+        xr_id: s
+        for xr_id, s in sources.items()
+        if s.merged_into is None and xr_id not in superseded
+    }
+
+
 def unverified_sources(sources: Mapping[str, Source]) -> list[Source]:
     """Pins minted by a fetcher whose field mapping has never been exercised against the live API.
 
@@ -92,20 +114,17 @@ def same_document_of(
     point_in_time is OLRC's site-wide "laws in effect on" date, which moves every few days without
     the section changing, so the URL rule waves a re-pin of an unchanged section straight through.
 
-    Only LIVE pins count: `merged_into` losers were wrong, and a pin another one supersedes is
-    history, which is exactly the chain this rule must not forbid. That is also where the override
-    lives — naming a pin with `--supersedes` makes it not live, so the collision disappears. No
-    separate force flag, because superseding is the assertion the operator is actually making.
+    Only LIVE pins count, as `live_sources` defines live: a superseded pin is history, which is
+    exactly the chain this rule must not forbid. That is also where the override lives — naming a
+    pin with `--supersedes` makes it not live, so the collision disappears. No separate force
+    flag, because superseding is the assertion the operator is actually making.
 
     Both callers go through here — `pin add` to refuse before it archives anything, and
     `check_source_invariants` to enforce the rule on load — so the shortcut and the authoritative
     check cannot drift apart.
     """
     want = normalize_citation(citation)
-    superseded = superseded_ids(sources)
-    for source in sources.values():
-        if source.merged_into is not None or source.xr_id in superseded:
-            continue
+    for source in live_sources(sources).values():
         if (
             normalize_citation(source.citation) == want
             and source.artifact.drift_key == drift_key
@@ -156,14 +175,10 @@ def check_source_invariants(
             )
         accepted[source.xr_id] = source
     # One LIVE pin per document, decided by same_document_of for the same reason: one definition.
-    # Liveness depends on the whole set — a later pin's `supersedes` retires an earlier one, and
-    # file order says nothing about which came first — so the retired ids are computed over every
-    # source before the walk, and only live pins are tested against each other.
-    superseded = superseded_ids(sources)
+    # `live_sources` is handed every source rather than the walk's accumulator, because a later
+    # pin's `supersedes` retires an earlier one and file order says nothing about which came first.
     live: dict[str, Source] = {}
-    for source in sources.values():
-        if source.merged_into is not None or source.xr_id in superseded:
-            continue
+    for source in live_sources(sources).values():
         artifact = source.artifact
         other = same_document_of(live, source.citation, artifact.drift_key, artifact.drift_value)
         if other is not None:

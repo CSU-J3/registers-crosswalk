@@ -226,7 +226,11 @@ def test_state_lists_every_fetcher_with_its_verified_flag(client):
     by_name = {f["name"]: f for f in body["fetchers"]}
     assert by_name["courtlistener"]["verified"] is True
     assert by_name["courtlistener"]["verified_at"] == date(2026, 9, 20).isoformat()
-    assert by_name["openfec"]["verified"] is False
+    assert by_name["openfec"]["verified"] is True
+    assert by_name["openfec"]["verified_at"] == date(2026, 9, 21).isoformat()
+    # govinfo is the unverified one now; openfec flipped on its MUR run of 2026-09-21.
+    assert by_name["govinfo"]["verified"] is False
+    assert by_name["govinfo"]["verified_at"] is None
     assert by_name["uscode"]["requires_archive"] is True
     assert by_name["courtlistener"]["searchable"] is True
     assert by_name["ecfr"]["searchable"] is False
@@ -338,10 +342,11 @@ def test_resolve_says_so_when_the_cluster_has_no_document(tmp_path):
 
 
 def test_resolve_refuses_an_unverified_fetcher(client):
-    status, body = client.post("/api/resolve", {"fetcher": "openfec", "args": {"number": "1"}})
+    # govinfo, the last fetcher whose spec() has never been run from this tree.
+    status, body = client.post("/api/resolve", {"fetcher": "govinfo", "args": {"package": "X"}})
     assert status == 409
     assert body["error"] == (
-        "fetcher openfec is unverified; its first live run goes through the terminal, "
+        "fetcher govinfo is unverified; its first live run goes through the terminal, "
         "per docs/operations.md"
     )
 
@@ -1041,19 +1046,24 @@ def test_favicon_is_an_empty_204(client):
 
 
 def test_the_search_select_defaults_to_a_verified_fetcher(client):
-    """Module order puts openfec first — unverified, keyless, and unable to pin.
+    """The rule is "first VERIFIED searchable fetcher", and it has now moved on its own.
 
-    Only the default moves; the options stay in module order. If openfec is ever verified it
-    becomes the default again by being first, with no change here.
+    Module order puts openfec first. It was the unverified, keyless fetcher this rule was written
+    to skip, and the test said that if openfec were ever verified it would become the default
+    again by being first, with no change to the console. It was verified on 2026-09-21 and it is
+    the default again — so what follows is the same rule with its answer moved, not a new rule.
     """
+    from registers_crosswalk.fetchers import get
+
+    assert get("openfec").VERIFIED is True
     page = client.page()
     start = page.index('<select id="search-fetcher">')
     end = page.index("</select>", start)
     block = page[start:end]
     assert 'value="openfec"' in block and 'value="courtlistener"' in block
     assert block.index('value="openfec"') < block.index('value="courtlistener"')
-    assert 'value="courtlistener" selected' in block
-    assert 'value="openfec" selected' not in block
+    assert 'value="openfec" selected' in block
+    assert 'value="courtlistener" selected' not in block
 
 
 def test_every_api_caller_handles_a_request_that_never_landed(client):

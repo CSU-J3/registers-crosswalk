@@ -153,6 +153,16 @@ def test_check_exits_1_on_drift(tmp_path, capsys):
     assert sha256_hex(b"changed") in out
 
 
+def _move_govinfo_pin_to_the_api_host(tmp_path, xr_id="xr_src_0001"):
+    """govinfo stores its key-free content URL, which `check` re-fetches without a key. A URL on
+    the API host is the one place a key is still needed, so these tests put the pin there to
+    reach the KEY_MISSING path."""
+    path = tmp_path / "sources" / f"{xr_id}.json"
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["canonical_url"] = "https://api.govinfo.gov/packages/P/granules/P/pdf"
+    path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+
+
 def test_check_exits_2_when_a_key_is_missing(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("GOVINFO_API_KEY", raising=False)
     argv = [
@@ -177,6 +187,7 @@ def test_check_exits_2_when_a_key_is_missing(tmp_path, monkeypatch, capsys):
 
     assert main(argv, fetch=fetch) == 0
     capsys.readouterr()
+    _move_govinfo_pin_to_the_api_host(tmp_path)
     monkeypatch.delenv("GOVINFO_API_KEY")
     assert main(["--data-dir", str(tmp_path), "check"], fetch=fetch) == 2
     assert "KEY_MISSING" in capsys.readouterr().out
@@ -315,6 +326,7 @@ def test_key_missing_outranks_a_transport_failure(tmp_path, monkeypatch, capsys)
     )
     _add(tmp_path)
     capsys.readouterr()
+    _move_govinfo_pin_to_the_api_host(tmp_path)
     monkeypatch.delenv("GOVINFO_API_KEY")
 
     def boom(url, headers=None):

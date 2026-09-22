@@ -5,7 +5,7 @@ that resolves inside the repo root, and a `Source` holds only facts about the do
 (where it lives, when it was fetched, what it hashes to, who published it, when). Blobs live in the
 consuming project or in the archive copy; the artifact hash verifies either.
 
-CLI: `python -m registers_crosswalk.pin {add,search,check,ledger}`.
+CLI: `python -m registers_crosswalk.pin {add,archive,note,search,check,ledger}`.
 """
 
 from __future__ import annotations
@@ -1015,6 +1015,41 @@ def archive_source(
     )
 
 
+def note_source(xr_id: str, text: str, *, data_dir: Path) -> AddOutcome:
+    """Set a pin's `notes`, offline. The same one-field amendment `archive_source` makes.
+
+    `notes` is a plain-language label — what the document IS in the matter, which the status page
+    prints ahead of the title — and it is the one field of a record that is ours rather than a fact
+    read off the document, so it is the one field worth being able to restate without re-pinning.
+    Nothing is fetched and nothing else in the file is touched: read, replace one key, write.
+    """
+    text = text.strip()
+    if not text:
+        return AddOutcome(status="refused", message="a note must not be empty")
+    xw = Crosswalk(data_dir)
+    source = xw.sources.get(xr_id)
+    if source is None:
+        return AddOutcome(status="refused", message=f"unknown source {xr_id!r}")
+
+    updated = Source.model_validate(source.model_copy(update={"notes": text}).model_dump())
+    try:
+        check_source_invariants({**xw.sources, xr_id: updated}, xw.nodes)
+    except ValueError as exc:
+        return AddOutcome(status="refused", message=str(exc))
+
+    path = _sources_dir(data_dir) / f"{xr_id}.json"
+    # Read, touch one key, write — as `archive_source` does, and for the same reason.
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["notes"] = text
+    path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return AddOutcome(
+        status="written",
+        message=f"noted {xr_id}: {text}",
+        source=updated,
+        path=path,
+    )
+
+
 def _cmd_add(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
     """argparse in, exit code out. The guards and the write live in `add_source`."""
     from . import fetchers
@@ -1069,6 +1104,17 @@ def _cmd_archive(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn
         return 1
     print(outcome.message)
     print(outcome.ledger)
+    return 0
+
+
+def _cmd_note(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
+    """argparse in, exit code out. The guards and the write live in `note_source`."""
+    del fetch, archive_fn  # offline: a label is restated, the document is not touched
+    outcome = note_source(args.xr_id, args.text, data_dir=args.data_dir)
+    if outcome.status != "written":
+        print(outcome.message, file=sys.stderr)
+        return 1
+    print(outcome.message)
     return 0
 
 
@@ -1210,6 +1256,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     archive_parser.set_defaults(handler=_cmd_archive)
     archive_parser.add_argument("xr_id", type=_src_id_arg, metavar="xr_src_NNNN")
+
+    note_parser = sub.add_parser(
+        "note", help="set a pin's notes label (offline; nothing else moves)"
+    )
+    note_parser.set_defaults(handler=_cmd_note)
+    note_parser.add_argument("xr_id", type=_src_id_arg, metavar="xr_src_NNNN")
+    note_parser.add_argument("text", help="the plain-language label; replaces any existing one")
 
     check_parser = sub.add_parser("check", help="re-fetch pinned documents and report drift")
     check_parser.set_defaults(handler=_cmd_check)

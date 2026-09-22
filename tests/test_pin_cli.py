@@ -794,3 +794,77 @@ def test_an_archived_record_still_loads(tmp_path, capsys):
     source = xw.sources["xr_src_0001"]
     assert source.archives[0].url == "https://web.archive.org/web/20260920190851/x"
     assert source.archives[0].captured_at == datetime(2026, 9, 20, 19, 8, 51, tzinfo=UTC)
+
+
+# ------------------------------------------------- `pin note`: restate a label, offline
+
+
+def _note(tmp_path, text, xr_id="xr_src_0001"):
+    def must_not_fetch(url, headers=None):
+        raise AssertionError("pin note fetched something")
+
+    def must_not_archive(url, **_):
+        raise AssertionError("pin note asked for a capture")
+
+    return main(
+        ["--data-dir", str(tmp_path), "note", xr_id, text],
+        fetch=must_not_fetch,
+        archive_fn=must_not_archive,
+    )
+
+
+def test_note_sets_the_notes_field_offline(tmp_path, capsys):
+    assert _add(tmp_path) == 0
+    capsys.readouterr()
+    assert _note(tmp_path, "the advisory opinion itself") == 0
+    assert "noted xr_src_0001: the advisory opinion itself" in capsys.readouterr().out
+    assert _record(tmp_path)["notes"] == "the advisory opinion itself"
+    assert Crosswalk(tmp_path).sources["xr_src_0001"].notes == "the advisory opinion itself"
+
+
+def test_note_replaces_an_existing_note(tmp_path, capsys):
+    assert _add(tmp_path, extra=("--notes", "old label")) == 0
+    capsys.readouterr()
+    assert _record(tmp_path)["notes"] == "old label"
+    assert _note(tmp_path, "new label") == 0
+    assert _record(tmp_path)["notes"] == "new label"
+
+
+def test_note_changes_only_the_notes_field(tmp_path, capsys):
+    """Same proof as `test_archive_changes_only_the_archives_field`: keys perturbed first, so a
+    re-serialisation would snap them back and the test could tell."""
+    assert _add(tmp_path, extra=("--notes", "old label")) == 0
+    capsys.readouterr()
+    path = tmp_path / "sources" / "xr_src_0001.json"
+
+    original = json.loads(path.read_text(encoding="utf-8"))
+    shuffled = {k: original[k] for k in reversed(list(original))}
+    path.write_text(json.dumps(shuffled, indent=2) + "\n", encoding="utf-8")
+    before = json.loads(path.read_text(encoding="utf-8"))
+    assert list(before) != list(original)  # the perturbation took
+
+    assert _note(tmp_path, "new label") == 0
+    after = json.loads(path.read_text(encoding="utf-8"))
+
+    # same keys in the same (perturbed) order: nothing was re-serialised
+    assert list(after) == list(before)
+    assert after["notes"] == "new label"
+    for key in before:
+        if key != "notes":
+            assert after[key] == before[key], key
+
+
+def test_note_refuses_an_unknown_id(tmp_path, capsys):
+    assert _add(tmp_path) == 0
+    capsys.readouterr()
+    assert _note(tmp_path, "x", xr_id="xr_src_0404") == 1
+    assert "unknown source 'xr_src_0404'" in capsys.readouterr().err
+
+
+def test_note_refuses_an_empty_label(tmp_path, capsys):
+    assert _add(tmp_path, extra=("--notes", "keep me")) == 0
+    capsys.readouterr()
+    before = _record(tmp_path)
+    assert _note(tmp_path, "   ") == 1
+    assert "a note must not be empty" in capsys.readouterr().err
+    assert _record(tmp_path) == before  # nothing written

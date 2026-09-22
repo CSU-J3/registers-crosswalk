@@ -67,6 +67,7 @@ citation defaults to `FEC MUR 8098` and `--citation` overrides it.
     python -m registers_crosswalk.pin search <fetcher> <query>   # identifiers, then the add to paste
     python -m registers_crosswalk.pin check        # 0 clean, 1 drift, 2 missing key, 3 fetch failed
     python -m registers_crosswalk.pin ledger       # entries for the New Gray ledgers
+    python -m registers_crosswalk.pin note xr_src_NNNN "<label>"   # offline; rewrites only notes
 
 A transport failure (exit 3) is deliberately not reported as drift (exit 1) — a dead endpoint and
 a changed document demand opposite responses. Every record also carries `fetcher_verified`: false

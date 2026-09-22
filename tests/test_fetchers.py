@@ -207,32 +207,45 @@ def test_govinfo_spec_keeps_the_key_off_canonical_url():
     assert fetch.calls[0][0] == (
         "https://api.govinfo.gov/packages/USCODE-2023-title52/summary?api_key=SECRET"
     )
-    # ...what we store does not, and the fetch url re-attaches it
-    assert spec.canonical_url == GOVINFO_SUMMARY["download"]["pdfLink"]
-    assert "api_key" not in spec.canonical_url
-    assert spec.fetch_url.endswith("?api_key=SECRET")
+    # ...what we store and fetch is the content-host copy, which carries none
+    assert spec.canonical_url == (
+        "https://www.govinfo.gov/content/pkg/USCODE-2023-title52/pdf/USCODE-2023-title52.pdf"
+    )
+    assert spec.fetch_url is None
     assert spec.published_at == date(2024, 1, 8)
     assert spec.grade.code() == "A1"
 
 
 def test_govinfo_granule_uses_the_same_path():
     fetch = _json_fetch(GOVINFO_SUMMARY)
-    govinfo.spec(
+    spec = govinfo.spec(
         package="USCODE-2023-title52",
         granule="USCODE-2023-title52-subtitleIII",
         fetch=fetch,
         env={"GOVINFO_API_KEY": "SECRET"},
     )
     assert "/granules/USCODE-2023-title52-subtitleIII/summary" in fetch.calls[0][0]
+    assert spec.canonical_url == (
+        "https://www.govinfo.gov/content/pkg/USCODE-2023-title52/pdf/"
+        "USCODE-2023-title52-subtitleIII.pdf"
+    )
 
 
-def test_govinfo_strips_a_query_string_the_api_hands_back():
+def test_govinfo_stores_no_query_string_whatever_pdflink_carries():
+    # The API's own pdfLink is on the key-bearing API host; it is never what is stored.
     payload = {
         **GOVINFO_SUMMARY,
-        "download": {"pdfLink": "https://www.govinfo.gov/content/x.pdf?api_key=LEAKED"},
+        "download": {"pdfLink": "https://api.govinfo.gov/packages/X/pdf?api_key=LEAKED"},
     }
     spec = govinfo.spec(package="X", fetch=_json_fetch(payload), env={"GOVINFO_API_KEY": "SECRET"})
-    assert spec.canonical_url == "https://www.govinfo.gov/content/x.pdf"
+    assert spec.canonical_url == "https://www.govinfo.gov/content/pkg/X/pdf/X.pdf"
+    assert "?" not in spec.canonical_url
+
+
+def test_govinfo_refuses_a_summary_that_lists_no_pdf():
+    payload = {**GOVINFO_SUMMARY, "download": {}}
+    with pytest.raises(ValueError, match="lists no PDF"):
+        govinfo.spec(package="X", fetch=_json_fetch(payload), env={"GOVINFO_API_KEY": "SECRET"})
 
 
 def test_govinfo_without_a_key_raises_missing_key():
@@ -240,11 +253,22 @@ def test_govinfo_without_a_key_raises_missing_key():
         govinfo.spec(package="X", fetch=_json_fetch(GOVINFO_SUMMARY), env={})
 
 
-def test_govinfo_content_request_reattaches_the_key():
+def test_govinfo_content_request_needs_no_key_on_the_content_host():
+    # What `check` re-fetches for every govinfo pin: no key attached, none demanded.
     url, headers = govinfo.content_request(
-        "https://www.govinfo.gov/content/x.pdf", env={"GOVINFO_API_KEY": "SECRET"}
+        "https://www.govinfo.gov/content/pkg/X/pdf/X.pdf", env={}
     )
-    assert url == "https://www.govinfo.gov/content/x.pdf?api_key=SECRET"
+    assert url == "https://www.govinfo.gov/content/pkg/X/pdf/X.pdf"
+    assert headers == {}
+
+
+def test_govinfo_content_request_still_needs_the_key_on_the_api_host():
+    with pytest.raises(MissingKey, match="GOVINFO_API_KEY"):
+        govinfo.content_request("https://api.govinfo.gov/packages/X/pdf", env={})
+    url, headers = govinfo.content_request(
+        "https://api.govinfo.gov/packages/X/pdf", env={"GOVINFO_API_KEY": "SECRET"}
+    )
+    assert url == "https://api.govinfo.gov/packages/X/pdf?api_key=SECRET"
     assert headers == {}
 
 

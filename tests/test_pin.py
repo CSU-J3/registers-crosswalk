@@ -247,23 +247,34 @@ def test_check_reports_error_when_the_fetch_raises_a_non_transport_error():
     assert "ValueError" in report.detail
 
 
+# govinfo re-fetches its content-host pins with no key; only a URL on the API host needs one, so
+# that is the URL these two use to reach the key paths in `check`.
+GOVINFO_API_PDF = "https://api.govinfo.gov/packages/X/granules/X/pdf"
+
+
 def test_check_reports_key_missing_rather_than_ok():
-    source = _fr_source(
-        fetcher="govinfo", canonical_url="https://www.govinfo.gov/content/pkg/X/pdf/X.pdf"
-    )
+    source = _fr_source(fetcher="govinfo", canonical_url=GOVINFO_API_PDF)
     report = check(source, fetch=_fetch(), env={})
     assert report.status == "key_missing"
     assert "GOVINFO_API_KEY" in report.detail
 
 
 def test_check_reattaches_the_key_from_env():
-    source = _fr_source(
-        fetcher="govinfo", canonical_url="https://www.govinfo.gov/content/pkg/X/pdf/X.pdf"
-    )
+    source = _fr_source(fetcher="govinfo", canonical_url=GOVINFO_API_PDF)
     fetch = _fetch()
     report = check(source, fetch=fetch, env={"GOVINFO_API_KEY": "SECRET"})
     assert report.status == "ok"
     assert fetch.calls[0][0].endswith("?api_key=SECRET")
+
+
+def test_check_needs_no_key_for_a_govinfo_content_url():
+    source = _fr_source(
+        fetcher="govinfo", canonical_url="https://www.govinfo.gov/content/pkg/X/pdf/X.pdf"
+    )
+    fetch = _fetch()
+    report = check(source, fetch=fetch, env={})
+    assert report.status == "ok"
+    assert "api_key" not in fetch.calls[0][0]
 
 
 USCODE_URL = "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title52-section30116&num=0&edition=prelim"

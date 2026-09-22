@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0017",
+  "kind": "source",
+  "citation": "301 U.S. 242",
+  "title": "Herndon v. Lowry",
+  "publisher": "Supreme Court of the United States",
+  "canonical_url": "https://storage.courtlistener.com/harvard_pdf/102821.pdf",
+  "fetcher": "courtlistener",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-20",
+  "point_in_time": null,
+  "published_at": "1937-04-26",
+  "artifact": {
+    "sha256": "737cdc040b40d5741aec5f52d3795dd736df2c7fc0f469459a208b053f4d3aa7",
+    "byte_length": 1746082,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-22T21:22:09.245768Z",
+    "drift_key": "sha256",
+    "drift_value": "737cdc040b40d5741aec5f52d3795dd736df2c7fc0f469459a208b053f4d3aa7"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

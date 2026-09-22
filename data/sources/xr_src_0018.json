@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0018",
+  "kind": "source",
+  "citation": "326 U.S. 135",
+  "title": "Bridges v. Wixon",
+  "publisher": "Supreme Court of the United States",
+  "canonical_url": "https://storage.courtlistener.com/harvard_pdf/104184.pdf",
+  "fetcher": "courtlistener",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-20",
+  "point_in_time": null,
+  "published_at": "1945-06-18",
+  "artifact": {
+    "sha256": "f60177b110c1d05cd400c96e6d96e675118fda44895ea4b1368db5ebc12a74f8",
+    "byte_length": 2318483,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-22T21:24:20.906504Z",
+    "drift_key": "sha256",
+    "drift_value": "f60177b110c1d05cd400c96e6d96e675118fda44895ea4b1368db5ebc12a74f8"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

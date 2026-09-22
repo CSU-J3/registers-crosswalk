@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0020",
+  "kind": "source",
+  "citation": "845 F. Supp. 17",
+  "title": "Senate Select Committee on Ethics v. Packwood",
+  "publisher": "District Court, District of Columbia",
+  "canonical_url": "https://storage.courtlistener.com/harvard_pdf/1459984.pdf",
+  "fetcher": "courtlistener",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-20",
+  "point_in_time": null,
+  "published_at": "1994-01-24",
+  "artifact": {
+    "sha256": "2214362ffd1119a8222023412fc54c7f92bbf5bfd431d9efbcfa31a96b2bdf21",
+    "byte_length": 582146,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-22T21:27:07.679381Z",
+    "drift_key": "sha256",
+    "drift_value": "2214362ffd1119a8222023412fc54c7f92bbf5bfd431d9efbcfa31a96b2bdf21"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260922212708/https://storage.courtlistener.com/harvard_pdf/1459984.pdf",
+      "captured_at": "2026-09-22T21:27:08Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

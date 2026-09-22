@@ -1,0 +1,31 @@
+{
+    "dateIssued": "2024-12-31",
+    "documentType": "USCODE",
+    "packageId": "USCODE-2024-title52",
+    "collectionCode": "USCODE",
+    "detailsLink": "https://www.govinfo.gov/app/details/USCODE-2024-title52",
+    "title": "VOTING AND ELECTIONS",
+    "branch": "legislative",
+    "collectionName": "United States Code",
+    "download": {
+        "premisLink": "https://api.govinfo.gov/packages/USCODE-2024-title52/premis",
+        "txtLink": "https://api.govinfo.gov/packages/USCODE-2024-title52/htm",
+        "zipLink": "https://api.govinfo.gov/packages/USCODE-2024-title52/zip",
+        "modsLink": "https://api.govinfo.gov/packages/USCODE-2024-title52/mods",
+        "pdfLink": "https://api.govinfo.gov/packages/USCODE-2024-title52/pdf"
+    },
+    "pages": "144",
+    "governmentAuthor2": "House of Representatives",
+    "titleNumber": "52",
+    "governmentAuthor1": "Congress",
+    "publisher": "U.S. Government Publishing Office",
+    "suDocClassNumber": "Y 1.2/5:",
+    "docClass": "USCODE",
+    "lastModified": "2026-04-13T14:29:14Z",
+    "category": "Bills and Statutes",
+    "otherIdentifier": {
+        "parent-ils-system-id": "000645501",
+        "migrated-doc-id": "52USC"
+    },
+    "granulesLink": "https://api.govinfo.gov/packages/USCODE-2024-title52/granules?offsetMark=*&pageSize=100"
+}

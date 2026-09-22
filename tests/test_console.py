@@ -221,16 +221,15 @@ def test_a_wrong_token_is_refused(client):
 # --------------------------------------------------------------------------- state and keys
 
 
-def test_state_lists_every_fetcher_with_its_verified_flag(client):
+def test_state_lists_every_fetcher_with_its_verified_flag(client, unverified_fetcher):
     _, body = client.get("/api/state")
     by_name = {f["name"]: f for f in body["fetchers"]}
     assert by_name["courtlistener"]["verified"] is True
     assert by_name["courtlistener"]["verified_at"] == date(2026, 9, 20).isoformat()
     assert by_name["openfec"]["verified"] is True
     assert by_name["openfec"]["verified_at"] == date(2026, 9, 21).isoformat()
-    # govinfo is the unverified one now; openfec flipped on its MUR run of 2026-09-21.
-    assert by_name["govinfo"]["verified"] is False
-    assert by_name["govinfo"]["verified_at"] is None
+    assert by_name["unverified_fake"]["verified"] is False
+    assert by_name["unverified_fake"]["verified_at"] is None
     assert by_name["uscode"]["requires_archive"] is True
     assert by_name["courtlistener"]["searchable"] is True
     assert by_name["ecfr"]["searchable"] is False
@@ -341,12 +340,13 @@ def test_resolve_says_so_when_the_cluster_has_no_document(tmp_path):
         thread.join(timeout=5)
 
 
-def test_resolve_refuses_an_unverified_fetcher(client):
-    # govinfo, the last fetcher whose spec() has never been run from this tree.
-    status, body = client.post("/api/resolve", {"fetcher": "govinfo", "args": {"package": "X"}})
+def test_resolve_refuses_an_unverified_fetcher(client, unverified_fetcher):
+    status, body = client.post(
+        "/api/resolve", {"fetcher": "unverified_fake", "args": {"url": "https://example.gov/x"}}
+    )
     assert status == 409
     assert body["error"] == (
-        "fetcher govinfo is unverified; its first live run goes through the terminal, "
+        "fetcher unverified_fake is unverified; its first live run goes through the terminal, "
         "per docs/operations.md"
     )
 
@@ -565,13 +565,13 @@ def test_load_dotenv_never_touches_os_environ(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------- the page
 
 
-def test_the_page_carries_the_token_and_the_fetcher_chips(client):
+def test_the_page_carries_the_token_and_the_fetcher_chips(client, unverified_fetcher):
     page = client.page()
     assert client.console.token in page
     assert "Pinning console" in page
     assert "Local only." in page
     assert "courtlistener" in page and "verified 2026-09-20" in page
-    assert "unverified" in page
+    assert "unverified_fake" in page and "unverified" in page
 
 
 def test_the_page_never_renders_api_json_as_markup(client):

@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0015",
+  "kind": "source",
+  "citation": "11 CFR Part 109",
+  "title": "11 CFR Part 109, as of 2026-09-14",
+  "publisher": "Office of the Federal Register",
+  "canonical_url": "https://www.ecfr.gov/api/versioner/v1/full/2026-09-14/title-11.xml?part=109",
+  "fetcher": "ecfr",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-18",
+  "point_in_time": "2026-09-14",
+  "published_at": null,
+  "artifact": {
+    "sha256": "d977683bfbc606ee1f11b922bbfb70be2e3d316897f2c24ec20ef7c292c6871e",
+    "byte_length": 47685,
+    "media_type": "application/xml",
+    "fetched_at": "2026-09-22T21:20:07.142752Z",
+    "drift_key": "sha256",
+    "drift_value": "d977683bfbc606ee1f11b922bbfb70be2e3d316897f2c24ec20ef7c292c6871e"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

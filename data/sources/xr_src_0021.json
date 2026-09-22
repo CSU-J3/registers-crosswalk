@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0021",
+  "kind": "source",
+  "citation": "558 U.S. 310",
+  "title": "Citizens United v. Federal Election Commission",
+  "publisher": "Supreme Court of the United States",
+  "canonical_url": "https://storage.courtlistener.com/harvard_pdf/1741.pdf",
+  "fetcher": "courtlistener",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-20",
+  "point_in_time": null,
+  "published_at": "2010-01-21",
+  "artifact": {
+    "sha256": "919a0dd78061344acffee6ecbbac20694508dd31f9125633ce38c7182176b168",
+    "byte_length": 10115524,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-22T21:28:15.452006Z",
+    "drift_key": "sha256",
+    "drift_value": "919a0dd78061344acffee6ecbbac20694508dd31f9125633ce38c7182176b168"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260922212911/https://storage.courtlistener.com/harvard_pdf/1741.pdf",
+      "captured_at": "2026-09-22T21:29:11Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

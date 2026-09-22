@@ -1,14 +1,28 @@
 """GovInfo — a GPO package or granule (signed U.S. Code editions, CFR annuals, bills, CREC).
 
-Verified live 2026-09-17:
-  * `https://api.govinfo.gov/packages/{pkg}/summary?api_key=...` returns `download.pdfLink`,
-    `dateIssued` and `title`. Granules use the same shape under
-    `/packages/{pkg}/granules/{granule}/summary`, so one code path covers both.
-  * The key comes from `GOVINFO_API_KEY` (an api.data.gov key; the same key works for OpenFEC).
+Verified live 2026-09-22 against the 2024 edition of 52 U.S.C. § 30116:
+  * `https://api.govinfo.gov/packages/{pkg}/summary?api_key=...` returns `title`, `dateIssued` and
+    `download.pdfLink`. A granule uses the same shape under
+    `/packages/{pkg}/granules/{granule}/summary`, so one code path covers both. The captures are
+    `tests/fixtures/govinfo_summary_*_2026-09-22.json`.
+  * `download.pdfLink` is on the API host (`api.govinfo.gov/packages/.../pdf`) and needs the key.
+    The same PDF is served anonymously at `www.govinfo.gov/content/pkg/{pkg}/pdf/{granule or
+    pkg}.pdf`, and the two were byte-identical for the § 30116 granule (154865 bytes) and for the
+    whole USCODE-2024-title52 package (673832 bytes). So `spec()` stores and fetches the content
+    URL, and the key is used for the summary call and nothing else: `check` re-fetches a govinfo
+    pin with no key in the environment, and CI needs no GovInfo secret.
+  * The key comes from `GOVINFO_API_KEY`, an api.data.gov key. Any live api.data.gov key works;
+    see docs/operations.md for the one that was disabled account-wide.
+
+Two things that each cost a probe to learn, for whoever looks a granule up next:
+  * The granules listing pages by `offsetMark` (`?offsetMark=*&pageSize=100`, then the reply's
+    `nextPage`), not by a numeric `offset`.
+  * A section's number is in its `granuleId` (`...-subchapI-sec30116`), not its `title`, which is
+    the bare heading ("Limitations on contributions and expenditures"). Search the ids.
 
 Decision 1: the key NEVER enters `canonical_url`. This repo is public, so a key interpolated into
-a stored URL would be a committed secret. We store the key-free content URL and re-attach the key
-from the environment at fetch time, here and in `content_request` when drift is checked.
+a stored URL would be a committed secret. `content_request` re-attaches it only for a URL on the
+API host, which no pin minted by this module has.
 """
 
 from __future__ import annotations
@@ -26,12 +40,14 @@ from ..pin import FetchFn, MissingKey, PinSpec, default_fetch, sha256_hex
 NAME = "govinfo"
 HELP = "a GovInfo package or granule (GPO)"
 DRIFT_KEY = "sha256"
-# NOT yet exercised against the live API from this tree. The endpoint behaviour recorded in the
-# docstring above came from the spec work, not from a run here, and a secondhand claim is not a
-# verification — so every record this module mints says `fetcher_verified: false` on its face.
-# Flip to True, dated the day it ran, on the first live `add` through this fetcher.
-VERIFIED = False
-VERIFIED_AT = None
+# Exercised against the live API on 2026-09-22 (UTC) through the current code path: a scratch
+# `add govinfo --package USCODE-2024-title52 --granule ...-sec30116` outside the repo, whose
+# summary responses are captured at tests/fixtures/govinfo_summary_*_2026-09-22.json and which the
+# tests now read. Every field spec() maps was checked against that capture, and a keyless `check`
+# of the scratch record exited 0. Any further edit to spec() or its parsing resets this to False —
+# see the convention in docs/operations.md.
+VERIFIED = True
+VERIFIED_AT = date(2026, 9, 22)
 PUBLISHER = "U.S. Government Publishing Office"
 ENV_KEY = "GOVINFO_API_KEY"
 API = "https://api.govinfo.gov/packages"

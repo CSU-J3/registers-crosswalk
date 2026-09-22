@@ -188,47 +188,118 @@ def test_federalregister_falls_back_to_the_govinfo_pdf():
 
 # --------------------------------------------------------------------------- govinfo
 
-GOVINFO_SUMMARY = {
-    "title": "United States Code, 2023 Edition, Title 52",
-    "dateIssued": "2024-01-08",
-    "download": {"pdfLink": "https://www.govinfo.gov/content/pkg/USCODE-2023-title52/pdf/x.pdf"},
+GOVINFO_PACKAGE_STEM = "govinfo_summary_USCODE-2024-title52"
+GOVINFO_GRANULE_STEM = "govinfo_summary_USCODE-2024-title52-subtitleIII-chap301-subchapI-sec30116"
+GOVINFO_SUMMARY = load_fixture(GOVINFO_PACKAGE_STEM)
+GOVINFO_GRANULE_SUMMARY = load_fixture(GOVINFO_GRANULE_STEM)
+SEC_30116 = "USCODE-2024-title52-subtitleIII-chap301-subchapI-sec30116"
+
+# Every top-level key the live summary endpoint returned on 2026-09-22, package and granule.
+LIVE_GOVINFO_PACKAGE_KEYS = {
+    "branch",
+    "category",
+    "collectionCode",
+    "collectionName",
+    "dateIssued",
+    "detailsLink",
+    "docClass",
+    "documentType",
+    "download",
+    "governmentAuthor1",
+    "governmentAuthor2",
+    "granulesLink",
+    "lastModified",
+    "otherIdentifier",
+    "packageId",
+    "pages",
+    "publisher",
+    "suDocClassNumber",
+    "title",
+    "titleNumber",
 }
+LIVE_GOVINFO_GRANULE_KEYS = {
+    "category",
+    "collectionCode",
+    "collectionName",
+    "dateIssued",
+    "detailsLink",
+    "docClass",
+    "download",
+    "graphicsInPDF",
+    "granuleClass",
+    "granuleId",
+    "granuleNumber",
+    "granulesLink",
+    "heading",
+    "lastModified",
+    "leafRange",
+    "packageId",
+    "packageLink",
+    "relatedLink",
+    "title",
+}
+
+
+@pytest.mark.parametrize(
+    ("stem", "keys"),
+    [
+        (GOVINFO_PACKAGE_STEM, LIVE_GOVINFO_PACKAGE_KEYS),
+        (GOVINFO_GRANULE_STEM, LIVE_GOVINFO_GRANULE_KEYS),
+    ],
+)
+def test_captured_govinfo_summary_matches_the_observed_live_key_set(stem, keys):
+    # Guards both directions, as for eCFR and FR. If GovInfo changes its payload, the fixture must
+    # be RE-CAPTURED rather than edited by hand.
+    assert set(load_fixture(stem)) == keys
+
+
+def test_govinfo_spec_reads_the_captured_granule_summary():
+    fetch = _json_fetch(GOVINFO_GRANULE_SUMMARY)
+    spec = govinfo.spec(
+        package="USCODE-2024-title52",
+        granule=SEC_30116,
+        citation="52 U.S.C. § 30116 (2024 ed.)",
+        fetch=fetch,
+        env={"GOVINFO_API_KEY": "SECRET"},
+    )
+    assert fetch.calls[0][0] == (
+        f"https://api.govinfo.gov/packages/USCODE-2024-title52/granules/{SEC_30116}/summary"
+        "?api_key=SECRET"
+    )
+    assert spec.title == "Limitations on contributions and expenditures"
+    assert spec.published_at == date(2024, 12, 31)
+    assert spec.citation == "52 U.S.C. § 30116 (2024 ed.)"
+    assert spec.publisher == "U.S. Government Publishing Office"
+    # the capture's own pdfLink is on the key-bearing API host; what is stored is not
+    assert GOVINFO_GRANULE_SUMMARY["download"]["pdfLink"].startswith("https://api.govinfo.gov/")
+    assert spec.canonical_url == (
+        f"https://www.govinfo.gov/content/pkg/USCODE-2024-title52/pdf/{SEC_30116}.pdf"
+    )
+    assert spec.fetch_url is None
+    assert spec.fetcher_verified is True
+    assert spec.verified_at == date(2026, 9, 22)
+    assert spec.grade.code() == "A1"
 
 
 def test_govinfo_spec_keeps_the_key_off_canonical_url():
     fetch = _json_fetch(GOVINFO_SUMMARY)
     spec = govinfo.spec(
-        package="USCODE-2023-title52",
-        citation="52 U.S.C. (2023 ed.)",
+        package="USCODE-2024-title52",
+        citation="52 U.S.C. (2024 ed.)",
         fetch=fetch,
         env={"GOVINFO_API_KEY": "SECRET"},
     )
     # the metadata call carries the key...
     assert fetch.calls[0][0] == (
-        "https://api.govinfo.gov/packages/USCODE-2023-title52/summary?api_key=SECRET"
+        "https://api.govinfo.gov/packages/USCODE-2024-title52/summary?api_key=SECRET"
     )
     # ...what we store and fetch is the content-host copy, which carries none
     assert spec.canonical_url == (
-        "https://www.govinfo.gov/content/pkg/USCODE-2023-title52/pdf/USCODE-2023-title52.pdf"
+        "https://www.govinfo.gov/content/pkg/USCODE-2024-title52/pdf/USCODE-2024-title52.pdf"
     )
     assert spec.fetch_url is None
-    assert spec.published_at == date(2024, 1, 8)
-    assert spec.grade.code() == "A1"
-
-
-def test_govinfo_granule_uses_the_same_path():
-    fetch = _json_fetch(GOVINFO_SUMMARY)
-    spec = govinfo.spec(
-        package="USCODE-2023-title52",
-        granule="USCODE-2023-title52-subtitleIII",
-        fetch=fetch,
-        env={"GOVINFO_API_KEY": "SECRET"},
-    )
-    assert "/granules/USCODE-2023-title52-subtitleIII/summary" in fetch.calls[0][0]
-    assert spec.canonical_url == (
-        "https://www.govinfo.gov/content/pkg/USCODE-2023-title52/pdf/"
-        "USCODE-2023-title52-subtitleIII.pdf"
-    )
+    assert spec.title == "VOTING AND ELECTIONS"
+    assert spec.published_at == date(2024, 12, 31)
 
 
 def test_govinfo_stores_no_query_string_whatever_pdflink_carries():
@@ -1082,6 +1153,9 @@ def test_courtlistener_stamps_its_live_run_onto_every_record():
         # openfec: a scratch `add --number 8098 --type murs --document 100512215` on 2026-09-21
         # (UTC). It corrected the MUR number parameter, which was ignored rather than rejected.
         (openfec, date(2026, 9, 21)),
+        # govinfo: a scratch `add --package USCODE-2024-title52 --granule ...-sec30116` on
+        # 2026-09-22 (UTC). It moved the stored URL to the key-free content host.
+        (govinfo, date(2026, 9, 22)),
     ],
 )
 def test_exercised_fetchers_ship_verified(module, verified_on):
@@ -1089,24 +1163,23 @@ def test_exercised_fetchers_ship_verified(module, verified_on):
     assert module.VERIFIED_AT == verified_on
 
 
-@pytest.mark.parametrize("module", [govinfo])
-def test_unexercised_fetchers_ship_unverified(module):
-    # A claim recorded in a handoff or a docstring is not a verification. These flip one at a
-    # time, each on its own live `add` in this tree, dated the day it ran.
-    assert module.VERIFIED is False
-    assert module.VERIFIED_AT is None
+def test_unexercised_fetchers_ship_unverified(unverified_fetcher):
+    # A claim recorded in a handoff or a docstring is not a verification. Real fetchers flip one at
+    # a time, each on its own live `add` in this tree, dated the day it ran; every one has now, so
+    # the unverified shape is held by a fixture rather than by whichever fetcher is left.
+    from registers_crosswalk.fetchers import NAMES, get
+
+    unverified = [n for n in NAMES if not get(n).VERIFIED]
+    assert unverified == [unverified_fetcher.NAME]
+    assert unverified_fetcher.VERIFIED is False
+    assert unverified_fetcher.VERIFIED_AT is None
 
 
-def test_the_stamp_reaches_the_minted_record():
+def test_the_stamp_reaches_the_minted_record(unverified_fetcher):
     from registers_crosswalk.pin import pin
 
-    # govinfo is the unverified example now: openfec flipped to True on 2026-09-21.
     unverified = pin(
-        govinfo.spec(
-            package="USCODE-2023-title52",
-            fetch=_json_fetch(GOVINFO_SUMMARY),
-            env={"GOVINFO_API_KEY": "K"},
-        ),
+        unverified_fetcher.spec(url="https://example.gov/unverified.pdf"),
         next_id="xr_src_0001",
         fetch=lambda u, h=None: (b"%PDF fake", "application/pdf"),
     )

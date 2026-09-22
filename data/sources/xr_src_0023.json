@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0023",
+  "kind": "source",
+  "citation": "52 U.S.C. § 30118 (2024 ed.)",
+  "title": "Contributions or expenditures by national banks, corporations, or labor organizations",
+  "publisher": "U.S. Government Publishing Office",
+  "canonical_url": "https://www.govinfo.gov/content/pkg/USCODE-2024-title52/pdf/USCODE-2024-title52-subtitleIII-chap301-subchapI-sec30118.pdf",
+  "fetcher": "govinfo",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-22",
+  "point_in_time": null,
+  "published_at": "2024-12-31",
+  "artifact": {
+    "sha256": "ef36658ff32faebc762be72ab44731adda9abdecf7210da7c1f71a77effcf1a5",
+    "byte_length": 148767,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-22T21:31:30.832051Z",
+    "drift_key": "sha256",
+    "drift_value": "ef36658ff32faebc762be72ab44731adda9abdecf7210da7c1f71a77effcf1a5"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "signed annual edition; the fixed-text companion to the prelim pin, pending"
+}

@@ -22,7 +22,13 @@
     "reliability": "A",
     "credibility": 1
   },
-  "archives": [],
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260922174347/https://www.govinfo.gov/content/pkg/FR-1995-02-09/pdf/95-3162.pdf",
+      "captured_at": "2026-09-22T17:43:47Z"
+    }
+  ],
   "cited_in": [],
   "supersedes": null,
   "merged_into": null,

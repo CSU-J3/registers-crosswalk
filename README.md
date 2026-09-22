@@ -54,6 +54,16 @@ read path would reject. `--blob-dir PATH` also writes the bytes to
 `PATH/<sha256><ext>` — **outside this repo**, which is enforced, not merely asked. Other fetchers:
 `federalregister`, `govinfo`, `uscode`, `openfec`, `courtlistener`, `manual`.
 
+A signed U.S. Code edition comes through GovInfo by package and granule. A section's number is
+in the granule id, not its title:
+
+    python -m registers_crosswalk.pin add govinfo --package USCODE-2024-title52 \
+        --granule USCODE-2024-title52-subtitleIII-chap301-subchapI-sec30116 \
+        --citation "52 U.S.C. § 30116 (2024 ed.)"
+
+`add govinfo` needs `GOVINFO_API_KEY` for the summary call. What it stores is the key-free
+`www.govinfo.gov` copy, so `check` needs no key.
+
 An FEC matter carries several documents and repeats their categories, so one is named by the
 API's own id:
 

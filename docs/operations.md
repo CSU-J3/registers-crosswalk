@@ -119,7 +119,7 @@ fetch time; in CI they are repo secrets wired into `.github/workflows/sources-dr
 
 | env var | needed for | where to get it |
 |---|---|---|
-| `GOVINFO_API_KEY` | `govinfo` metadata **and** re-fetching the stored PDF | api.data.gov |
+| `GOVINFO_API_KEY` | `govinfo` metadata (the summary call only) — never `check` | api.data.gov |
 | `OPENFEC_API_KEY` | `openfec` legal search (the metadata call only) | api.data.gov — the same key works for both |
 | `COURTLISTENER_TOKEN` | `courtlistener` **search and `add`** — never `check` (see below) | courtlistener.com account |
 | `WAYBACK_ACCESS_KEY` + `WAYBACK_SECRET_KEY` | authenticated Save Page Now (SPN2) | archive.org account |
@@ -127,8 +127,8 @@ fetch time; in CI they are repo secrets wired into `.github/workflows/sources-dr
 **A key never enters a stored URL.** This repo is public, so an `?api_key=...` interpolated into a
 `canonical_url` would be a committed secret — published the moment it is pushed, and live until
 someone notices and rotates it. So the fetchers store the key-free content URL (govinfo's
-`download.pdfLink`, OpenFEC's joined `fec.gov` URL) and re-attach the key from the environment on
-each request. This is enforced three ways, not just documented: `Source` refuses a `canonical_url`
+`www.govinfo.gov/content/pkg/...` copy, OpenFEC's joined `fec.gov` URL) and use the key only for
+the metadata call. This is enforced three ways, not just documented: `Source` refuses a `canonical_url`
 whose query carries a credential parameter (`api_key`, `access_key`, `token`, `key`, `sig`,
 `signature`, `secret`, or any `x-amz-*` — so an S3 presigned URL is refused too), `pin()` refuses
 one before it makes any request, and a test asserts no file under `data/sources/` contains a key.
@@ -385,8 +385,8 @@ enough.
 legal-search call and nothing else: `documents[].url` is relative, joins against
 `https://www.fec.gov`, and the PDF is served anonymously. This was proved before anything was
 pinned — a keyless fetch of both certifications returned 200, `application/pdf`, and byte lengths
-matching the API's own. `openfec` has no `content_request` for exactly this reason, unlike
-`govinfo`, which must re-attach its key.
+matching the API's own. `openfec` has no `content_request` for exactly this reason. `govinfo`
+keeps one, but it attaches the key only to the API host, which no govinfo pin stores (below).
 
 **The key itself is worth a note.** `OPENFEC_API_KEY` is an api.data.gov key and any api.data.gov
 key works — but they are account-level and can be disabled account-wide. The first attempt at this
@@ -399,6 +399,31 @@ and "over rate limit" it means.
 a different query shape; `q=` has never been asked of the live endpoint. What the captures do cover
 is `_hit`'s parse, since a search hit and a `spec()` record read the same MUR record. Treat the
 query itself as unproven.
+
+## `govinfo` was verified live on 2026-09-22, and the 2024 edition of § 30116 is pinned
+
+Discovery came first, read-only: `USCODE-2025-title52` is 404 and `USCODE-2024-title52` is the
+newest edition, issued 2024-12-31. § 30116 is granule
+`USCODE-2024-title52-subtitleIII-chap301-subchapI-sec30116`, a `LEAF`. A scratch `add govinfo`
+outside the repo then ran the current code path. Its citation, title, `published_at` (against
+`dateIssued`), canonical URL, sha256 and byte length all matched the captures, and a `check` with
+no key in the environment exited 0. The committed pin is `xr_src_0014`, with the same sha256 as the
+scratch record. The fetcher now ships `VERIFIED = True`, `VERIFIED_AT = 2026-09-22`, and its tests
+read the captured summaries.
+
+**`check` re-fetches govinfo with no key, and CI needs no GovInfo secret.** The summary's
+`download.pdfLink` is on `api.govinfo.gov` and wants the key. The same PDF is served anonymously at
+`www.govinfo.gov/content/pkg/{package}/pdf/{granule or package}.pdf`. The two were fetched and
+compared before anything was pinned: byte-identical for the § 30116 granule (154865 bytes) and for
+the whole title 52 package (673832 bytes). So `spec()` stores the content URL and never the
+`pdfLink`, and `content_request` attaches the key only to a URL on the API host. That is the same
+shape as courtlistener's "check re-fetches the document without a token". The key is still needed
+for `add govinfo`, which reads the summary.
+
+**Two things cost a probe each.** The granules listing pages by `offsetMark`
+(`?offsetMark=*&pageSize=100`, then `nextPage`), not by a numeric `offset`. And a section's number
+is in its `granuleId` (`...-sec30116`), not its `title`, which is the bare heading. A search of
+titles for "30116" finds nothing. The module docstring says both.
 
 ## `add` cannot write a record that fails to load
 
@@ -552,6 +577,14 @@ scratch run had just made, so the record's `captured_at` precedes its `fetched_a
 not a defect, because what the archive preserves is the credit date and the text, not the bytes,
 which vary from request to request.
 
+**The signed annual edition is pinned beside it, as `xr_src_0014`.** `xr_src_0005` is the prelim
+text: its URL serves only the current version, which is why its drift key had to be redesigned
+twice and why it cannot stand without an archive. The 2024 annual edition of the same section,
+through `govinfo`, is a fixed published PDF with one sha256 that never moves. Neither supersedes
+the other. They are two documents of the same law with different provenance, and the register
+holds both because the difference between "what the section says today" and "what the signed
+edition printed" is the kind of fact this repo exists to record.
+
 **The header on the GET was not enough; `archive()` had to speak SPN2.** On 2026-09-18 Wayback's
 unauthenticated `GET /save/` answered HTTP 500 for the § 30116 URL three times over twenty minutes,
 while a control save of `https://example.com` returned 429 — that history is why the keys were
@@ -628,7 +661,7 @@ fetcher whose `VERIFIED` is false, naming this file. Search is allowed for the s
 harmless: it reads somebody else's index and writes nothing. It is `spec()` — the call that
 decides *which* document gets pinned and at *what grade* — that a first live run has to witness,
 with a human reading the output. That is what the terminal is for, and it is why the console
-cannot be the place `govinfo` or `openfec` is exercised for the first time. See
+cannot be the place any fetcher is exercised for the first time. See
 `fetcher_verified`: the convention for flipping it, above.
 
 **Keys: it reads `.env` itself and never modifies the environment.** `load_dotenv` parses the file

@@ -22,7 +22,13 @@
     "reliability": "A",
     "credibility": 1
   },
-  "archives": [],
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260922175329/https://www.fec.gov/files/legal/murs/8111/8111_33.pdf",
+      "captured_at": "2026-09-22T17:53:29Z"
+    }
+  ],
   "cited_in": [],
   "supersedes": null,
   "merged_into": null,

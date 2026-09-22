@@ -22,7 +22,13 @@
     "reliability": "A",
     "credibility": 1
   },
-  "archives": [],
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260711041732/https://www.fec.gov/files/legal/murs/8098/8098_12.pdf",
+      "captured_at": "2026-07-11T04:17:32Z"
+    }
+  ],
   "cited_in": [],
   "supersedes": null,
   "merged_into": null,

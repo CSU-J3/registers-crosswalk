@@ -7,10 +7,12 @@ name: sources-drift
 # Weekly, not per-push: a pin drifts on the publisher's schedule, not ours, and re-fetching every
 # pinned document on every commit would be rude to the services and slow.
 #
-# GOVINFO_API_KEY / OPENFEC_API_KEY are optional repo secrets. Without them `check` exits 2 for the
-# fetchers that need one and this job FAILS — deliberately. A drift check that silently skipped the
-# sources it couldn't reach would report green while telling you nothing, so there is no
-# continue-on-error here. If you have no govinfo/openfec pins yet, the exit-2 path never triggers.
+# No fetcher needs a key to re-fetch what it stored: govinfo, openfec and courtlistener all pin a
+# key-free public URL and use their keys only for the metadata call at `add` time (see
+# docs/operations.md). The secrets below are optional and unset. They stay wired so a future pin
+# that DOES need one makes `check` exit 2 and fails this job — deliberately. A drift check that
+# silently skipped the sources it couldn't reach would report green while telling you nothing, so
+# there is no continue-on-error here.
 on:
   schedule:
     - cron: "0 12 * * 1"

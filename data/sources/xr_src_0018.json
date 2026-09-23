@@ -22,7 +22,13 @@
     "reliability": "B",
     "credibility": 1
   },
-  "archives": [],
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260923013953/https://storage.courtlistener.com/harvard_pdf/104184.pdf",
+      "captured_at": "2026-09-23T01:39:53Z"
+    }
+  ],
   "cited_in": [],
   "supersedes": null,
   "merged_into": null,

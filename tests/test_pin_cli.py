@@ -866,6 +866,17 @@ def test_note_changes_only_the_notes_field(tmp_path, capsys):
             assert after[key] == before[key], key
 
 
+def test_note_leaves_non_ascii_as_written(tmp_path, capsys):
+    """`add` writes `§` as itself; a one-key amendment must not re-escape it to `\\u00a7`, or the
+    diff of a note carries a citation line that did not change."""
+    assert _add(tmp_path) == 0
+    capsys.readouterr()
+    assert _note(tmp_path, "the companion to 52 U.S.C. § 30118") == 0
+    text = (tmp_path / "sources" / "xr_src_0001.json").read_text(encoding="utf-8")
+    assert "§ 30118" in text
+    assert "\\u00a7" not in text
+
+
 def test_note_refuses_an_unknown_id(tmp_path, capsys):
     assert _add(tmp_path) == 0
     capsys.readouterr()

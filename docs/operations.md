@@ -120,7 +120,7 @@ fetch time; in CI they are repo secrets wired into `.github/workflows/sources-dr
 | env var | needed for | where to get it |
 |---|---|---|
 | `GOVINFO_API_KEY` | `govinfo` metadata (the summary call only) — never `check` | api.data.gov |
-| `OPENFEC_API_KEY` | `openfec` legal search (the metadata call only) | api.data.gov — the same key works for both |
+| `OPENFEC_API_KEY` | `openfec` legal search and `fecfiling` filings metadata (the metadata calls only) — never `check` | api.data.gov — the same key works for both |
 | `COURTLISTENER_TOKEN` | `courtlistener` **search and `add`** — never `check` (see below) | courtlistener.com account |
 | `WAYBACK_ACCESS_KEY` + `WAYBACK_SECRET_KEY` | authenticated Save Page Now (SPN2) | archive.org account |
 
@@ -424,6 +424,63 @@ for `add govinfo`, which reads the summary.
 (`?offsetMark=*&pageSize=100`, then `nextPage`), not by a numeric `offset`. And a section's number
 is in its `granuleId` (`...-sec30116`), not its `title`, which is the bare heading. A search of
 titles for "30116" finds nothing. The module docstring says both.
+
+## `fecfiling` was verified live on 2026-09-23, and the Osborn For Senate reports are pinned
+
+The essay's filing ledger says Osborn For Senate (`C00901355`) paid Helix Campaigns and Fight
+Agency, sourced at B3. The upgrade to A1 is the committee's own filed report. Discovery was
+read-only, into a scratch dir: the processed Schedule B rows to find the reports, then
+`/v1/filings/?file_number=N` for each report's metadata, then a keyless fetch of the documents.
+A scratch `add fecfiling --file-number 1903438 --document fec` ran the current code path. Its URL,
+`published_at` (against `receipt_date`), sha256 and byte length matched the captured metadata and an
+independent keyless fetch, and a `check` with no key in the environment exited 0. The fetcher now
+ships `VERIFIED = True`, `VERIFIED_AT = 2026-09-23`. The tests read the two metadata captures under
+`tests/fixtures/fecfiling_filings_*`, which are committee-level. The Schedule A and B pages and the
+`.fec` contents are NOT captured: they carry individuals' names and addresses.
+
+**Processed rows find a report; they are never the source.** `/schedules/schedule_b/` is the FEC's
+coded copy of what was filed, and it is re-coded. Its `amendment_indicator` disagreed with the
+filing's own on all five reports that itemized Helix Campaigns (`C` on reports that are `A`, `A` on
+reports that are `N`, `N` on one that is `A`). So a Schedule B row is used to learn which file
+numbers to read, and the pin is the report as filed.
+
+**The filing is the evidence, the amendments included.** Every report in a chain is pinned, the
+original first, each later one with `--supersedes` the previous pin of the same document kind, so
+the default `check` covers only the latest filing of each report while the originals stay on the
+record. They are not clutter: the amendments re-described the Helix payments ("digital
+fundraising" and "digital consulting" became "Digital Advertising") without changing an amount or
+a date. Eighteen pins, `xr_src_0026` through `xr_src_0043`: nine filings across five reports (Q2,
+Q3 and year-end 2025, Q1 and pre-primary 2026), a `.fec` and a PDF each. Each pin's notes carry the
+chain's chronology, and a PDF carries the same notes as its `.fec` twin: `original, received
+2025-07-15; itemizes Helix Campaigns`, or `amendment 2 of 2, received 2026-01-31; amends FEC file
+1920944 (received 2025-10-15), original 1903438 (received 2025-07-15); itemizes Helix Campaigns`.
+
+**A `.fec` is listed as `.fec`.** docquery serves it as `binary/octet-stream`, which says nothing
+about the file, so the manifest and `--blob-dir` take the extension from the URL's own suffix when
+the served type is generic. A specific type still wins, and no earlier pin's name changed.
+
+**The `.fec` is the filing; the PDF is a rendering of it.** The `.fec` file is what the committee
+submitted, and it is the primary object. The PDF is the FEC's image of it. If a PDF pin reports
+DRIFT while the `.fec` pin of the same filing stays OK, the FEC re-rendered the image; the filing
+did not change. An amendment never shows up as drift: it is a new filing with a new file number.
+
+**Wayback could not capture docquery on 2026-09-23.** SPN2 answered
+`error:invalid-host-resolution` ("Cannot resolve host docquery.fec.gov") for the first `.fec`, then
+`error:not-found` (HTTP 404) for every other `.fec` and PDF, while docquery served each of them to
+this tree with a 200 within the same minute. One PDF, `xr_src_0027`, already had a capture from
+2025-07-28 whose bytes hash to the pin, and the reuse path adopted it. The other seventeen went in
+unarchived, per the courtlistener fallback, and are listed for `pin archive`. They are public FEC
+records that can be fetched again by file number, and each pin's sha256 is what any copy has to
+match.
+
+**Fight Agency is not a payee of this committee.** No Schedule B row names it: not in the 1,878
+processed rows, not in the 866 raw e-file rows, and not in any of the nine filings. The name
+appears once, in a Schedule A receipt, as a contributor's employer. That finding went back to the
+essay chat. Nothing is pinned for it.
+
+**`check` re-fetches docquery with no key, and CI needs no new secret.** The key authorizes the
+filings metadata call only. `fecfiling` has no `content_request`, as `openfec` has none, and `spec()`
+refuses to store any URL that is not a bare `https://docquery.fec.gov/...` URL.
 
 ## `add` cannot write a record that fails to load
 

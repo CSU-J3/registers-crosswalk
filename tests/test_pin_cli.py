@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 from datetime import UTC, datetime
@@ -273,6 +274,13 @@ def test_ledger_formats(tmp_path, capsys):
     main(["--data-dir", str(tmp_path), "ledger", "--format", "manifest"], fetch=_fetch())
     line = capsys.readouterr().out.strip()
     assert line == f"{sha256_hex(BODY)}  xr_src_0001-fec-advisory-opinion-2023-01.pdf"
+
+
+def test_ledger_says_its_retrieval_date_is_utc(tmp_path, capsys):
+    _add(tmp_path)
+    capsys.readouterr()
+    main(["--data-dir", str(tmp_path), "ledger"], fetch=_fetch())
+    assert re.search(r"Retrieved \d{4}-\d{2}-\d{2} UTC;", capsys.readouterr().out)
 
 
 def test_every_manifest_filename_in_the_real_data_dir_is_unique():

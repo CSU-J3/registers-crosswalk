@@ -15,6 +15,7 @@ from registers_crosswalk.fetchers import (
     MissingKey,
     courtlistener,
     ecfr,
+    fecfiling,
     federalregister,
     govinfo,
     manual,
@@ -1026,6 +1027,184 @@ def test_the_committed_courtlistener_pin_needs_no_token_to_recheck():
     )
 
 
+# --------------------------------------------------------------------------- fecfiling
+
+# Committee-level metadata only. The Schedule A/B pages and the .fec contents Phase A read carry
+# individuals' names and addresses and are deliberately NOT captured into this repo.
+FECFILING_ORIGINAL_STEM = "fecfiling_filings_1903438"  # Q2 2025, amendment_indicator N
+FECFILING_AMENDED_STEM = "fecfiling_filings_1997103"  # Q1 2026, amendment_indicator A
+FECFILING_ORIGINAL = load_fixture(FECFILING_ORIGINAL_STEM)
+FECFILING_AMENDED = load_fixture(FECFILING_AMENDED_STEM)
+FEC_KEY = {"OPENFEC_API_KEY": "SECRET"}
+
+# The result keys the live /v1/filings/ endpoint returned on 2026-09-23.
+LIVE_FECFILING_RESULT_KEYS = {
+    "additional_bank_names",
+    "amendment_chain",
+    "amendment_indicator",
+    "amendment_version",
+    "bank_depository_city",
+    "bank_depository_name",
+    "bank_depository_state",
+    "bank_depository_street_1",
+    "bank_depository_street_2",
+    "bank_depository_zip",
+    "beginning_image_number",
+    "candidate_id",
+    "candidate_name",
+    "cash_on_hand_beginning_period",
+    "cash_on_hand_end_period",
+    "committee_id",
+    "committee_name",
+    "committee_type",
+    "coverage_end_date",
+    "coverage_start_date",
+    "csv_url",
+    "cycle",
+    "debts_owed_by_committee",
+    "debts_owed_to_committee",
+    "document_description",
+    "document_type",
+    "document_type_full",
+    "election_year",
+    "ending_image_number",
+    "fec_file_id",
+    "fec_url",
+    "file_number",
+    "form_category",
+    "form_type",
+    "house_personal_funds",
+    "html_url",
+    "is_amended",
+    "means_filed",
+    "most_recent",
+    "most_recent_file_number",
+    "net_donations",
+    "office",
+    "opposition_personal_funds",
+    "pages",
+    "party",
+    "pdf_url",
+    "previous_file_number",
+    "primary_general_indicator",
+    "receipt_date",
+    "report_type",
+    "report_type_full",
+    "report_year",
+    "request_type",
+    "senate_personal_funds",
+    "state",
+    "sub_id",
+    "total_communication_cost",
+    "total_disbursements",
+    "total_independent_expenditures",
+    "total_individual_contributions",
+    "total_receipts",
+    "treasurer_name",
+    "update_date",
+}
+
+
+@pytest.mark.parametrize("stem", [FECFILING_ORIGINAL_STEM, FECFILING_AMENDED_STEM])
+def test_captured_fecfiling_metadata_matches_the_observed_live_key_set(stem):
+    payload = load_fixture(stem)
+    assert set(payload) == {"api_version", "pagination", "results"}
+    assert len(payload["results"]) == 1
+    assert set(payload["results"][0]) == LIVE_FECFILING_RESULT_KEYS
+
+
+def test_fecfiling_spec_pins_the_fec_file_of_the_original():
+    fetch = _json_fetch(FECFILING_ORIGINAL)
+    spec = fecfiling.spec(file_number=1903438, document="fec", fetch=fetch, env=FEC_KEY)
+    assert fetch.calls[0][0] == (
+        "https://api.open.fec.gov/v1/filings/?file_number=1903438&api_key=SECRET"
+    )
+    assert spec.fetcher == "fecfiling"
+    assert spec.canonical_url == "https://docquery.fec.gov/dcdev/posted/1903438.fec"
+    assert spec.fetch_url is None
+    assert spec.title == "Form 3 electronic filing (.fec)"
+    # the name as the metadata gives it; re-casing is the caller's --citation
+    assert spec.citation == "OSBORN FOR SENATE, Form 3 Q2 2025-06-30, FEC file 1903438"
+    assert spec.published_at == date(2025, 7, 15)  # receipt_date
+    assert spec.point_in_time is None
+    assert spec.publisher == "Federal Election Commission"
+    assert spec.grade.code() == "A1"
+    assert spec.drift_key == "sha256"
+    assert spec.fetcher_verified is False
+    assert spec.verified_at is None
+
+
+def test_fecfiling_spec_pins_the_image_pdf_of_an_amendment_under_a_given_citation():
+    spec = fecfiling.spec(
+        file_number=1997103,
+        document="pdf",
+        citation="Osborn For Senate, Form 3 Q1 2026-03-31, FEC file 1997103",
+        fetch=_json_fetch(FECFILING_AMENDED),
+        env=FEC_KEY,
+    )
+    assert spec.canonical_url == (
+        "https://docquery.fec.gov/pdf/521/202607159885311521/202607159885311521.pdf"
+    )
+    assert spec.title == "Form 3 image (PDF)"
+    assert spec.citation == "Osborn For Senate, Form 3 Q1 2026-03-31, FEC file 1997103"
+    assert spec.published_at == date(2026, 7, 15)
+
+
+def test_fecfiling_refuses_a_result_for_another_file_number():
+    # The filter could be ignored, as openfec's `mur_no` was: insist on the filing asked for.
+    with pytest.raises(ValueError, match="0 results for file number 1903438"):
+        fecfiling.spec(
+            file_number=1903438, document="fec", fetch=_json_fetch(FECFILING_AMENDED), env=FEC_KEY
+        )
+
+
+@pytest.mark.parametrize(
+    "pdf_url",
+    [
+        "https://docquery.fec.gov/pdf/x.pdf?api_key=LEAKED",
+        "https://example.com/pdf/x.pdf",
+        "http://docquery.fec.gov/pdf/x.pdf",
+        None,
+    ],
+)
+def test_fecfiling_stores_only_a_bare_docquery_url(pdf_url):
+    # A mutated copy of the capture, one field changed.
+    payload = json.loads(json.dumps(FECFILING_AMENDED))
+    payload["results"][0]["pdf_url"] = pdf_url
+    with pytest.raises(ValueError, match="docquery URL|lists no pdf_url"):
+        fecfiling.spec(file_number=1997103, document="pdf", fetch=_json_fetch(payload), env=FEC_KEY)
+
+
+def test_fecfiling_refuses_an_unknown_document_kind():
+    with pytest.raises(ValueError, match="document must be one of fec, pdf"):
+        fecfiling.spec(
+            file_number=1997103, document="csv", fetch=_json_fetch(FECFILING_AMENDED), env=FEC_KEY
+        )
+
+
+def test_fecfiling_without_a_key_raises_missing_key():
+    with pytest.raises(MissingKey, match="OPENFEC_API_KEY"):
+        fecfiling.spec(
+            file_number=1997103, document="fec", fetch=_json_fetch(FECFILING_AMENDED), env={}
+        )
+
+
+def test_fecfiling_check_needs_no_key():
+    # docquery served both documents keyless on 2026-09-23, so `check` re-fetches the stored URL
+    # as it is, with no key demanded of the environment.
+    assert not hasattr(fecfiling, "content_request")
+
+
+def test_fecfiling_cli_adapter():
+    parser = argparse.ArgumentParser()
+    fecfiling.add_arguments(parser)
+    args = parser.parse_args(["--file-number", "1997103", "--document", "fec"])
+    spec = fecfiling.spec_from_args(args, fetch=_json_fetch(FECFILING_AMENDED), env=FEC_KEY)
+    assert spec.canonical_url == "https://docquery.fec.gov/dcdev/posted/1997103.fec"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--file-number", "1997103", "--document", "csv"])
+
+
 # --------------------------------------------------------------------------- manual
 
 
@@ -1090,6 +1269,12 @@ def test_no_built_canonical_url_carries_a_key():
             cluster_id=1,
             fetch=_cl_fetch(),
             env={"COURTLISTENER_TOKEN": "SECRET"},
+        ),
+        fecfiling.spec(
+            file_number=1997103, document="fec", fetch=_json_fetch(FECFILING_AMENDED), env=FEC_KEY
+        ),
+        fecfiling.spec(
+            file_number=1997103, document="pdf", fetch=_json_fetch(FECFILING_AMENDED), env=FEC_KEY
         ),
     ]
     for spec in specs:
@@ -1170,7 +1355,8 @@ def test_unexercised_fetchers_ship_unverified(unverified_fetcher):
     from registers_crosswalk.fetchers import NAMES, get
 
     unverified = [n for n in NAMES if not get(n).VERIFIED]
-    assert unverified == [unverified_fetcher.NAME]
+    # fecfiling until its first live run flips it
+    assert unverified == ["fecfiling", unverified_fetcher.NAME]
     assert unverified_fetcher.VERIFIED is False
     assert unverified_fetcher.VERIFIED_AT is None
 

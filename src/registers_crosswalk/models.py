@@ -98,7 +98,14 @@ class Node(XrModel):
 # ---------------------------------------------------------------------------
 
 Fetcher = Literal[
-    "ecfr", "federalregister", "govinfo", "uscode", "openfec", "courtlistener", "manual"
+    "ecfr",
+    "federalregister",
+    "govinfo",
+    "uscode",
+    "openfec",
+    "fecfiling",
+    "courtlistener",
+    "manual",
 ]
 # Admiralty grading: source reliability A-F, information credibility 1-6. "A1" is an official
 # primary text from its publisher of record.

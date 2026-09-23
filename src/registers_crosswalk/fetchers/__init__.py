@@ -39,11 +39,12 @@ from types import ModuleType
 
 from ..models import DriftKey
 from ..pin import MissingKey, SearchHit
-from . import courtlistener, ecfr, federalregister, govinfo, manual, openfec, uscode
+from . import courtlistener, ecfr, fecfiling, federalregister, govinfo, manual, openfec, uscode
 
 # CLI subcommand order: most-used first, `manual` last as the escape hatch.
 _MODULES: dict[str, ModuleType] = {
-    m.NAME: m for m in (ecfr, federalregister, govinfo, uscode, openfec, courtlistener, manual)
+    m.NAME: m
+    for m in (ecfr, federalregister, govinfo, uscode, openfec, fecfiling, courtlistener, manual)
 }
 NAMES: tuple[str, ...] = tuple(_MODULES)
 # The subset `pin search` offers. Derived, never hand-listed, so adding SEARCH_TYPES to a module

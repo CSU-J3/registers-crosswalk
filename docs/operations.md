@@ -550,6 +550,7 @@ drift run. On the six MUR pins currently in `data/`, four were going unchecked.
 - **3 — the check could not run: the transport failed** (`FETCH_FAILED`) — timeout, non-2xx, DNS,
   connection refused. Also not a finding. Usually transient, so re-run before investigating; if it
   persists, a 404 on a canonical URL means the document moved, which *is* a finding.
+  `check` retries these once, after one 30-second wait per run, so a reported one failed twice.
 
 **Why 3 is separate from 1**, and the rule to keep: a dead endpoint must never be reported as a
 changed document. They demand opposite responses — one is "wait and retry", the other is "read the

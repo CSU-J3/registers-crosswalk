@@ -18,6 +18,7 @@ from registers_crosswalk.pin import (
     add_source,
     archive,
     check,
+    check_all,
     default_fetch,
     pin,
     sha256_hex,
@@ -1161,6 +1162,95 @@ def test_ecfr_amendment_history_timeout_is_fetch_failed():
     report = check(_ecfr_source(), fetch=fetch, env={})
     assert report.status == "fetch_failed"
     assert "amendment history unreachable" in report.detail
+
+
+# ------------------------------------------ one retry for a transport failure, and for nothing else
+
+
+class _Clock:
+    """A fake clock: `sleep` advances it instead of waiting, and `now` is what a fetch records."""
+
+    def __init__(self):
+        self.now = 0.0
+        self.slept = []
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.now += seconds
+
+
+def _flaky(clock, failures, body=BODY, *, only=None):
+    """A fetch that times out on its first `failures` calls to a url containing `only` (every url
+    when None), then answers. It records the clock time of each call."""
+    calls, failed = [], []
+
+    def fetch(url, headers=None):
+        calls.append((url, clock.now))
+        if (only is None or only in url) and len(failed) < failures:
+            failed.append(url)
+            raise TimeoutError("read timed out")
+        if "/versions/" in url:
+            return json.dumps({"content_versions": []}).encode(), "application/json"
+        return body, "application/xml"
+
+    fetch.calls = calls
+    return fetch
+
+
+def test_a_fetch_that_fails_once_then_succeeds_is_ok():
+    clock = _Clock()
+    fetch = _flaky(clock, 1)
+    [report] = check_all([_fr_source()], fetch=fetch, env={}, sleep_fn=clock.sleep)
+    assert report.status == "ok"
+    assert [at for _url, at in fetch.calls] == [0.0, 30.0]  # the retry comes after the wait
+
+
+def test_a_fetch_that_fails_twice_is_fetch_failed():
+    clock = _Clock()
+    fetch = _flaky(clock, 2)
+    [report] = check_all([_fr_source()], fetch=fetch, env={}, sleep_fn=clock.sleep)
+    assert report.status == "fetch_failed"
+    assert [at for _url, at in fetch.calls] == [0.0, 30.0]  # one retry, not a loop
+    assert "retried once after 30s" in report.detail
+
+
+def test_a_drifted_document_is_fetched_once_and_reported_drift():
+    clock = _Clock()
+    fetch = _flaky(clock, 0, body=b"changed")
+    [report] = check_all([_fr_source()], fetch=fetch, env={}, sleep_fn=clock.sleep)
+    assert report.status == "drift"
+    assert len(fetch.calls) == 1
+    assert clock.slept == []
+
+
+def test_amended_and_key_missing_are_never_retried():
+    clock = _Clock()
+    amended = _ecfr_fetch(
+        {"content_versions": [{"amendment_date": "2026-09-30", "substantive": True}]}
+    )
+    keyed = _fr_source(fetcher="govinfo", canonical_url=GOVINFO_API_PDF)
+    [a] = check_all([_ecfr_source()], fetch=amended, env={}, sleep_fn=clock.sleep)
+    [k] = check_all([keyed], fetch=_fetch(), env={}, sleep_fn=clock.sleep)
+    assert (a.status, k.status) == ("amended", "key_missing")
+    assert clock.slept == []
+
+
+def test_many_failing_pins_share_one_wait():
+    # One host down must not cost 30s per pin: 20 of the live pins sit on docquery.fec.gov.
+    clock = _Clock()
+    sources = [_fr_source(xr_id=f"xr_src_{n:04d}") for n in range(1, 6)]
+    fetch = _flaky(clock, 5)
+    reports = check_all(sources, fetch=fetch, env={}, sleep_fn=clock.sleep)
+    assert [r.status for r in reports] == ["ok"] * 5
+    assert clock.slept == [30.0]
+
+
+def test_an_unreachable_ecfr_amendment_history_is_retried_too():
+    clock = _Clock()
+    fetch = _flaky(clock, 1, only="/versions/")
+    [report] = check_all([_ecfr_source()], fetch=fetch, env={}, sleep_fn=clock.sleep)
+    assert report.status == "ok"
+    assert clock.slept == [30.0]
 
 
 # --------------------------------------------------- archive visibility on a drift report

@@ -1084,7 +1084,7 @@ def test_ledger_markdown_uses_the_archive_when_there_is_one():
 
 
 def test_manifest_line_is_sha256sum_format():
-    assert to_manifest_line(_pinned()) == f"{sha256_hex(BODY)}  11-c-f-r-part-114.xml"
+    assert to_manifest_line(_pinned()) == f"{sha256_hex(BODY)}  xr_src_0001-11-c-f-r-part-114.xml"
 
 
 # ------------------------------------------------- transport failure is NOT drift (exit 3, not 1)

@@ -1130,8 +1130,8 @@ def test_fecfiling_spec_pins_the_fec_file_of_the_original():
     assert spec.publisher == "Federal Election Commission"
     assert spec.grade.code() == "A1"
     assert spec.drift_key == "sha256"
-    assert spec.fetcher_verified is False
-    assert spec.verified_at is None
+    assert spec.fetcher_verified is True
+    assert spec.verified_at == date(2026, 9, 23)
 
 
 def test_fecfiling_spec_pins_the_image_pdf_of_an_amendment_under_a_given_citation():
@@ -1341,6 +1341,9 @@ def test_courtlistener_stamps_its_live_run_onto_every_record():
         # govinfo: a scratch `add --package USCODE-2024-title52 --granule ...-sec30116` on
         # 2026-09-22 (UTC). It moved the stored URL to the key-free content host.
         (govinfo, date(2026, 9, 22)),
+        # fecfiling: a scratch `add --file-number 1903438 --document fec` on 2026-09-23 (UTC),
+        # checked with no key in the environment.
+        (fecfiling, date(2026, 9, 23)),
     ],
 )
 def test_exercised_fetchers_ship_verified(module, verified_on):
@@ -1355,8 +1358,7 @@ def test_unexercised_fetchers_ship_unverified(unverified_fetcher):
     from registers_crosswalk.fetchers import NAMES, get
 
     unverified = [n for n in NAMES if not get(n).VERIFIED]
-    # fecfiling until its first live run flips it
-    assert unverified == ["fecfiling", unverified_fetcher.NAME]
+    assert unverified == [unverified_fetcher.NAME]
     assert unverified_fetcher.VERIFIED is False
     assert unverified_fetcher.VERIFIED_AT is None
 

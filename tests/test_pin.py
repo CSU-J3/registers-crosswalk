@@ -1087,6 +1087,42 @@ def test_manifest_line_is_sha256sum_format():
     assert to_manifest_line(_pinned()) == f"{sha256_hex(BODY)}  xr_src_0001-11-c-f-r-part-114.xml"
 
 
+def _pinned_as(url, media_type, **kw):
+    return pin(
+        _spec(canonical_url=url), next_id="xr_src_0001", fetch=_fetch(media_type=media_type), **kw
+    )
+
+
+@pytest.mark.parametrize("generic", ["binary/octet-stream", "application/octet-stream"])
+def test_a_generic_type_takes_the_urls_own_suffix(generic, tmp_path):
+    # docquery's shape: an FEC filing served as binary/octet-stream under a `.fec` URL.
+    url = "https://docquery.fec.gov/dcdev/posted/1903438.fec"
+    source = _pinned_as(url, generic, blob_dir=tmp_path / "pins", now=NOW)
+    assert to_manifest_line(source).endswith("-11-c-f-r-part-114.fec")
+    assert (tmp_path / "pins" / f"{sha256_hex(BODY)}.fec").exists()
+
+
+def test_a_generic_type_with_no_url_suffix_is_bin():
+    source = _pinned_as("https://example.gov/documents/1903438", "binary/octet-stream", now=NOW)
+    assert to_manifest_line(source).endswith(".bin")
+
+
+def test_a_specific_type_is_never_renamed_by_the_url():
+    # The served type wins whenever it says something: an HTML page at a `.pdf` url stays `.html`.
+    source = _pinned_as("https://example.gov/doc.pdf", "text/html", now=NOW)
+    assert to_manifest_line(source).endswith(".html")
+
+
+def test_no_committed_pin_with_a_specific_type_changes_its_manifest_name():
+    from registers_crosswalk.registry import Crosswalk
+
+    for source in Crosswalk(REPO / "data").sources.values():
+        if source.artifact.media_type in pinmod._GENERIC_TYPES:  # noqa: SLF001
+            continue
+        ext = pinmod._EXTENSIONS.get(source.artifact.media_type, ".bin")  # noqa: SLF001
+        assert to_manifest_line(source).endswith(ext), source.xr_id
+
+
 # ------------------------------------------------- transport failure is NOT drift (exit 3, not 1)
 
 

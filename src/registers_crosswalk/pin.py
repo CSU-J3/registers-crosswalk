@@ -756,8 +756,14 @@ def to_ledger_markdown(source: Source) -> str:
 
 
 def to_manifest_line(source: Source) -> str:
-    """One line in `sha256sum` format, for verifying a consuming project's blob directory."""
-    name = f"{_slug(source.citation)}{_extension(source.artifact.media_type)}"
+    """One line in `sha256sum` format, for verifying a consuming project's blob directory.
+
+    The filename leads with the id because citations are not unique: the six MUR pins share two
+    citations, and a manifest naming one file three times cannot pass `sha256sum -c`. The id also
+    travels with the file into a `pins/` directory, so no trailing comment is needed to say which
+    pin a line is — and `sha256sum` would read such a comment as part of the filename.
+    """
+    name = f"{source.xr_id}-{_slug(source.citation)}{_extension(source.artifact.media_type)}"
     return f"{source.artifact.sha256}  {name}"
 
 

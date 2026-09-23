@@ -1,12 +1,16 @@
 import json
+import shutil
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from registers_crosswalk.models import ArchiveCopy
-from registers_crosswalk.pin import ArchiveFailure, main, sha256_hex
+from registers_crosswalk.pin import ArchiveFailure, main, sha256_hex, to_manifest_line
 from registers_crosswalk.registry import Crosswalk
+
+DATA = Path(__file__).resolve().parents[1] / "data"
 
 ARCHIVED = ArchiveCopy(service="wayback", url="https://web.archive.org/web/1/x")
 
@@ -268,7 +272,53 @@ def test_ledger_formats(tmp_path, capsys):
 
     main(["--data-dir", str(tmp_path), "ledger", "--format", "manifest"], fetch=_fetch())
     line = capsys.readouterr().out.strip()
-    assert line == f"{sha256_hex(BODY)}  fec-advisory-opinion-2023-01.pdf"
+    assert line == f"{sha256_hex(BODY)}  xr_src_0001-fec-advisory-opinion-2023-01.pdf"
+
+
+def test_every_manifest_filename_in_the_real_data_dir_is_unique():
+    names = [to_manifest_line(s).split("  ", 1)[1] for s in Crosswalk(DATA).sources.values()]
+    assert names and len(names) == len(set(names))
+
+
+def test_two_pins_sharing_a_citation_get_two_manifest_filenames(tmp_path, capsys):
+    # The six MUR pins' shape: one citation, several documents.
+    _add(tmp_path, citation="FEC MUR 8098", fetch=_fetch(b"certification"))
+    _add(tmp_path, url=URL + "?2", citation="FEC MUR 8098", fetch=_fetch(b"factual and legal"))
+    capsys.readouterr()
+    main(["--data-dir", str(tmp_path), "ledger", "--format", "manifest"], fetch=_fetch())
+    names = [line.split("  ", 1)[1] for line in capsys.readouterr().out.splitlines()]
+    assert names == ["xr_src_0001-fec-mur-8098.pdf", "xr_src_0002-fec-mur-8098.pdf"]
+
+
+@pytest.mark.skipif(shutil.which("sha256sum") is None, reason="needs coreutils sha256sum")
+def test_the_manifest_verifies_with_real_sha256sum(tmp_path, capsys):
+    data, pins = tmp_path / "data", tmp_path / "pins"
+    pins.mkdir()
+    bodies = {b"one document": URL, b"another": URL + "?2", b"a third": URL + "?3"}
+    for body, url in bodies.items():
+        # two of the three share a citation, the case the id in the filename exists for
+        citation = "FEC MUR 8098" if url != URL else "FEC Advisory Opinion 2023-01"
+        assert _add(data, url=url, citation=citation, fetch=_fetch(body)) == 0
+    capsys.readouterr()
+    main(["--data-dir", str(data), "ledger", "--format", "manifest"], fetch=_fetch())
+    manifest = capsys.readouterr().out
+    by_hash = {sha256_hex(body): body for body in bodies}
+    for line in manifest.splitlines():
+        digest, name = line.split("  ", 1)
+        (pins / name).write_bytes(by_hash[digest])
+    (tmp_path / "SHA256SUMS").write_text(manifest, encoding="utf-8", newline="\n")
+
+    def verify():
+        return subprocess.run(
+            ["sha256sum", "-c", "--strict", str(tmp_path / "SHA256SUMS")],
+            cwd=pins,
+            capture_output=True,
+        ).returncode
+
+    assert verify() == 0
+    victim = next(pins.iterdir())
+    victim.write_bytes(b"X" + victim.read_bytes()[1:])  # one byte changed
+    assert verify() == 1
 
 
 def test_ledger_since_filters_on_the_fetch_date(tmp_path, capsys):

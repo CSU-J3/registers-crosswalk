@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0031",
+  "kind": "source",
+  "citation": "Osborn For Senate, Form 3 Q2 2025-06-30, FEC file 1943600",
+  "title": "Form 3 image (PDF)",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://docquery.fec.gov/pdf/280/202601319825636280/202601319825636280.pdf",
+  "fetcher": "fecfiling",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-23",
+  "point_in_time": null,
+  "published_at": "2026-01-31",
+  "artifact": {
+    "sha256": "ec8a100542168f2a17f9a8a474ad8d3004641c618047af2db3c275d35d79b1b8",
+    "byte_length": 599986,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-23T02:24:15.139452Z",
+    "drift_key": "sha256",
+    "drift_value": "ec8a100542168f2a17f9a8a474ad8d3004641c618047af2db3c275d35d79b1b8"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": "xr_src_0029",
+  "merged_into": null,
+  "notes": "amendment 2 of 2, received 2026-01-31; amends FEC file 1920944 (received 2025-10-15), original 1903438 (received 2025-07-15); itemizes Helix Campaigns"
+}

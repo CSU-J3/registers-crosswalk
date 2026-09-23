@@ -21,8 +21,10 @@ jobs:
   sources-drift:
     runs-on: ubuntu-latest
     # Every fetch has its own 60s timeout, but a long pin list against a slow service still adds
-    # up, and a hung request would otherwise burn the full 6h default.
-    timeout-minutes: 10
+    # up, and a hung request would otherwise burn the full 6h default. A pin whose fetch fails is
+    # fetched once more after a single 30s wait per run (`check_all`), so a run of timeouts now
+    # costs twice what it did; 20 minutes leaves room for that.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

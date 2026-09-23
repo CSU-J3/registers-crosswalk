@@ -52,7 +52,7 @@ entry to paste into a New Gray source-links file. `--cited-in` requires `--archi
 register record depends on has to stay recoverable, and `add` refuses to write a record that the
 read path would reject. `--blob-dir PATH` also writes the bytes to
 `PATH/<sha256><ext>` — **outside this repo**, which is enforced, not merely asked. Other fetchers:
-`federalregister`, `govinfo`, `uscode`, `openfec`, `courtlistener`, `manual`.
+`federalregister`, `govinfo`, `uscode`, `openfec`, `fecfiling`, `courtlistener`, `manual`.
 
 A signed U.S. Code edition comes through GovInfo by package and granule. A section's number is
 in the granule id, not its title:
@@ -73,6 +73,19 @@ API's own id:
 `documents[]`. `--category` is the other way to name a document and is what advisory opinions use
 (`--type advisory_opinions`, one `Final Opinion` each); the two are mutually exclusive. The
 citation defaults to `FEC MUR 8098` and `--citation` overrides it.
+
+A committee's report as filed is named by its FEC file number, and each filing has two documents:
+the `.fec` file the committee submitted and the FEC's image PDF of it.
+
+    python -m registers_crosswalk.pin add fecfiling --file-number 1920944 --document fec \
+        --citation "Osborn For Senate, Form 3 Q2 2025-06-30, FEC file 1920944" \
+        --supersedes xr_src_0026 \
+        --notes "amendment 1 of 2, received 2025-10-15; amends FEC file 1903438 (received 2025-07-15), the original; itemizes Helix Campaigns"
+
+An amendment is a new filing with its own number, so it is a new pin that supersedes the last one
+of the same document kind. The processed Schedule B rows are only for finding the file numbers; the
+pin is the filing itself. `add fecfiling` needs `OPENFEC_API_KEY` for the metadata call; docquery
+serves both documents without one, so `check` needs no key.
 
     python -m registers_crosswalk.pin search <fetcher> <query>   # identifiers, then the add to paste
     python -m registers_crosswalk.pin check        # 0 clean, 1 drift, 2 missing key, 3 fetch failed

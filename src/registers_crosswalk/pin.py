@@ -26,9 +26,9 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urlencode, urljoin, urlsplit
 
 from .ids import SRC_ID
 from .models import (
@@ -183,7 +183,21 @@ class SearchHit:
     url: str | None = None
 
 
-def _extension(media_type: str) -> str:
+_GENERIC_TYPES = frozenset({"binary/octet-stream", "application/octet-stream"})
+_URL_SUFFIX = re.compile(r"\.[a-z0-9]{1,8}$")
+
+
+def _extension(media_type: str, url: str) -> str:
+    """The file extension a pinned document is written and listed under.
+
+    A specific served type names it. A generic one says nothing about the file, so the URL's own
+    suffix does, when it has one: docquery serves an FEC `.fec` filing as `binary/octet-stream`,
+    and `.bin` would hide what it is. No suffix falls back to `.bin`, as before.
+    """
+    if media_type in _GENERIC_TYPES:
+        suffix = PurePosixPath(urlsplit(url).path).suffix.lower()
+        if _URL_SUFFIX.fullmatch(suffix):
+            return suffix
     return _EXTENSIONS.get(media_type, ".bin")
 
 
@@ -245,7 +259,7 @@ def pin(
     )
     if target is not None:
         target.mkdir(parents=True, exist_ok=True)
-        blob = target / f"{source.artifact.sha256}{_extension(media_type)}"
+        blob = target / f"{source.artifact.sha256}{_extension(media_type, source.canonical_url)}"
         if not blob.exists():
             blob.write_bytes(body)
     return source
@@ -765,7 +779,8 @@ def to_manifest_line(source: Source) -> str:
     travels with the file into a `pins/` directory, so no trailing comment is needed to say which
     pin a line is — and `sha256sum` would read such a comment as part of the filename.
     """
-    name = f"{source.xr_id}-{_slug(source.citation)}{_extension(source.artifact.media_type)}"
+    ext = _extension(source.artifact.media_type, source.canonical_url)
+    name = f"{source.xr_id}-{_slug(source.citation)}{ext}"
     return f"{source.artifact.sha256}  {name}"
 
 

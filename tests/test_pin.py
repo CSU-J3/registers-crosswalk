@@ -1012,7 +1012,7 @@ def test_ledger_markdown_format():
     source = _pinned()
     assert to_ledger_markdown(source).splitlines() == [
         "- **Office of the Federal Register, 2026-09-14 (A1)** — 11 CFR Part 114, as of "
-        "2026-09-14. Retrieved 2026-09-17; "
+        "2026-09-14. Retrieved 2026-09-17 UTC; "
         f"sha256 {sha256_hex(BODY)[:16]}…; xr_src_0001.",
         f"  {ECFR_URL}",
         "  Archive: pending",
@@ -1024,7 +1024,7 @@ def test_ledger_markdown_adds_as_of_when_the_title_does_not_carry_it():
     # is never left unsaid.
     source = _pinned().model_copy(update={"title": "11 CFR Part 114"})
     line = to_ledger_markdown(source).splitlines()[0]
-    assert "11 CFR Part 114. Retrieved 2026-09-17, as of 2026-09-14;" in line
+    assert "11 CFR Part 114. Retrieved 2026-09-17 UTC, as of 2026-09-14;" in line
 
 
 def test_ledger_markdown_leaves_a_title_that_already_carries_its_citation_alone():
@@ -1053,7 +1053,7 @@ def test_ledger_markdown_appends_the_citation_to_a_federal_register_title():
     )
     line = to_ledger_markdown(source).splitlines()[0]
     assert "— Expenditures; Reports by Political Committees; " in line
-    assert "Personal Use of Campaign Funds, 60 FR 7862. Retrieved 2026-09-17;" in line
+    assert "Personal Use of Campaign Funds, 60 FR 7862. Retrieved 2026-09-17 UTC;" in line
 
 
 def test_ledger_markdown_appends_the_citation_to_a_case_name():
@@ -1072,7 +1072,7 @@ def test_ledger_markdown_appends_the_citation_to_a_case_name():
     assert line == (
         "- **Court of Appeals for the Eighth Circuit, 1943-09-20 (A1)** — "
         "Dunne v. United States, 138 F.2d 137. "
-        f"Retrieved 2026-09-17; sha256 {sha256_hex(BODY)[:16]}…; xr_src_0001."
+        f"Retrieved 2026-09-17 UTC; sha256 {sha256_hex(BODY)[:16]}…; xr_src_0001."
     )
 
 

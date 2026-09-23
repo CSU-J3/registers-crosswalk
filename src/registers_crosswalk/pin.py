@@ -734,7 +734,9 @@ def to_ledger_markdown(source: Source) -> str:
     when = source.published_at or source.point_in_time
     head_bits = [b for b in (source.publisher, when.isoformat() if when else None) if b]
     head = ", ".join(head_bits) if head_bits else "undated"
-    retrieved = f"Retrieved {source.artifact.fetched_at:%Y-%m-%d}"
+    # `fetched_at` is UTC, and the day it names can be tomorrow for a reader west of Greenwich, so
+    # the entry says which day it means. The document dates beside it are dates, not instants.
+    retrieved = f"Retrieved {source.artifact.fetched_at:%Y-%m-%d} UTC"
     # Fetchers with a point in time put it in the title too ("11 CFR Part 114, as of 2026-09-14"),
     # so appending it unconditionally printed the same date twice on one line.
     if source.point_in_time is not None and source.point_in_time.isoformat() not in source.title:

@@ -339,6 +339,10 @@ def test_ledger_since_filters_on_the_fetch_date(tmp_path, capsys):
 # ------------------------------------------------------------------- the four exit codes
 
 
+def _no_wait(_seconds):
+    """The retry's 30s wait, skipped: these tests are about the exit code, not the wait."""
+
+
 def test_exit_3_when_the_transport_fails(tmp_path, capsys):
     _add(tmp_path)
     capsys.readouterr()
@@ -346,7 +350,7 @@ def test_exit_3_when_the_transport_fails(tmp_path, capsys):
     def boom(url, headers=None):
         raise TimeoutError("read timed out")
 
-    assert main(["--data-dir", str(tmp_path), "check"], fetch=boom) == 3
+    assert main(["--data-dir", str(tmp_path), "check"], fetch=boom, sleep_fn=_no_wait) == 3
     assert "FETCH_FAILED" in capsys.readouterr().out
 
 
@@ -359,7 +363,7 @@ def test_transport_failure_does_not_read_as_drift(tmp_path, capsys):
     def boom(url, headers=None):
         raise ConnectionRefusedError("refused")
 
-    assert main(["--data-dir", str(tmp_path), "check"], fetch=boom) == 3
+    assert main(["--data-dir", str(tmp_path), "check"], fetch=boom, sleep_fn=_no_wait) == 3
     out = capsys.readouterr().out
     assert "DRIFT" not in out
 
@@ -390,7 +394,7 @@ def test_key_missing_outranks_a_transport_failure(tmp_path, monkeypatch, capsys)
     def boom(url, headers=None):
         raise TimeoutError("read timed out")
 
-    assert main(["--data-dir", str(tmp_path), "check", "--all"], fetch=boom) == 2
+    assert main(["--data-dir", str(tmp_path), "check", "--all"], fetch=boom, sleep_fn=_no_wait) == 2
     out = capsys.readouterr().out
     assert "KEY_MISSING" in out and "FETCH_FAILED" in out
 
@@ -405,7 +409,25 @@ def test_transport_failure_outranks_drift(tmp_path, capsys):
             raise TimeoutError("read timed out")
         return b"changed", "application/pdf"
 
-    assert main(["--data-dir", str(tmp_path), "check", "--all"], fetch=mixed) == 3
+    assert (
+        main(["--data-dir", str(tmp_path), "check", "--all"], fetch=mixed, sleep_fn=_no_wait) == 3
+    )
+
+
+def test_check_retries_a_transport_failure_once_before_reporting(tmp_path, capsys):
+    _add(tmp_path)
+    capsys.readouterr()
+    answers = [TimeoutError("read timed out")]
+
+    def flaky(url, headers=None):
+        if answers:
+            raise answers.pop()
+        return BODY, "application/pdf"
+
+    slept = []
+    assert main(["--data-dir", str(tmp_path), "check"], fetch=flaky, sleep_fn=slept.append) == 0
+    assert slept == [30.0]
+    assert "FETCH_FAILED" not in capsys.readouterr().out
 
 
 def test_clean_run_still_exits_0(tmp_path, capsys):

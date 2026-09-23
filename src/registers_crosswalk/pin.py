@@ -629,6 +629,15 @@ def archive(
 # (refused), gaierror (DNS), TimeoutError — subclasses OSError, so that one type cleanly separates
 # "we could not reach the document" from "we read the document and it had changed".
 _TRANSPORT = OSError
+# `check_all` waits this long, ONCE per run, and then re-checks every pin that came back
+# fetch_failed. Once per run, not once per pin: on 2026-09-23, 20 of the 45 live pins sat on
+# docquery.fec.gov, and 30s each while that one host refused would be ten minutes of sleep, the
+# whole job budget of sources-drift.yml and status-page.yml. Nothing else is retried: DRIFT,
+# AMENDED and ERROR are answers about the document, and KEY_MISSING cannot change while the
+# process runs. Why retry at all: that same day a push-triggered run reported five eCFR pins
+# FETCH_FAILED, a run started two and a half minutes later reported two uscode pins timed out, and
+# each of the seven was OK on the next run that checked it.
+_CHECK_RETRY_WAIT = 30.0
 
 DriftStatus = Literal["ok", "drift", "amended", "key_missing", "fetch_failed", "error"]
 
@@ -667,10 +676,39 @@ class DriftReport(XrModel):
     archived: bool = True
 
 
+def check_all(
+    sources: Sequence[Source],
+    *,
+    fetch: FetchFn = default_fetch,
+    env: Mapping[str, str] | None = None,
+    sleep_fn: SleepFn = time.sleep,
+) -> list[DriftReport]:
+    """`check` every source, in order; then, if any came back `fetch_failed`, wait
+    `_CHECK_RETRY_WAIT` seconds once and check just those again.
+
+    The second answer is the one reported, whatever it is. A pin that fails both times says so in
+    its detail, so a FETCH_FAILED line always means two failures at least 30 seconds apart.
+    """
+    reports = [check(source, fetch=fetch, env=env) for source in sources]
+    failed = [i for i, report in enumerate(reports) if report.status == "fetch_failed"]
+    if not failed:
+        return reports
+    sleep_fn(_CHECK_RETRY_WAIT)
+    for i in failed:
+        retried = check(sources[i], fetch=fetch, env=env)
+        if retried.status == "fetch_failed":
+            retried = retried.model_copy(
+                update={"detail": f"{retried.detail} (retried once after {_CHECK_RETRY_WAIT:g}s)"}
+            )
+        reports[i] = retried
+    return reports
+
+
 def check(
     source: Source, *, fetch: FetchFn = default_fetch, env: Mapping[str, str] | None = None
 ) -> DriftReport:
-    """Re-fetch a pinned document and compare it against what was pinned.
+    """Re-fetch a pinned document and compare it against what was pinned. One attempt; the retry
+    of a `fetch_failed` lives in `check_all`.
 
     Compares the fetcher's own drift key, not always the hash: uscode.house.gov re-renders its
     markup, so for those sources the parsed "laws in effect on" date is the signal. For eCFR
@@ -1085,8 +1123,11 @@ def note_source(xr_id: str, text: str, *, data_dir: Path) -> AddOutcome:
     )
 
 
-def _cmd_add(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
+def _cmd_add(
+    args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
+) -> int:
     """argparse in, exit code out. The guards and the write live in `add_source`."""
+    del sleep_fn  # the archive step keeps its own waits, inside archive_fn
     from . import fetchers
 
     # Refused before any network call: the load path requires a cited source to carry an archive,
@@ -1130,9 +1171,12 @@ def _cmd_add(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) ->
     return 0
 
 
-def _cmd_archive(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
+def _cmd_archive(
+    args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
+) -> int:
     """argparse in, exit code out. The guards and the write live in `archive_source`."""
     del fetch  # the document is not re-fetched: this amends a record, it does not re-pin one
+    del sleep_fn  # the archive step keeps its own waits, inside archive_fn
     outcome = archive_source(args.xr_id, data_dir=args.data_dir, archive_fn=archive_fn)
     if outcome.status != "written":
         print(outcome.message, file=sys.stderr)
@@ -1142,9 +1186,11 @@ def _cmd_archive(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn
     return 0
 
 
-def _cmd_note(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
+def _cmd_note(
+    args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
+) -> int:
     """argparse in, exit code out. The guards and the write live in `note_source`."""
-    del fetch, archive_fn  # offline: a label is restated, the document is not touched
+    del fetch, archive_fn, sleep_fn  # offline: a label is restated, the document is not touched
     outcome = note_source(args.xr_id, args.text, data_dir=args.data_dir)
     if outcome.status != "written":
         print(outcome.message, file=sys.stderr)
@@ -1153,7 +1199,9 @@ def _cmd_note(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -
     return 0
 
 
-def _cmd_check(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
+def _cmd_check(
+    args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
+) -> int:
     del archive_fn  # check never archives
     xw = Crosswalk(args.data_dir)
     if args.only:
@@ -1170,7 +1218,7 @@ def _cmd_check(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) 
     else:
         targets = _live_pins(xw)
 
-    reports = [check(s, fetch=fetch) for s in targets]
+    reports = check_all(list(targets), fetch=fetch, sleep_fn=sleep_fn)
     if args.json:
         print(json.dumps([r.model_dump(mode="json") for r in reports], indent=2))
     else:
@@ -1187,13 +1235,15 @@ def _cmd_check(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) 
     return max((_EXIT_CODES[r.status] for r in reports), default=0, key=_EXIT_RANK.get)
 
 
-def _cmd_search(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
+def _cmd_search(
+    args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
+) -> int:
     """Look a document up and print the `add` that would pin it. Reads; never writes.
 
     Deliberately does NOT touch `data/`: search answers "what is this document called and what is
     its id", which is a question about the publisher's index, not about what this repo holds.
     """
-    del archive_fn  # search never archives
+    del archive_fn, sleep_fn  # search never archives, and a search is not retried
     from . import fetchers
 
     doc_type = args.doc_type or fetchers.search_types(args.fetcher)[0]
@@ -1232,8 +1282,10 @@ def _cmd_search(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn)
     return 0
 
 
-def _cmd_ledger(args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn) -> int:
-    del fetch, archive_fn  # offline command; it only reads what is already pinned
+def _cmd_ledger(
+    args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
+) -> int:
+    del fetch, archive_fn, sleep_fn  # offline command; it only reads what is already pinned
     xw = Crosswalk(args.data_dir)
     sources = sorted(xw.sources.values(), key=lambda s: s.xr_id)
     if args.since is not None:
@@ -1339,9 +1391,10 @@ def main(
     *,
     fetch: FetchFn = default_fetch,
     archive_fn: ArchiveFn = archive,
+    sleep_fn: SleepFn = time.sleep,
 ) -> int:
     args = _build_parser().parse_args(argv)
-    return args.handler(args, fetch, archive_fn)
+    return args.handler(args, fetch, archive_fn, sleep_fn)
 
 
 if __name__ == "__main__":

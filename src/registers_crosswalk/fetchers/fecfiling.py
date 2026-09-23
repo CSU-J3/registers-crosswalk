@@ -1,6 +1,7 @@
 """FEC filings — a committee's report as filed, the document behind a Schedule B line.
 
-What Phase A observed live on 2026-09-23, for committee C00901355 (Osborn For Senate):
+Verified live 2026-09-23, on the nine Form 3 filings of committee C00901355 (Osborn For Senate)
+behind its Schedule B payments to Helix Campaigns:
   * `https://api.open.fec.gov/v1/filings/?file_number={n}&api_key=...` returns exactly one result
     for each of the nine file numbers queried. The result carries `committee_name`, `form_type`
     (`F3`), `report_type` (`Q2`, `YE`, `12P`, ...), `coverage_end_date`, `receipt_date`,
@@ -37,10 +38,14 @@ from ..pin import FetchFn, MissingKey, PinSpec, default_fetch, sha256_hex
 NAME = "fecfiling"
 HELP = "a committee's FEC filing as filed: the .fec file or its image PDF (by file number)"
 DRIFT_KEY = "sha256"
-# Not yet exercised through this code path. A scratch `add` outside the repo flips it, dated the
-# run's UTC day; any later edit to spec() resets it — the convention in docs/operations.md.
-VERIFIED = False
-VERIFIED_AT: date | None = None
+# Exercised against the live API on 2026-09-23 (UTC) through the current code path: a scratch
+# `add fecfiling --file-number 1903438 --document fec` into a data dir outside the repo, every
+# mapped field compared against the captured metadata (tests/fixtures/fecfiling_filings_*), the
+# hash against an independent keyless fetch of the same .fec, and a `check` with no key in the
+# environment exited 0. Any further edit to spec() or its parsing resets this to False — see the
+# convention in docs/operations.md.
+VERIFIED = True
+VERIFIED_AT = date(2026, 9, 23)
 PUBLISHER = "Federal Election Commission"
 ENV_KEY = "OPENFEC_API_KEY"
 FILINGS = "https://api.open.fec.gov/v1/filings/"

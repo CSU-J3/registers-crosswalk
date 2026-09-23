@@ -259,6 +259,11 @@ _WAYBACK_SAVE = "https://web.archive.org/save/"
 # with keys — see docs/operations.md. SPN2 is the interface Wayback documents for keyholders.
 _WAYBACK_SPN2 = "https://web.archive.org/save"
 _WAYBACK_SPN2_STATUS = "https://web.archive.org/save/status/"
+# Appended to every failure of the anonymous path, the one a run without keys takes.
+_ANONYMOUS_PATH = (
+    "no WAYBACK keys in this environment, so the anonymous save path was used; "
+    "it has answered 500 for these hosts before"
+)
 _WAYBACK_TS = re.compile(r"/web/(\d{14})/")
 # How long to wait between polls of an SPN2 job, and the shape of the wait. Injected in tests so
 # they neither sleep nor reach the network.
@@ -574,27 +579,34 @@ def archive(
         headers = _retrying(lambda: fn(f"{_WAYBACK_SAVE}{url}", None), sleep_fn=sleep_fn)
         assert isinstance(headers, Mapping)  # noqa: S101 - headers_fn's contract
         location = _header(headers, "Content-Location")
-        if not location:
-            return ArchiveFailure(f"anonymous save of {url} returned no Content-Location")
-        captured_at = None
-        m = _WAYBACK_TS.search(location)
-        if m is not None:
-            captured_at = datetime.strptime(m.group(1), "%Y%m%d%H%M%S").replace(tzinfo=UTC)
-        return ArchiveCopy(
-            service="wayback",
-            url=urljoin("https://web.archive.org", location),
-            captured_at=captured_at,
-        )
+        if location:
+            captured_at = None
+            m = _WAYBACK_TS.search(location)
+            if m is not None:
+                captured_at = datetime.strptime(m.group(1), "%Y%m%d%H%M%S").replace(tzinfo=UTC)
+            return ArchiveCopy(
+                service="wayback",
+                url=urljoin("https://web.archive.org", location),
+                captured_at=captured_at,
+            )
+        failure = ArchiveFailure(f"anonymous save of {url} returned no Content-Location")
     except urllib.error.HTTPError as exc:
         # 5xx and 429 have already been retried by the time they reach here.
         if exc.code == 429:
-            return ArchiveFailure(
+            failure = ArchiveFailure(
                 f"HTTP 429 from the Wayback Machine for {url}: still rate limited after "
                 f"{_RATE_LIMIT_TRIES} tries"
             )
-        return ArchiveFailure(f"HTTP {exc.code} from the Wayback Machine for {url}")
+        else:
+            failure = ArchiveFailure(f"HTTP {exc.code} from the Wayback Machine for {url}")
     except Exception as exc:  # noqa: BLE001 - best-effort contract: nothing here may raise
-        return ArchiveFailure(f"{type(exc).__name__}: {exc}")
+        failure = ArchiveFailure(f"{type(exc).__name__}: {exc}")
+    # A keyless run looks exactly like a Wayback outage from the outside: the anonymous save has
+    # answered 500 for uscode.house.gov and storage.courtlistener.com while SPN2 took the same urls
+    # minutes later. Say which path failed, so the fix (load the keys) is not mistaken for a wait.
+    if not auth:
+        failure = ArchiveFailure(f"{failure.reason}; {_ANONYMOUS_PATH}")
+    return failure
 
 
 # --------------------------------------------------------------------------- drift

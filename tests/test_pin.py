@@ -490,6 +490,21 @@ def test_archive_reports_a_missing_content_location():
     assert "no Content-Location" in result.reason
 
 
+def test_an_anonymous_failure_says_no_keys_were_loaded():
+    # 2026-09-23: three archive attempts from a shell that had not loaded .env failed with HTTP
+    # 500 and read as a Wayback outage; with the keys loaded all three succeeded at once.
+    def headers_fn(url, headers=None):
+        raise urllib.error.HTTPError(url, 500, "boom", {}, None)
+
+    result = archive(ECFR_URL, headers_fn=headers_fn, sleep_fn=lambda _s: None, env={})
+    assert isinstance(result, ArchiveFailure)
+    assert result.reason.startswith("HTTP 500 from the Wayback Machine for ")
+    assert result.reason.endswith(
+        "no WAYBACK keys in this environment, so the anonymous save path was used; "
+        "it has answered 500 for these hosts before"
+    )
+
+
 KEYS = {"WAYBACK_ACCESS_KEY": "k", "WAYBACK_SECRET_KEY": "s"}
 
 

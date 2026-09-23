@@ -1005,7 +1005,7 @@ def archive_source(
     # every field and turn a one-fact amendment into a diff nobody can read.
     record = json.loads(path.read_text(encoding="utf-8"))
     record["archives"] = [result.model_dump(mode="json")]
-    path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return AddOutcome(
         status="written",
         message=f"archived {xr_id}: {result.url}",
@@ -1041,7 +1041,7 @@ def note_source(xr_id: str, text: str, *, data_dir: Path) -> AddOutcome:
     # Read, touch one key, write — as `archive_source` does, and for the same reason.
     record = json.loads(path.read_text(encoding="utf-8"))
     record["notes"] = text
-    path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return AddOutcome(
         status="written",
         message=f"noted {xr_id}: {text}",

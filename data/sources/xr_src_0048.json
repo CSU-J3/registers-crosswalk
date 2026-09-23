@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0048",
+  "kind": "source",
+  "citation": "Graham For Maine, Form 3 Q1 2026-03-31, FEC file 1966624",
+  "title": "Form 3 electronic filing (.fec)",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://docquery.fec.gov/dcdev/posted/1966624.fec",
+  "fetcher": "fecfiling",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-23",
+  "point_in_time": null,
+  "published_at": "2026-04-15",
+  "artifact": {
+    "sha256": "9a346d66b49f08b899006448f7acaaf9ea41960ee45af3cb53f7e689b2fcdf17",
+    "byte_length": 7383634,
+    "media_type": "binary/octet-stream",
+    "fetched_at": "2026-09-23T03:11:37.558080Z",
+    "drift_key": "sha256",
+    "drift_value": "9a346d66b49f08b899006448f7acaaf9ea41960ee45af3cb53f7e689b2fcdf17"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "original, received 2026-04-15; itemizes Helix Campaigns"
+}

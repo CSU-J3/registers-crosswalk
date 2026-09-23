@@ -85,6 +85,28 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           exit $code
 
+      - name: Print each pin's result
+        # The check's JSON goes to build/drift.json, never to the log, and the runner is thrown
+        # away, so a failed run used to lose every pin's detail with it: on 2026-09-23 five eCFR
+        # pins went FETCH_FAILED here and nothing now says why. One line per pin keeps it. This
+        # step only prints. `continue-on-error`, because the steps after it have no `always()` and
+        # a crash here must not cost the page; the check's code still travels in `steps.check`.
+        if: always()
+        continue-on-error: true
+        run: |
+          python - <<'EOF'
+          import json
+          from pathlib import Path
+
+          path = Path("build/drift.json")
+          if not path.is_file() or path.stat().st_size == 0:
+              print("build/drift.json is missing or empty: the check printed no JSON")
+          else:
+              for r in json.loads(path.read_text(encoding="utf-8")):
+                  detail = " ".join((r.get("detail") or "").split())
+                  print(f"{r['xr_id']}  {r['status'].upper():<12}  {detail}".rstrip())
+          EOF
+
       - name: Build the status page
         # The only step that reads data/. It never touches the network. The guard is for the one
         # case the check cannot report through its JSON — it died before printing any — and it

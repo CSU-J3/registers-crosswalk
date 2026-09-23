@@ -57,7 +57,8 @@ concurrency:
 jobs:
   status-page:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The same drift check as sources-drift.yml, so the same budget; its comment says why 20.
+    timeout-minutes: 20
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

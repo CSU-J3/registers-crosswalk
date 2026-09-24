@@ -445,9 +445,9 @@ reports that are `N`, `N` on one that is `A`). So a Schedule B row is used to le
 numbers to read, and the pin is the report as filed.
 
 **The filing is the evidence, the amendments included.** Every report in a chain is pinned, the
-original first, each later one with `--supersedes` the previous pin of the same document kind, so
-the default `check` covers only the latest filing of each report while the originals stay on the
-record. They are not clutter: the amendments re-described the Helix payments ("digital
+original first, each later one with `--supersedes` the previous pin of the same document kind, and
+the default `check` still re-tests every filing in the chain (see "A superseded filing is still
+checked" below). They are not clutter: the amendments re-described the Helix payments ("digital
 fundraising" and "digital consulting" became "Digital Advertising") without changing an amount or
 a date. Eighteen pins, `xr_src_0026` through `xr_src_0043`: nine filings across five reports (Q2,
 Q3 and year-end 2025, Q1 and pre-primary 2026), a `.fec` and a PDF each. Each pin's notes carry the
@@ -528,9 +528,20 @@ Consequences worth knowing:
 `.github/workflows/sources-drift.yml` runs `python -m registers_crosswalk.pin check` weekly
 (Mondays 12:00 UTC) and on `workflow_dispatch`. By default it checks **every live pin** — live as
 `registry.live_sources` defines it, the same predicate the duplicate rule and the load-path
-invariants use: not a `merged_into` loser, and not named by another pin's `supersedes`. `--all`
-adds the ones that default skips, so a run can ask whether the documents behind the history are
-still reachable.
+invariants use: not a `merged_into` loser, and not named by another pin's `supersedes` — plus the
+superseded pins described next. `--all` adds the ones that default skips, so a run can ask whether
+the documents behind the history are still reachable.
+
+**A superseded filing is still checked.** A fetcher module may declare `CHECK_SUPERSEDED = True`,
+and `check` then also re-fetches that fetcher's superseded pins by default. Only `fecfiling` does.
+A superseded filing, the original or an earlier amendment, is a separate filing with its own file
+number and URL, and it never changes; the record cites it alongside the amendment that replaced
+it, so its bytes are worth re-testing. `ecfr`
+and `uscode` keep the default `False`, for two different reasons. A superseded eCFR pin was
+superseded because its part was amended, so it would report `AMENDED` forever. A uscode URL serves
+only the current text, so a retired pin would read as `DRIFT`. On 2026-09-23 this took the default
+from the 49 live pins to all 57. The eight added are the superseded Osborn For Senate pins: four
+filings (1903438, 1920944, 1921751, 1967383), a `.fec` and a PDF each.
 
 It used to check the *latest pin per citation*, and that was wrong for any citation naming a
 proceeding rather than a text. One FEC MUR is one citation over several documents — the

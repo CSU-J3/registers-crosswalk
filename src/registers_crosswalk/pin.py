@@ -854,8 +854,9 @@ def _cited_in_arg(value: str) -> CitationRef:
         raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
-def _live_pins(xw: Crosswalk) -> list[Source]:
-    """Every pin that still claims to be current, in id order: `check`'s default target set.
+def _default_targets(xw: Crosswalk) -> list[Source]:
+    """`check`'s default target set, in id order: every pin that still claims to be current, plus
+    the superseded pins of any fetcher that declares CHECK_SUPERSEDED (`fecfiling` alone).
 
     One pin per *citation* was the earlier rule, and it was wrong as soon as a citation named a
     proceeding rather than a text. An FEC MUR is one citation over several documents — the
@@ -866,8 +867,23 @@ def _live_pins(xw: Crosswalk) -> list[Source]:
 
     Liveness is `registry.live_sources`, the same predicate the duplicate rule and the load-path
     invariant use, so a pin `add` would refuse as a live duplicate is a pin `check` re-fetches.
+
+    A superseded pin is history. Most history cannot be re-tested at its URL (see
+    `fetchers.check_superseded`), but a superseded FEC filing can, and the record cites the original
+    alongside the amendment, so the original is checked too. A `merged_into` loser never is: it was
+    wrong, not old.
     """
-    return sorted(live_sources(xw.sources).values(), key=lambda s: s.xr_id)
+    from . import fetchers
+
+    live = live_sources(xw.sources)
+    return sorted(
+        (
+            s
+            for s in xw.sources.values()
+            if s.xr_id in live or (s.merged_into is None and fetchers.check_superseded(s.fetcher))
+        ),
+        key=lambda s: s.xr_id,
+    )
 
 
 @dataclass(frozen=True)
@@ -1216,7 +1232,7 @@ def _cmd_check(
         # different question from whether what we stand behind today still matches.
         targets = sorted(xw.sources.values(), key=lambda s: s.xr_id)
     else:
-        targets = _live_pins(xw)
+        targets = _default_targets(xw)
 
     reports = check_all(list(targets), fetch=fetch, sleep_fn=sleep_fn)
     if args.json:
@@ -1357,7 +1373,8 @@ def _build_parser() -> argparse.ArgumentParser:
     check_parser.add_argument(
         "--all",
         action="store_true",
-        help="check superseded pins too, not just the live ones",
+        help="check every record on disk: also the superseded pins the default skips, and "
+        "merged_into losers",
     )
     check_parser.add_argument("--json", action="store_true")
 

@@ -147,13 +147,13 @@ def _successors(sources: Mapping[str, Source]) -> dict[str, str]:
 
 
 def _check_cell(report: DriftReport | None, superseded: bool) -> str:
-    # A superseded pin makes no claim about the current world, so it carries no verdict at all —
-    # which is a different thing from a live pin this run simply did not check, and that one gets
-    # an em dash rather than an empty cell.
-    if superseded:
-        return ""
+    # A superseded pin no run checks makes no claim about the current world, so it carries no
+    # verdict at all — which is a different thing from a live pin this run simply did not check,
+    # and that one gets an em dash rather than an empty cell. A superseded pin the run DID check
+    # (its fetcher declares CHECK_SUPERSEDED, as fecfiling does) shows its verdict like any other:
+    # the band counts that report, so the row has to show it.
     if report is None:
-        return '<span class="none">—</span>'
+        return "" if superseded else '<span class="none">—</span>'
     label, tone = _PILLS[report.status]
     return f'<span class="pill pill-{tone}">{_e(label)}</span>'
 

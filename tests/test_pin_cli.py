@@ -343,6 +343,52 @@ def _no_wait(_seconds):
     """The retry's 30s wait, skipped: these tests are about the exit code, not the wait."""
 
 
+@pytest.mark.parametrize(
+    ("fetcher", "targeted"), [("fecfiling", True), ("ecfr", False), ("uscode", False)]
+)
+def test_check_default_takes_a_superseded_pin_only_where_its_fetcher_declares_it(
+    tmp_path, capsys, fetcher, targeted
+):
+    # fecfiling: an amended report's original is a fixed document at its own URL, still checkable.
+    # ecfr: a superseded part would read AMENDED forever. uscode: the URL serves only today's text.
+    _add(tmp_path, extra=["--point-in-time", "2023-05-11"])
+    _add(
+        tmp_path,
+        url=URL.replace("2023-01", "2023-01-revised"),
+        extra=["--point-in-time", "2024-05-11", "--supersedes", "xr_src_0001"],
+    )
+    for path in (tmp_path / "sources").glob("*.json"):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        record["fetcher"] = fetcher
+        path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+    capsys.readouterr()  # drop what `add` printed
+
+    main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(), sleep_fn=_no_wait)
+    out = capsys.readouterr().out
+    assert "xr_src_0002" in out  # the live pin, whatever its fetcher
+    assert ("xr_src_0001" in out) is targeted
+
+
+def test_check_default_skips_a_merged_loser_even_where_superseded_pins_are_checked(
+    tmp_path, capsys
+):
+    # A merged_into loser was wrong, not old: CHECK_SUPERSEDED must not bring it back.
+    _add(tmp_path)
+    _add(tmp_path, url=URL.replace("2023-01", "2023-01-dup"), citation="FEC AO 2023-01 dup")
+    for path in (tmp_path / "sources").glob("*.json"):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        record["fetcher"] = "fecfiling"
+        if record["xr_id"] == "xr_src_0002":
+            record["merged_into"] = "xr_src_0001"
+        path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+    capsys.readouterr()  # drop what `add` printed
+
+    main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(), sleep_fn=_no_wait)
+    out = capsys.readouterr().out
+    assert "xr_src_0001" in out
+    assert "xr_src_0002" not in out
+
+
 def test_exit_3_when_the_transport_fails(tmp_path, capsys):
     _add(tmp_path)
     capsys.readouterr()

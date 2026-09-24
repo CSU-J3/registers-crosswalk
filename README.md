@@ -90,6 +90,7 @@ serves both documents without one, so `check` needs no key.
     python -m registers_crosswalk.pin search <fetcher> <query>   # identifiers, then the add to paste
     python -m registers_crosswalk.pin check        # 0 clean, 1 drift, 2 missing key, 3 fetch failed
     python -m registers_crosswalk.pin ledger       # entries for the New Gray ledgers
+    python -m registers_crosswalk.pin blobs --out DIR   # verified copies + MANIFEST.sha256, outside the repo
     python -m registers_crosswalk.pin note xr_src_NNNN "<label>"   # offline; rewrites only notes
 
 A transport failure (exit 3) is deliberately not reported as drift (exit 1) — a dead endpoint and

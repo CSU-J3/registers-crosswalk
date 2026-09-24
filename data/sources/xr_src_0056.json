@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0056",
+  "kind": "source",
+  "citation": "52 U.S.C. § 30111",
+  "title": "52 U.S.C. § 30111 (prelim, laws in effect on 2026-09-22)",
+  "publisher": "Office of the Law Revision Counsel",
+  "canonical_url": "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title52-section30111&num=0&edition=prelim",
+  "fetcher": "uscode",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-19",
+  "point_in_time": "2026-09-22",
+  "published_at": null,
+  "artifact": {
+    "sha256": "74ca67bbd1e1b4a685c9a224291b2133ab561cf8420a187e8f67e9fdfe80f4e0",
+    "byte_length": 182751,
+    "media_type": "text/html",
+    "fetched_at": "2026-09-23T19:21:28.572361Z",
+    "drift_key": "last_amended",
+    "drift_value": "2002-10-29"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260923192143/https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title52-section30111&num=0&edition=prelim",
+      "captured_at": "2026-09-23T19:21:43Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

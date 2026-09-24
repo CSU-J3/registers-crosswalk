@@ -473,6 +473,25 @@ unarchived, per the courtlistener fallback, and are listed for `pin archive`. Th
 records that can be fetched again by file number, and each pin's sha256 is what any copy has to
 match.
 
+**The preservation copy.** For FEC filings, the preservation copy is New Gray's hashed blob, saved
+under its manifest name; the FEC is the repository of record, with a statutory retention floor of
+ten years from receipt, five for filings relating solely to House candidates (52 U.S.C.
+§ 30111(a)(5); xr_src_0057, 2024 ed.; xr_src_0056, prelim). This command makes that copy:
+
+    python -m registers_crosswalk.pin blobs --out <New Gray's pins directory>
+
+For every pin (or the ones named with `--only`), it re-fetches the canonical URL through the
+fetcher's own request path and writes the bytes under the pin's manifest name, but only if they
+hash to the pin. A download that doesn't match writes nothing and is reported. A file that's
+already there is never overwritten: identical bytes are left as they are, and different bytes are
+reported. Then it writes `MANIFEST.sha256`, listing every file in that directory that hashes to its
+pin, so `sha256sum -c MANIFEST.sha256` passes there. The manifest only ever grows. If the one
+already there lists a line the run can't keep (a copy that changed or went missing, or a file this
+command didn't write), it is left exactly as it is, the line is reported, and the run fails. The
+uscode prelims always mismatch, because their pages vary per request; their Wayback copies are
+their preservation copies, and those mismatches don't fail the run. Until the first run against
+New Gray's directory, the copy this paragraph describes doesn't exist yet.
+
 **Fight Agency is not a payee of this committee.** No Schedule B row names it: not in the 1,878
 processed rows, not in the 866 raw e-file rows, and not in any of the nine filings. The name
 appears once, in a Schedule A receipt, as a contributor's employer. That finding went back to the

@@ -489,8 +489,10 @@ pin, so `sha256sum -c MANIFEST.sha256` passes there. The manifest only ever grow
 already there lists a line the run can't keep (a copy that changed or went missing, or a file this
 command didn't write), it is left exactly as it is, the line is reported, and the run fails. The
 uscode prelims always mismatch, because their pages vary per request; their Wayback copies are
-their preservation copies, and those mismatches don't fail the run. Until the first run against
-New Gray's directory, the copy this paragraph describes doesn't exist yet.
+their preservation copies, and those mismatches don't fail the run. The first run into New Gray's
+pins directory was on 2026-09-24 (UTC). It wrote 54 files, all 30 FEC filings among them, and 3
+weren't written: the expected mismatches of the uscode prelims `xr_src_0005`, `xr_src_0024` and
+`xr_src_0056`. `sha256sum -c --strict MANIFEST.sha256` then passed there, 54 OK.
 
 **Fight Agency is not a payee of this committee.** No Schedule B row names it: not in the 1,878
 processed rows, not in the 866 raw e-file rows, and not in any of the nine filings. The name

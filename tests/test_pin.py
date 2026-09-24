@@ -1,11 +1,13 @@
+import email.message
 import gzip
 import json
+import re
 import socket
 import urllib.error
 from datetime import UTC, date, datetime, timedelta
 from email.utils import format_datetime
 from pathlib import Path
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 
 import pytest
 
@@ -14,6 +16,7 @@ from registers_crosswalk.fetchers import ecfr, uscode
 from registers_crosswalk.models import ArchiveCopy, Grade, Source
 from registers_crosswalk.pin import (
     ArchiveFailure,
+    ExpectedDrift,
     PinSpec,
     add_source,
     archive,
@@ -728,28 +731,39 @@ def test_add_source_keeps_the_old_wording_for_an_archiver_that_gives_no_reason(t
     )
 
 
-# ------------------------------------------- reusing a capture that already holds these bytes
+# ------------------------------------ reusing a capture only when it reproduces the pin's drift
 
 ARCHIVED_BODY = b"%PDF-1.4 the pinned bytes"
 ARCHIVED_TS = "20260920190851"
-AVAILABLE_URL = "https://archive.org/wayback/available?url=" + quote(ECFR_URL, safe="")
+EXPECTED = ExpectedDrift("ecfr", "sha256", sha256_hex(ARCHIVED_BODY))
+CDX_URL = "https://web.archive.org/cdx/search/cdx?" + urlencode(
+    {"url": ECFR_URL, "output": "json", "fl": "timestamp,statuscode,digest"}
+)
 
 
-def _available(url, timestamp=ARCHIVED_TS, *, present=True):
-    """The availability API's answer, in the shape it actually returns (captured 2026-09-20)."""
-    if not present:
-        return {"url": url, "archived_snapshots": {}}
-    return {
-        "url": url,
-        "archived_snapshots": {
-            "closest": {
-                "status": "200",
-                "available": True,
-                "url": f"http://web.archive.org/web/{timestamp}/{url}",
-                "timestamp": timestamp,
-            }
-        },
-    }
+def _cdx(*captures):
+    """The CDX API's answer: a header row, then one row per (timestamp, statuscode, digest)."""
+    return [["timestamp", "statuscode", "digest"], *[list(c) for c in captures]] if captures else []
+
+
+def _memento(timestamp):
+    when = datetime.strptime(timestamp, "%Y%m%d%H%M%S").replace(tzinfo=UTC)
+    return format_datetime(when, usegmt=True)
+
+
+def _served(bodies, *, redirect=None, calls=None):
+    """A fake `id_` fetch. `bodies` maps a timestamp to the bytes Wayback holds there; `redirect`
+    maps a timestamp it does not hold to the one it serves instead, as Wayback does."""
+
+    def capture_fn(url):
+        if calls is not None:
+            calls.append(url)
+        asked = re.search(r"/web/(\d{14})id_/", url).group(1)
+        served = (redirect or {}).get(asked, asked)
+        final = url.replace(f"/web/{asked}id_/", f"/web/{served}id_/")
+        return bodies[served], final, {"memento-datetime": _memento(served)}
+
+    return capture_fn
 
 
 def _spn2_success(url, data):
@@ -758,90 +772,135 @@ def _spn2_success(url, data):
     return {"status": "success", "timestamp": "20260919120000"}
 
 
-def test_archive_reuses_an_existing_capture_whose_bytes_match():
-    """No Save Page Now request at all: the archive already holds exactly what we pinned.
+def _no_save(url, headers=None, data=None):
+    """A JSON seam that answers the CDX query only; any Save Page Now call fails the test."""
+    raise AssertionError(f"Save Page Now was called: {url}")
 
-    SPN2 would not have taken a new capture anyway for anything archived in the last hour, so the
-    round trip buys nothing and spends a write against a rate-limited service.
+
+def _cdx_then_spn2(cdx_rows, *, posted=None):
+    def json_fn(url, headers=None, data=None):
+        if url.startswith("https://web.archive.org/cdx/"):
+            return cdx_rows
+        if posted is not None:
+            posted.append(url)
+        if data is not None:
+            return {"job_id": "spn2-abc"}
+        return {"status": "success", "timestamp": "20260919120000"}
+
+    return json_fn
+
+
+def test_archive_reuses_the_newest_capture_that_reproduces_the_pin():
+    """No Save Page Now request at all: Wayback already holds a capture of what we pinned.
+
+    The CDX API lists every capture; they are tried newest first, each at its exact timestamp, and
+    the first that reproduces the pin is reused. A newer capture of other bytes is passed over.
     """
     calls = []
+    rows = _cdx((ARCHIVED_TS, "200", "AAA"), ("20260922101010", "200", "BBB"))
 
     def json_fn(url, headers=None, data=None):
         calls.append(url)
-        if url.startswith("https://archive.org/wayback/available"):
-            return _available(ECFR_URL)
-        raise AssertionError(f"Save Page Now was called: {url}")
+        if url == CDX_URL:
+            return rows
+        return _no_save(url)
 
-    def fetch_fn(url, headers=None):
-        calls.append(url)
-        return ARCHIVED_BODY, "application/pdf"
-
+    capture_fn = _served(
+        {ARCHIVED_TS: ARCHIVED_BODY, "20260922101010": b"a later, different document"},
+        calls=calls,
+    )
     copy = archive(
         ECFR_URL,
-        expected_sha256=sha256_hex(ARCHIVED_BODY),
+        expected=EXPECTED,
         json_fn=json_fn,
-        fetch_fn=fetch_fn,
+        capture_fn=capture_fn,
         sleep_fn=lambda _s: None,
         env=KEYS,
     )
-    assert copy.service == "wayback"
     assert copy.url == f"https://web.archive.org/web/{ARCHIVED_TS}/{ECFR_URL}"
     assert copy.captured_at == datetime(2026, 9, 20, 19, 8, 51, tzinfo=UTC)
-    # the availability probe, then the capture's own bytes through the id_ form, and nothing else.
-    # `id_` matters: without it Wayback serves the document wrapped in its toolbar and rewritten,
-    # which would never hash to what we pinned and would make this check always fail.
+    # the listing, then the newest capture, then the one that matched; `id_` every time, because
+    # without it Wayback wraps the document in its toolbar and it could never reproduce the pin
     assert calls == [
-        AVAILABLE_URL,
+        CDX_URL,
+        f"https://web.archive.org/web/20260922101010id_/{ECFR_URL}",
         f"https://web.archive.org/web/{ARCHIVED_TS}id_/{ECFR_URL}",
     ]
 
 
-def test_archive_falls_through_to_spn2_when_the_existing_capture_does_not_match():
-    """A capture of that url is not the same claim as a capture of these bytes.
+def test_a_prelim_capture_is_reused_by_its_last_amendment_not_its_bytes():
+    """A U.S. Code prelim page carries per-request session data, so its bytes never match twice.
 
-    A url that served something else last year has a capture; reusing it would attach a
-    recoverable copy of the wrong document to the record.
+    The rule is the pin's drift value, which for uscode is the section's last amendment: a capture
+    with other bytes and the same amendment is reused; one showing a later amendment is not.
     """
-    posted = []
-
-    def json_fn(url, headers=None, data=None):
-        if url.startswith("https://archive.org/wayback/available"):
-            return _available(ECFR_URL)
-        posted.append(url)
-        return _spn2_success(url, data)
-
-    def fetch_fn(url, headers=None):
-        return b"some other document entirely", "application/pdf"
-
+    expected = ExpectedDrift("uscode", "last_amended", USCODE_LAST_AMENDED)
+    same_law = USCODE_PAGE + b"<!-- jsessionid=another-request -->"
+    amended = _append_to_source_credit(USCODE_PAGE, b"; Pub. L. 119-1, Jan. 5, 2026")
+    rows = _cdx(("20260919194240", "200", "OLD"), ("20260923014054", "200", "NEW"))
     copy = archive(
-        ECFR_URL,
-        expected_sha256=sha256_hex(ARCHIVED_BODY),
-        json_fn=json_fn,
-        fetch_fn=fetch_fn,
+        USCODE_URL,
+        expected=expected,
+        json_fn=lambda url, h=None, d=None: rows if "/cdx/" in url else _no_save(url),
+        capture_fn=_served({"20260923014054": amended, "20260919194240": same_law}),
         sleep_fn=lambda _s: None,
         env=KEYS,
     )
-    assert posted, "SPN2 was never asked for a capture"
-    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+    assert sha256_hex(same_law) != sha256_hex(USCODE_PAGE)  # reused although the bytes differ
+    assert copy.url == f"https://web.archive.org/web/20260919194240/{USCODE_URL}"
 
 
-def test_archive_falls_through_to_spn2_when_there_is_no_capture():
-    posted = []
+def test_reuse_passes_over_a_timestamp_wayback_serves_as_another_capture():
+    """The xr_src_0012 case: CDX names a timestamp, Wayback redirects it to an older capture.
 
-    def json_fn(url, headers=None, data=None):
-        if url.startswith("https://archive.org/wayback/available"):
-            return _available(ECFR_URL, present=False)
-        posted.append(url)
-        return _spn2_success(url, data)
-
-    def fetch_fn(url, headers=None):
-        raise AssertionError("nothing to fetch: there is no capture")
-
+    Drift values are compared only once the served timestamp is the one asked for, so the
+    redirected one is not reused under its own timestamp; the capture that is served is.
+    """
+    rows = _cdx(("20260711041727", "200", "YUS"), ("20260922175016", "200", "YUS"))
     copy = archive(
         ECFR_URL,
-        expected_sha256=sha256_hex(ARCHIVED_BODY),
-        json_fn=json_fn,
-        fetch_fn=fetch_fn,
+        expected=EXPECTED,
+        json_fn=lambda url, h=None, d=None: rows if "/cdx/" in url else _no_save(url),
+        capture_fn=_served(
+            {"20260711041727": ARCHIVED_BODY}, redirect={"20260922175016": "20260711041727"}
+        ),
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert copy.url == f"https://web.archive.org/web/20260711041727/{ECFR_URL}"
+
+
+def test_a_rejected_digest_is_not_fetched_again():
+    """A digest names a payload: once one capture of it fails to reproduce the pin, all do."""
+    calls = []
+    rows = _cdx(*[(f"2026092{n}000000", "200", "SAME") for n in range(1, 5)])
+    posted = []
+    archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=_cdx_then_spn2(rows, posted=posted),
+        capture_fn=_served(
+            {
+                **{f"2026092{n}000000": b"not the pinned bytes" for n in range(1, 5)},
+                "20260919120000": ARCHIVED_BODY,
+            },
+            calls=calls,
+        ),
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    reuse_fetches = [c for c in calls if "20260919120000" not in c]
+    assert len(reuse_fetches) == 1  # the newest; the other three share its digest
+    assert posted, "Save Page Now was never asked for a capture"
+
+
+def test_archive_attaches_a_new_capture_that_reproduces_the_pin():
+    posted = []
+    copy = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=_cdx_then_spn2(_cdx(), posted=posted),
+        capture_fn=_served({"20260919120000": ARCHIVED_BODY}),
         sleep_fn=lambda _s: None,
         env=KEYS,
     )
@@ -849,33 +908,203 @@ def test_archive_falls_through_to_spn2_when_there_is_no_capture():
     assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
 
 
-def test_archive_does_not_reuse_without_a_hash_to_check_against():
-    """No hash, no reuse. Reuse is conditional on the bytes matching, and nothing would match."""
-    asked = []
+def test_a_new_capture_that_does_not_reproduce_the_pin_is_refused():
+    """Save Page Now's word that it took a capture is not a check of what it took."""
+    slept = []
+    result = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=_cdx_then_spn2(_cdx()),
+        capture_fn=_served({"20260919120000": b"an error page, captured faithfully"}),
+        sleep_fn=slept.append,
+        env=KEYS,
+    )
+    assert isinstance(result, ArchiveFailure)
+    assert result.reason.startswith("new capture does not reproduce the pin's sha256")
+    assert result.reason.endswith("nothing attached")
+    assert 300.0 not in slept  # a capture that is served and wrong is refused at once
+
+
+def test_a_prelim_new_capture_is_refused_when_its_last_amendment_differs():
+    expected = ExpectedDrift("uscode", "last_amended", USCODE_LAST_AMENDED)
+    amended = _append_to_source_credit(USCODE_PAGE, b"; Pub. L. 119-1, Jan. 5, 2026")
+    result = archive(
+        USCODE_URL,
+        expected=expected,
+        json_fn=_cdx_then_spn2(_cdx()),
+        capture_fn=_served({"20260919120000": amended}),
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert isinstance(result, ArchiveFailure)
+    assert "does not reproduce the pin's last_amended" in result.reason
+
+
+def test_a_new_capture_not_yet_served_is_retried_then_reported():
+    """Three tries over ten minutes; if Wayback still serves an older capture, attach nothing."""
+    slept = []
+    result = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=_cdx_then_spn2(_cdx()),
+        capture_fn=_served(
+            {"20260711041727": ARCHIVED_BODY}, redirect={"20260919120000": "20260711041727"}
+        ),
+        sleep_fn=slept.append,
+        env=KEYS,
+    )
+    assert isinstance(result, ArchiveFailure)
+    assert result.reason.startswith("capture not stored at returned timestamp")
+    assert "3 tries over 10 minutes" in result.reason
+    assert slept.count(300.0) == 2
+
+
+def test_nothing_is_attached_when_nothing_is_stored_at_the_returned_timestamp():
+    """Save Page Now returned a timestamp, and on every try Wayback has nothing stored there:
+    it answers 404, or redirects to a different capture, which here even holds the pinned bytes.
+    Only the served-timestamp comparison stops that other capture being attached under the
+    returned timestamp."""
+    tries = []
+    redirected = _served(
+        {"20260711041727": ARCHIVED_BODY}, redirect={"20260919120000": "20260711041727"}
+    )
+
+    def capture_fn(url):
+        tries.append(url)
+        if len(tries) == 3:  # the last try decides the reason, so it is the 404
+            raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+        return redirected(url)
+
+    result = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=_cdx_then_spn2(_cdx()),
+        capture_fn=capture_fn,
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert isinstance(result, ArchiveFailure)
+    assert result.reason.startswith("capture not stored at returned timestamp: ")
+    assert "(HTTP 404)" in result.reason
+    assert result.reason.endswith("nothing attached")
+    assert len(tries) == 3
+
+
+def test_a_404_on_every_try_is_reported_as_nothing_stored():
+    def capture_fn(url):
+        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+
+    result = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=_cdx_then_spn2(_cdx()),
+        capture_fn=capture_fn,
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert isinstance(result, ArchiveFailure)
+    assert result.reason.startswith("capture not stored at returned timestamp: ")
+
+
+def test_the_new_capture_attached_is_the_pin_url_at_the_checked_timestamp():
+    """SPN2 may spell the url differently in `original_url`; what is attached is what's checked."""
 
     def json_fn(url, headers=None, data=None):
-        asked.append(url)
-        return _spn2_success(url, data)
-
-    archive(ECFR_URL, json_fn=json_fn, sleep_fn=lambda _s: None, env=KEYS)
-    assert not any("wayback/available" in url for url in asked)
-
-
-def test_a_broken_availability_api_cannot_refuse_a_pin():
-    """The probe is an optimisation; if it dies the pin goes the long way round, as before."""
-    posted = []
-
-    def json_fn(url, headers=None, data=None):
-        if url.startswith("https://archive.org/wayback/available"):
-            raise OSError("availability api down")
-        posted.append(url)
-        return _spn2_success(url, data)
+        if "/cdx/" in url:
+            return _cdx()
+        if data is not None:
+            return {"job_id": "spn2-abc"}
+        return {"status": "success", "timestamp": "20260919120000", "original_url": "http://x/y"}
 
     copy = archive(
         ECFR_URL,
-        expected_sha256=sha256_hex(ARCHIVED_BODY),
+        expected=EXPECTED,
         json_fn=json_fn,
-        fetch_fn=lambda u, h=None: (b"x", "application/pdf"),
+        capture_fn=_served({"20260919120000": ARCHIVED_BODY}),
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [["timestamp", "statuscode", "digest"], 5],  # a row that is not a row
+        [["timestamp", "statuscode", "digest"], ["20260920190851", "200", ["not", "a", "digest"]]],
+        [5, ["20260920190851", "200", "AAA"]],  # a header that is not a header
+    ],
+)
+def test_a_malformed_cdx_listing_cannot_raise_out_of_archive(rows):
+    posted = []
+
+    def json_fn(url, headers=None, data=None):
+        if "/cdx/" in url:
+            return rows
+        return _cdx_then_spn2(_cdx(), posted=posted)(url, headers, data)
+
+    copy = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=json_fn,
+        capture_fn=_served({"20260919120000": ARCHIVED_BODY, "20260920190851": b"x"}),
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert isinstance(copy, ArchiveCopy)
+
+
+def test_a_transport_error_is_not_reported_as_nothing_stored():
+    def capture_fn(url):
+        raise TimeoutError("read timed out")
+
+    result = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=_cdx_then_spn2(_cdx()),
+        capture_fn=capture_fn,
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert isinstance(result, ArchiveFailure)
+    assert result.reason.startswith("new capture could not be checked: ")
+
+
+def test_a_new_capture_served_on_a_later_try_is_attached():
+    served = {"n": 0}
+    later = _served({"20260919120000": ARCHIVED_BODY})
+    early = _served({"20260711041727": b"x"}, redirect={"20260919120000": "20260711041727"})
+
+    def capture_fn(url):
+        served["n"] += 1
+        return (early if served["n"] == 1 else later)(url)
+
+    copy = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=_cdx_then_spn2(_cdx()),
+        capture_fn=capture_fn,
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+    assert served["n"] == 2
+
+
+def test_a_broken_cdx_api_cannot_refuse_a_pin():
+    """The listing is an optimisation; if it dies the pin goes the long way round, as before."""
+    posted = []
+
+    def json_fn(url, headers=None, data=None):
+        if url.startswith("https://web.archive.org/cdx/"):
+            raise OSError("cdx api down")
+        return _cdx_then_spn2(_cdx(), posted=posted)(url, headers, data)
+
+    copy = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=json_fn,
+        capture_fn=_served({"20260919120000": ARCHIVED_BODY}),
         sleep_fn=lambda _s: None,
         env=KEYS,
     )
@@ -885,36 +1114,62 @@ def test_a_broken_availability_api_cannot_refuse_a_pin():
 
 def test_reuse_is_tried_on_the_anonymous_path_too():
     """Nothing about skipping a capture depends on holding keys."""
-    calls = []
-
-    def json_fn(url, headers=None, data=None):
-        calls.append(url)
-        return _available(ECFR_URL)
 
     def headers_fn(url, headers=None):
         raise AssertionError("the anonymous save was called")
 
     copy = archive(
         ECFR_URL,
-        expected_sha256=sha256_hex(ARCHIVED_BODY),
-        json_fn=json_fn,
-        fetch_fn=lambda u, h=None: (ARCHIVED_BODY, "application/pdf"),
+        expected=EXPECTED,
+        json_fn=lambda url, h=None, d=None: _cdx((ARCHIVED_TS, "200", "AAA")),
+        capture_fn=_served({ARCHIVED_TS: ARCHIVED_BODY}),
         headers_fn=headers_fn,
         sleep_fn=lambda _s: None,
         env={},
     )
     assert copy.url == f"https://web.archive.org/web/{ARCHIVED_TS}/{ECFR_URL}"
-    assert calls == [AVAILABLE_URL]
 
 
-def test_add_source_hands_the_artifact_hash_to_the_archiver(tmp_path):
-    """The hash has to reach `archive()` or none of the above can happen from a real pin."""
+def test_an_anonymous_new_capture_is_verified_too():
+    result = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=lambda url, h=None, d=None: _cdx(),
+        headers_fn=lambda u, h=None: {"Content-Location": f"/web/20260919120000/{ECFR_URL}"},
+        capture_fn=_served({"20260919120000": b"not the pinned bytes"}),
+        sleep_fn=lambda _s: None,
+        env={},
+    )
+    assert isinstance(result, ArchiveFailure)
+    assert "does not reproduce" in result.reason
+
+
+def test_archive_without_an_expected_drift_neither_reuses_nor_checks():
+    """No drift value, nothing to check against: no listing, and the capture comes back as-is."""
+    asked = []
+
+    def json_fn(url, headers=None, data=None):
+        asked.append(url)
+        return _cdx_then_spn2(_cdx())(url, headers, data)
+
+    def capture_fn(url):
+        raise AssertionError("a capture was fetched with nothing to check it against")
+
+    copy = archive(
+        ECFR_URL, json_fn=json_fn, capture_fn=capture_fn, sleep_fn=lambda _s: None, env=KEYS
+    )
+    assert not any("/cdx/" in url for url in asked)
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+
+
+def test_add_source_hands_the_pins_drift_value_to_the_archiver(tmp_path):
+    """The drift value has to reach `archive()` or none of the above can happen from a real pin."""
     (tmp_path / "sources").mkdir()
     seen = {}
 
-    def archive_fn(url, *, expected_sha256=None):
+    def archive_fn(url, *, expected=None):
         seen["url"] = url
-        seen["expected_sha256"] = expected_sha256
+        seen["expected"] = expected
         return ArchiveCopy(service="wayback", url="https://web.archive.org/web/1/x")
 
     outcome = add_source(
@@ -922,8 +1177,64 @@ def test_add_source_hands_the_artifact_hash_to_the_archiver(tmp_path):
     )
     assert outcome.status == "written"
     assert seen["url"] == ECFR_URL
-    assert seen["expected_sha256"] == sha256_hex(BODY)
-    assert seen["expected_sha256"] == outcome.source.artifact.sha256
+    assert seen["expected"] == ExpectedDrift("ecfr", "sha256", outcome.source.artifact.sha256)
+
+
+# ------------------------------------------------ response headers are read case-insensitively
+
+
+class _FakeResponse:
+    """What urlopen returns, with headers exactly as Wayback sends them: `content-encoding`."""
+
+    def __init__(self, body, headers, url):
+        self._body, self._url = body, url
+        self.headers = email.message.Message()
+        for key, value in headers.items():
+            self.headers[key] = value
+
+    def read(self):
+        return self._body
+
+    def geturl(self):
+        return self._url
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_decoding_reads_a_lowercase_content_encoding():
+    """The discarded 2026-09-24 run: a plain-dict lookup of "Content-Encoding" missed Wayback's
+    lowercase header and hashed still-gzipped bytes, which read as seven mismatches."""
+    raw = gzip.compress(ARCHIVED_BODY)
+    assert pinmod._decoded(raw, {"content-encoding": "gzip"}) == ARCHIVED_BODY  # noqa: SLF001
+    assert pinmod._decoded(raw, {"Content-Encoding": "gzip"}) == ARCHIVED_BODY  # noqa: SLF001
+
+
+def test_a_capture_fetch_decodes_lowercase_headers_and_says_what_was_served(monkeypatch):
+    final = f"https://web.archive.org/web/{ARCHIVED_TS}id_/{ECFR_URL}"
+    response = _FakeResponse(
+        gzip.compress(ARCHIVED_BODY),
+        {"content-encoding": "gzip", "memento-datetime": _memento(ARCHIVED_TS)},
+        final,
+    )
+    monkeypatch.setattr(pinmod.urllib.request, "urlopen", lambda req, timeout=None: response)
+    body, served_url, headers = pinmod._fetch_capture(final)  # noqa: SLF001
+    assert body == ARCHIVED_BODY
+    assert served_url == final
+    assert pinmod._served_timestamps(served_url, headers) == {ARCHIVED_TS}  # noqa: SLF001
+
+
+def test_default_fetch_decodes_a_lowercase_content_encoding(monkeypatch):
+    response = _FakeResponse(
+        gzip.compress(BODY),
+        {"content-encoding": "gzip", "content-type": "application/xml"},
+        ECFR_URL,
+    )
+    monkeypatch.setattr(pinmod.urllib.request, "urlopen", lambda req, timeout=None: response)
+    assert default_fetch(ECFR_URL) == (BODY, "application/xml")
 
 
 # ------------------------------------------------------------------- 429 is a rate, not a fault

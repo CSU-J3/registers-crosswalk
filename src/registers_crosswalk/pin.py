@@ -60,18 +60,23 @@ FetchFn = Callable[[str, Mapping[str, str] | None], tuple[bytes, str]]
 # archive() needs RESPONSE HEADERS rather than a body (Wayback answers in Content-Location), so it
 # gets its own injection point of a different shape. Same rule, different signature.
 HeadersFn = Callable[[str, Mapping[str, str] | None], Mapping[str, str]]
-# SPN2 answers in a JSON body rather than in response headers, so the keyed path needs a third
-# injection point. (url, headers, data) -> parsed JSON; `data` None is a GET, bytes is a POST.
-JsonFn = Callable[[str, Mapping[str, str] | None, bytes | None], Mapping[str, object]]
+# SPN2 and the CDX API answer in a JSON body rather than in response headers, so they share a
+# third injection point. (url, headers, data) -> parsed JSON: an object from SPN2, a list of rows
+# from CDX. `data` None is a GET, bytes is a POST.
+JsonFn = Callable[[str, Mapping[str, str] | None, bytes | None], object]
 # Polling has to wait between attempts; tests pass a fake so the suite neither sleeps nor drifts.
 SleepFn = Callable[[float], None]
+# Fetching a capture's `id_` copy has to say WHICH capture Wayback served: it redirects a timestamp
+# it does not hold to the nearest one it does. So this fetch also returns the final URL after
+# redirects and the response headers (for Memento-Datetime). (url) -> (body, final url, headers)
+CaptureFn = Callable[[str], tuple[bytes, str, Mapping[str, str]]]
 # The CLI's archiving step, injected for the same reason: tests stay offline. `archive()` answers
 # an ArchiveFailure when there is no capture; a plain None is still accepted from an injected fake
 # and normalised by `add_source`, so a test double stays a one-liner.
 #
-# Called as `archive_fn(url, expected_sha256=...)`. The hash is what lets an already-archived
-# document skip Save Page Now, and it is keyword-only so a fake that does not care can take
-# `**_` and ignore it.
+# Called as `archive_fn(url, expected=ExpectedDrift(...))`. The pin's drift value is what a capture
+# must reproduce before it is attached, reused or new; it is keyword-only so a fake that does not
+# care can take `**_` and ignore it.
 ArchiveFn = Callable[..., "ArchiveCopy | ArchiveFailure | None"]
 
 _UA = "registers-crosswalk/0.1 (+https://github.com/CSU-J3/registers-crosswalk)"
@@ -118,13 +123,24 @@ def default_fetch(
     req = urllib.request.Request(url, headers={**_BASE_HEADERS, **(headers or {})})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         raw = resp.read()
-        encoding = (resp.headers.get("Content-Encoding") or "").lower()
-        media_type = _media_type(resp.headers.get("Content-Type"))
+        media_type = _media_type(_header(resp.headers, "Content-Type"))
+        return _decoded(raw, resp.headers), media_type
+
+
+def _decoded(raw: bytes, headers: Mapping[str, str]) -> bytes:
+    """`raw` with its Content-Encoding undone. The hash is ALWAYS over the decoded bytes.
+
+    The header is looked up case-insensitively, always. Wayback sends `content-encoding` in
+    lowercase, and an exact-case lookup of a plain dict of those headers hashed still-gzipped bytes
+    for seven courtlistener captures in a verification run on 2026-09-24, which then read as seven
+    mismatches.
+    """
+    encoding = (_header(headers, "Content-Encoding") or "").lower()
     if encoding == "gzip":
-        raw = gzip.decompress(raw)
-    elif encoding == "deflate":
-        raw = zlib.decompress(raw)
-    return raw, media_type
+        return gzip.decompress(raw)
+    if encoding == "deflate":
+        return zlib.decompress(raw)
+    return raw
 
 
 @dataclass(frozen=True)
@@ -292,9 +308,20 @@ _ARCHIVE_RETRY_WAITS: tuple[float, ...] = (10.0, 20.0, 30.0)
 # waits is not going to lift inside this pin.
 _RATE_LIMIT_TRIES = 3
 _RATE_LIMIT_WAIT = 60.0
-# Where to ask whether a capture already exists. Read-only, and not part of Save Page Now: asking
-# costs nothing and takes no capture.
-_WAYBACK_AVAILABLE = "https://archive.org/wayback/available"
+# Where to ask which captures already exist. Read-only, and not part of Save Page Now: asking
+# costs nothing and takes no capture. The CDX API lists every capture of a url; the availability
+# API it replaced returns only the one closest, which is no help when that one does not verify.
+_WAYBACK_CDX = "https://web.archive.org/cdx/search/cdx"
+# How many existing captures reuse will fetch before giving up and asking for a new one. Captures
+# whose CDX digest already failed to reproduce the pin are skipped without counting, since a digest
+# names the payload.
+_REUSE_TRIES = 8
+# A new capture is checked by fetching it back at its exact timestamp. Wayback can take a while to
+# serve one it has just taken, answering 404 or redirecting to a different timestamp meanwhile, so
+# the check is tried three times over ten minutes before the capture is reported as "capture not
+# stored at returned timestamp" (or "could not be checked", when the last try failed in transport).
+_NEW_CAPTURE_WAITS: tuple[float, ...] = (0.0, 300.0, 300.0)
+_SERVED_TS = re.compile(r"/web/(\d{14})id_/")
 
 
 def _response_headers(
@@ -303,6 +330,16 @@ def _response_headers(
     req = urllib.request.Request(url, headers={**_BASE_HEADERS, **(headers or {})})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return dict(resp.headers)
+
+
+def _fetch_capture(url: str, *, timeout: float = 90) -> tuple[bytes, str, Mapping[str, str]]:
+    """`default_fetch`'s request, returning the final URL and the headers along with the body."""
+    req = urllib.request.Request(url, headers=_BASE_HEADERS)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read()
+        final = resp.geturl()
+        headers = {key.lower(): value for key, value in resp.headers.items()}
+    return _decoded(raw, headers), final, headers
 
 
 def _json_call(
@@ -332,6 +369,74 @@ def _capture_from_timestamp(url: str, timestamp: str) -> ArchiveCopy:
         url=f"https://web.archive.org/web/{timestamp}/{url}",
         captured_at=datetime.strptime(timestamp, "%Y%m%d%H%M%S").replace(tzinfo=UTC),
     )
+
+
+@dataclass(frozen=True)
+class ExpectedDrift:
+    """What a capture must reproduce before it is attached to a pin: the pin's drift value.
+
+    One rule for every capture, reused or new: its `id_` copy, fetched at its exact timestamp,
+    must give the pin's drift value when the pin's own fetcher reads it. For a fixed document that
+    is the sha256 of the bytes. For a U.S. Code prelim it is the section's last amendment, because
+    the page carries per-request session data and its bytes never match twice.
+    """
+
+    fetcher: Fetcher
+    drift_key: DriftKey
+    drift_value: str
+
+    @classmethod
+    def of(cls, source: Source) -> ExpectedDrift:
+        return cls(source.fetcher, source.artifact.drift_key, source.artifact.drift_value)
+
+    def reproduced_by(self, body: bytes) -> bool:
+        from . import fetchers
+
+        try:
+            return fetchers.drift_value(self.fetcher, body) == self.drift_value
+        except Exception:  # noqa: BLE001 - a page the fetcher cannot parse reproduces nothing
+            return False
+
+
+CaptureVerdict = Literal["ok", "not_served", "mismatch"]
+
+
+def _served_timestamps(final_url: str, headers: Mapping[str, str]) -> set[str]:
+    """The capture Wayback actually served, from the final URL and from Memento-Datetime."""
+    served = set()
+    m = _SERVED_TS.search(final_url)
+    if m is not None:
+        served.add(m.group(1))
+    memento = _header(headers, "Memento-Datetime")
+    if memento:
+        try:
+            served.add(parsedate_to_datetime(memento).astimezone(UTC).strftime("%Y%m%d%H%M%S"))
+        except (TypeError, ValueError):
+            pass
+    return served
+
+
+def _check_capture(
+    url: str, timestamp: str, expected: ExpectedDrift, *, capture_fn: CaptureFn
+) -> tuple[CaptureVerdict, str]:
+    """Fetch the capture of `url` at exactly `timestamp` and say whether it reproduces `expected`.
+
+    `not_served` when Wayback served some other capture (it redirects a timestamp it does not hold
+    to the nearest one it does), `mismatch` when it served that capture and the bytes do not give
+    the pin's drift value. Drift values are compared only once the served timestamp is the one
+    asked for. A transport error propagates; the caller decides what it means.
+    """
+    body, final, headers = capture_fn(f"https://web.archive.org/web/{timestamp}id_/{url}")
+    served = _served_timestamps(final, headers)
+    if served != {timestamp}:
+        shown = ", ".join(sorted(served)) or "a capture with no timestamp"
+        return "not_served", f"Wayback served {shown} for {timestamp}"
+    if not expected.reproduced_by(body):
+        return (
+            "mismatch",
+            f"the capture at {timestamp} does not reproduce the pin's {expected.drift_key}",
+        )
+    return "ok", f"the capture at {timestamp} reproduces the pin's {expected.drift_key}"
 
 
 @dataclass(frozen=True)
@@ -427,12 +532,14 @@ def _retrying(
 
 def _existing_capture(
     url: str,
-    expected_sha256: str,
+    expected: ExpectedDrift,
     *,
     json_fn: JsonFn,
-    fetch_fn: FetchFn,
+    capture_fn: CaptureFn,
+    sleep_fn: SleepFn,
+    why: list[str] | None = None,
 ) -> ArchiveCopy | None:
-    """A capture Wayback already holds whose BYTES are the ones we pinned, or None.
+    """The newest capture Wayback already holds that reproduces the pin's drift value, or None.
 
     Asking first is worth a request because Save Page Now will not take a new capture of a url it
     captured in the last hour anyway — it answers `success` with the older capture's timestamp
@@ -440,33 +547,132 @@ def _existing_capture(
     document already in the archive, the SPN2 round trip buys nothing and costs a write against a
     rate-limited service. This route skips it.
 
-    The hash is the whole safety of it. An availability hit says only that SOMETHING was captured
-    at that url, which is a different claim from "the bytes we pinned are recoverable" — a url
-    that served a different document last year has a capture, and reusing it would attach a
-    recoverable copy of the wrong thing to the record. So the capture's own bytes are fetched
-    through the `id_` form (which serves the original response, without Wayback's banner or any
-    rewriting) and hashed, and anything but an exact match falls through to a real capture.
+    The drift value is the whole safety of it. A capture of that url says only that SOMETHING was
+    captured there, which is a different claim from "what we pinned is recoverable": a url that
+    served a different document last year has a capture, and reusing it would attach a recoverable
+    copy of the wrong thing to the record. So the CDX API lists every capture, newest first, and
+    each one's own bytes are fetched through the `id_` form (the original response, without
+    Wayback's banner or rewriting) at its exact timestamp. The first that Wayback serves at that
+    timestamp and that reproduces the pin's drift value is the one reused.
 
     Best-effort in both directions: any failure here returns None and the caller asks SPN2, which
-    is what it would have done anyway. A broken availability API must not be able to refuse a pin.
+    is what it would have done anyway. A broken CDX API must not be able to refuse a pin. The
+    listing is retried on a 5xx or a 429, as Save Page Now is: the CDX API answered 503 twice in a
+    row on 2026-09-24 and then served the listing. With `why`, a list, the reason nothing was
+    found is appended to it for a caller that reports one (`repair_archive`).
     """
+
+    def found_nothing(reason: str) -> None:
+        if why is not None:
+            why.append(reason)
+
+    query = urlencode({"url": url, "output": "json", "fl": "timestamp,statuscode,digest"})
     try:
-        payload = json_fn(f"{_WAYBACK_AVAILABLE}?{urlencode({'url': url})}", None, None)
-        snapshot = ((payload.get("archived_snapshots") or {}) or {}).get("closest") or {}
-        if not isinstance(snapshot, Mapping):
+        rows = _retrying(lambda: json_fn(f"{_WAYBACK_CDX}?{query}", None, None), sleep_fn=sleep_fn)
+        # Parsed inside the try: a malformed listing is a broken optimisation, not an error.
+        if not isinstance(rows, list) or len(rows) < 2 or "timestamp" not in rows[0]:
+            found_nothing(f"the CDX API lists no capture of {url}")
             return None
-        timestamp = snapshot.get("timestamp")
-        if not snapshot.get("available") or not timestamp:
-            return None
-        # `id_` asks for the archived response as it was served. Without it Wayback returns the
-        # document wrapped in its own toolbar and with links rewritten, which would never hash to
-        # what we pinned and would make this check always fail.
-        body, _ = fetch_fn(f"https://web.archive.org/web/{timestamp}id_/{url}", None)
-    except Exception:  # noqa: BLE001 - an optimisation may not raise; fall through to SPN2
+        entries = [dict(zip(rows[0], row, strict=False)) for row in rows[1:]]
+    except Exception as exc:  # noqa: BLE001 - an optimisation may not raise; fall through to SPN2
+        code = getattr(exc, "code", None)
+        found_nothing(
+            f"the CDX listing of {url} could not be read "
+            f"({f'HTTP {code}' if code else type(exc).__name__})"
+        )
         return None
-    if sha256_hex(body) != expected_sha256:
-        return None
-    return _capture_from_timestamp(url, str(timestamp))
+    rejected_digests: set[str] = set()
+    tried = 0
+    counts = {"mismatch": 0, "not_served": 0, "unreachable": 0}
+    for entry in sorted(entries, key=lambda e: str(e.get("timestamp", "")), reverse=True):
+        timestamp, digest = str(entry.get("timestamp", "")), str(entry.get("digest") or "")
+        # "-" is a revisit record, whose payload is an earlier capture's; a 3xx, 4xx or 5xx
+        # capture holds no document at all.
+        if entry.get("statuscode") not in ("200", "-") or len(timestamp) != 14:
+            continue
+        if digest and digest in rejected_digests:
+            continue
+        if tried >= _REUSE_TRIES:
+            break
+        tried += 1
+        try:
+            verdict, _ = _check_capture(url, timestamp, expected, capture_fn=capture_fn)
+        except Exception:  # noqa: BLE001 - one unreachable capture is not a reason to stop
+            counts["unreachable"] += 1
+            continue
+        if verdict == "ok":
+            return _capture_from_timestamp(url, timestamp)
+        counts[verdict] += 1
+        if verdict == "mismatch" and digest:
+            rejected_digests.add(digest)
+    found_nothing(
+        f"none of the {tried} capture(s) of {url} tried reproduces the pin's {expected.drift_key} "
+        f"({counts['mismatch']} did not match, {counts['not_served']} were served under another "
+        f"timestamp, {counts['unreachable']} could not be fetched"
+        + (f"; the search stops at {_REUSE_TRIES}" if tried >= _REUSE_TRIES else "")
+        + ")"
+    )
+    return None
+
+
+def _verified_new_capture(
+    url: str,
+    copy: ArchiveCopy,
+    expected: ExpectedDrift,
+    *,
+    capture_fn: CaptureFn,
+    sleep_fn: SleepFn,
+) -> ArchiveCopy | ArchiveFailure:
+    """`copy`, if its `id_` copy at the timestamp Save Page Now reported reproduces the pin.
+
+    Save Page Now's word that it took a capture is not a check of what it took: on 2026-09-22 it
+    reported two captures (xr_src_0012, xr_src_0013) that the CDX API still does not hold, so both
+    records named captures Wayback serves only by redirecting to an older one. So the capture is
+    fetched back at its exact timestamp. Nothing stored there (a 404, or a redirect to a different
+    timestamp) is retried, three tries over ten minutes, since a capture can take a while to become
+    servable, and is then reported as "capture not stored at returned timestamp". A capture that is
+    served and does not reproduce the pin is refused at once. A transport error on the last try
+    says so instead, since it is no evidence of what is stored.
+    """
+    m = _WAYBACK_TS.search(copy.url)
+    if m is None:
+        return ArchiveFailure(
+            f"new capture {copy.url} has no timestamp to verify; nothing attached"
+        )
+    timestamp = m.group(1)
+    last, not_stored = "not tried", True
+    for wait in _NEW_CAPTURE_WAITS:
+        if wait:
+            sleep_fn(wait)
+        try:
+            verdict, detail = _check_capture(url, timestamp, expected, capture_fn=capture_fn)
+        except urllib.error.HTTPError as exc:
+            # A 404 is Wayback saying nothing is stored at that timestamp; anything else is not.
+            last, not_stored = f"HTTP {exc.code}", exc.code == 404
+            continue
+        except Exception as exc:  # noqa: BLE001 - retried; it says nothing about what is stored
+            last, not_stored = f"{type(exc).__name__}: {exc}", False
+            continue
+        if verdict == "ok":
+            # The capture that was checked: the pin's URL at the timestamp Save Page Now reported,
+            # not whatever `original_url` or Content-Location spelled it as.
+            return _capture_from_timestamp(url, timestamp)
+        if verdict == "mismatch":
+            return ArchiveFailure(
+                f"new capture does not reproduce the pin's {expected.drift_key}: {copy.url}; "
+                "nothing attached"
+            )
+        last, not_stored = detail, True
+    tries = (
+        f"{len(_NEW_CAPTURE_WAITS)} tries over {sum(_NEW_CAPTURE_WAITS) / 60:.0f} minutes ({last})"
+    )
+    if not_stored:
+        return ArchiveFailure(
+            f"capture not stored at returned timestamp: {copy.url}, after {tries}; nothing attached"
+        )
+    return ArchiveFailure(
+        f"new capture could not be checked: {copy.url}, after {tries}; nothing attached"
+    )
 
 
 def _archive_spn2(
@@ -484,9 +690,9 @@ def _archive_spn2(
     capture, the same as an error, because the caller has a pin to write or refuse now.
 
     A `success` here does NOT mean a capture was just taken. SPN2 reuses a capture under an hour
-    old and says so in `message`, returning that older capture's timestamp — which is a real
-    capture of the same bytes, so it is accepted, but it is why an archive can predate the fetch
-    it belongs to. See docs/operations.md.
+    old and says so in `message`, returning that older capture's timestamp. This function passes it
+    on as a success; `archive()` then checks it like any new capture, fetching it back at that
+    timestamp. It is why an archive can predate the fetch it belongs to. See docs/operations.md.
     """
     headers = {**auth, "Accept": "application/json"}
     started = _retrying(
@@ -527,10 +733,10 @@ def _archive_spn2(
 def archive(
     url: str,
     *,
-    expected_sha256: str | None = None,
+    expected: ExpectedDrift | None = None,
     headers_fn: HeadersFn | None = None,
     json_fn: JsonFn | None = None,
-    fetch_fn: FetchFn | None = None,
+    capture_fn: CaptureFn | None = None,
     sleep_fn: SleepFn | None = None,
     timeout: float = 90,
     env: Mapping[str, str] | None = None,
@@ -542,9 +748,12 @@ def archive(
     `add_source` can print a reason the operator can act on rather than one sentence for all of
     them. A transient 5xx or a 429 is retried first; see `_retrying`.
 
-    With `expected_sha256`, an existing capture whose bytes hash to it is returned as-is and no
-    capture is requested at all — see `_existing_capture`. Without it there is no reuse, because
-    reuse is conditional on the bytes matching and there would be nothing to match them against.
+    With `expected`, the pin's drift value, every capture is checked before it is returned: an
+    existing one that reproduces it is reused and no capture is requested at all (see
+    `_existing_capture`), and a new one is fetched back at its exact timestamp and returned only if
+    it reproduces it too (see `_verified_new_capture`). Without it there is no reuse and no check,
+    because there would be nothing to check against; every caller that attaches a capture to a
+    record passes it.
 
     Two interfaces, chosen by whether WAYBACK_ACCESS_KEY/WAYBACK_SECRET_KEY are both set. With
     keys, the documented SPN2 job interface: POST the url, poll the job, read `timestamp` from the
@@ -562,20 +771,35 @@ def archive(
     env = os.environ if env is None else env
     sleep_fn = sleep_fn or time.sleep
     json_call = json_fn or functools.partial(_json_call, timeout=timeout)
+    capture_call = capture_fn or functools.partial(_fetch_capture, timeout=timeout)
 
-    # Ask before asking for a capture. Only with a hash to check it against: an archive is reused
-    # when its BYTES are the ones we pinned, never merely because a capture of that url exists.
-    # Without `expected_sha256` there is nothing to check, so there is no reuse.
-    if expected_sha256:
+    # Ask before asking for a capture, and only with a drift value to check against: a capture is
+    # reused when it reproduces what we pinned, never merely because a capture of that url exists.
+    if expected is not None:
         existing = _existing_capture(
-            url,
-            expected_sha256,
-            json_fn=json_call,
-            fetch_fn=fetch_fn or functools.partial(default_fetch, timeout=timeout),
+            url, expected, json_fn=json_call, capture_fn=capture_call, sleep_fn=sleep_fn
         )
         if existing is not None:
             return existing
 
+    new = _new_capture(
+        url, env=env, headers_fn=headers_fn, json_fn=json_call, sleep_fn=sleep_fn, timeout=timeout
+    )
+    if isinstance(new, ArchiveFailure) or expected is None:
+        return new
+    return _verified_new_capture(url, new, expected, capture_fn=capture_call, sleep_fn=sleep_fn)
+
+
+def _new_capture(
+    url: str,
+    *,
+    env: Mapping[str, str],
+    headers_fn: HeadersFn | None,
+    json_fn: JsonFn,
+    sleep_fn: SleepFn,
+    timeout: float,
+) -> ArchiveCopy | ArchiveFailure:
+    """Ask Save Page Now for a capture of `url`: SPN2 with keys, the anonymous save without."""
     auth: dict[str, str] = {}
     access, secret = env.get("WAYBACK_ACCESS_KEY"), env.get("WAYBACK_SECRET_KEY")
     if access and secret:
@@ -585,7 +809,7 @@ def archive(
             return _archive_spn2(
                 url,
                 auth,
-                json_fn=json_call,
+                json_fn=json_fn,
                 sleep_fn=sleep_fn,
                 timeout=timeout,
             )
@@ -1023,7 +1247,7 @@ class AddOutcome:
     unchanged, so the two cannot describe the same refusal differently.
     """
 
-    status: Literal["written", "refused", "archive_failed"]
+    status: Literal["written", "unchanged", "refused", "archive_failed"]
     message: str
     source: Source | None = None
     path: Path | None = None
@@ -1111,9 +1335,9 @@ def add_source(
 
     archives: list[ArchiveCopy] = []
     if archive:
-        # The hash goes with the request so `archive()` can recognise a capture that already
-        # holds these exact bytes and skip asking for a new one.
-        result = archive_fn(source.canonical_url, expected_sha256=source.artifact.sha256)
+        # The drift value goes with the request: `archive()` attaches no capture, reused or new,
+        # that does not reproduce it.
+        result = archive_fn(source.canonical_url, expected=ExpectedDrift.of(source))
         if not isinstance(result, ArchiveCopy):
             # --archive is a requirement, not a courtesy: the caller asked for a recoverable pin
             # and we could not make one, so there is nothing worth writing. What differs now is
@@ -1178,8 +1402,8 @@ def archive_source(
     the service is up, without re-fetching the document or re-deciding anything about it.
 
     It goes through the SAME `archive_fn` the CLI hands `add_source`, so the reuse-or-capture path
-    is one implementation: an existing capture whose bytes hash to this artifact is adopted without
-    asking Save Page Now for anything, exactly as it would be at pin time.
+    is one implementation: an existing capture that reproduces this pin's drift value is adopted
+    without asking Save Page Now for anything, exactly as it would be at pin time.
 
     Only the `archives` field is rewritten. Everything else in the file is left as the bytes it
     already was — this is an amendment to one fact about a record, not a re-serialisation of it,
@@ -1197,7 +1421,7 @@ def archive_source(
             message=f"{xr_id} already has an archive copy: {held.url}",
         )
 
-    result = archive_fn(source.canonical_url, expected_sha256=source.artifact.sha256)
+    result = archive_fn(source.canonical_url, expected=ExpectedDrift.of(source))
     if not isinstance(result, ArchiveCopy):
         reason = (
             result.reason
@@ -1205,8 +1429,17 @@ def archive_source(
             else f"no capture returned for {source.canonical_url}; nothing written"
         )
         return AddOutcome(status="archive_failed", message=f"archive step failed: {reason}")
+    return _write_archives(
+        xw, source, [result], data_dir=data_dir, message=f"archived {xr_id}: {result.url}"
+    )
 
-    updated = Source.model_validate(source.model_copy(update={"archives": [result]}).model_dump())
+
+def _write_archives(
+    xw: Crosswalk, source: Source, archives: list[ArchiveCopy], *, data_dir: Path, message: str
+) -> AddOutcome:
+    """Validate `source` with `archives`, then rewrite that one field of its record and no other."""
+    xr_id = source.xr_id
+    updated = Source.model_validate(source.model_copy(update={"archives": archives}).model_dump())
     # The read path is the authority here too: an archive can make a record invalid (a cited
     # source is REQUIRED to carry one, and the rules about what an archive may be live in the
     # same place), so the amended record goes through the same gate `add` uses before it is
@@ -1220,14 +1453,109 @@ def archive_source(
     # Read, touch one key, write. Not `model_dump_json` of the whole node: that would rewrite
     # every field and turn a one-fact amendment into a diff nobody can read.
     record = json.loads(path.read_text(encoding="utf-8"))
-    record["archives"] = [result.model_dump(mode="json")]
+    record["archives"] = [a.model_dump(mode="json") for a in archives]
     path.write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return AddOutcome(
         status="written",
-        message=f"archived {xr_id}: {result.url}",
+        message=message,
         source=updated,
         path=path,
         ledger=to_ledger_markdown(updated),
+    )
+
+
+def repair_archive(
+    xr_id: str,
+    *,
+    data_dir: Path,
+    json_fn: JsonFn | None = None,
+    capture_fn: CaptureFn | None = None,
+    sleep_fn: SleepFn | None = None,
+) -> AddOutcome:
+    """Re-verify a pin's attached capture at its exact timestamp, and replace it if it fails.
+
+    If the attached capture reproduces the pin's drift value, nothing changes. If Wayback serves
+    some other capture for its timestamp, answers 404 for it, or the bytes do not reproduce the
+    pin, the newest existing capture that does (`_existing_capture`, through the CDX API) replaces
+    that entry, and only the `archives` field is rewritten. If none can be verified, if the
+    attached capture cannot be reached at all, or if it is not a Wayback capture with a timestamp
+    (a Perma.cc or GovInfo copy), nothing changes and the reason is reported. Never requests a
+    new capture.
+    """
+    capture_call = capture_fn or _fetch_capture
+    json_call = json_fn or _json_call
+    xw = Crosswalk(data_dir)
+    source = xw.sources.get(xr_id)
+    if source is None:
+        return AddOutcome(status="refused", message=f"unknown source {xr_id!r}")
+    if not source.archives:
+        return AddOutcome(
+            status="refused",
+            message=f"{xr_id} has no archive copy to repair; `pin archive` adds one",
+        )
+    held = source.archives[0]
+    expected = ExpectedDrift.of(source)
+    m = _WAYBACK_TS.search(held.url)
+    # Only a Wayback capture it can check is ever replaced. Anything else (a Perma.cc or GovInfo
+    # copy, or a Wayback URL with no timestamp) is left as it is: unchecked is not wrong.
+    if held.service != "wayback" or m is None:
+        return AddOutcome(
+            status="refused",
+            message=(
+                f"{xr_id}: the attached {held.service} copy {held.url} is not a Wayback capture "
+                "with a timestamp, so repair cannot check it; nothing changed"
+            ),
+        )
+    try:
+        # The capture the record names: its own URL at its own timestamp.
+        verdict, detail = _check_capture(
+            held.url[m.end() :], m.group(1), expected, capture_fn=capture_call
+        )
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            return AddOutcome(
+                status="archive_failed",
+                message=(
+                    f"{xr_id}: could not reach the attached capture {held.url} "
+                    f"(HTTP {exc.code}); nothing changed"
+                ),
+            )
+        # A 404 is Wayback saying nothing is stored there, as `_verified_new_capture` reads it.
+        verdict, detail = "not_served", f"Wayback holds nothing at {m.group(1)} (HTTP 404)"
+    except Exception as exc:  # noqa: BLE001 - unreachable is not the same as wrong
+        return AddOutcome(
+            status="archive_failed",
+            message=(
+                f"{xr_id}: could not reach the attached capture {held.url} "
+                f"({type(exc).__name__}: {exc}); nothing changed"
+            ),
+        )
+    if verdict == "ok":
+        return AddOutcome(
+            status="unchanged",
+            message=f"{xr_id}: {detail}; nothing changed ({held.url})",
+            source=source,
+        )
+    why: list[str] = []
+    found = _existing_capture(
+        source.canonical_url,
+        expected,
+        json_fn=json_call,
+        capture_fn=capture_call,
+        sleep_fn=sleep_fn or time.sleep,
+        why=why,
+    )
+    if found is None:
+        return AddOutcome(
+            status="archive_failed",
+            message=f"{xr_id}: {detail}, and {why[-1]}; nothing changed",
+        )
+    return _write_archives(
+        xw,
+        source,
+        [found, *source.archives[1:]],
+        data_dir=data_dir,
+        message=f"repaired {xr_id}: {held.url} -> {found.url} ({detail})",
     )
 
 
@@ -1317,10 +1645,18 @@ def _cmd_add(
 def _cmd_archive(
     args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
 ) -> int:
-    """argparse in, exit code out. The guards and the write live in `archive_source`."""
+    """argparse in, exit code out. The guards and the write live in `archive_source` and
+    `repair_archive`."""
     del fetch  # the document is not re-fetched: this amends a record, it does not re-pin one
-    del sleep_fn  # the archive step keeps its own waits, inside archive_fn
-    outcome = archive_source(args.xr_id, data_dir=args.data_dir, archive_fn=archive_fn)
+    if args.repair:
+        # The CDX listing is retried on a 5xx; its waits go through the injected sleep.
+        outcome = repair_archive(args.xr_id, data_dir=args.data_dir, sleep_fn=sleep_fn)
+    else:
+        # the archive step keeps its own waits, inside archive_fn
+        outcome = archive_source(args.xr_id, data_dir=args.data_dir, archive_fn=archive_fn)
+    if outcome.status == "unchanged":
+        print(outcome.message)
+        return 0
     if outcome.status != "written":
         print(outcome.message, file=sys.stderr)
         return 1
@@ -1531,6 +1867,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     archive_parser.set_defaults(handler=_cmd_archive)
     archive_parser.add_argument("xr_id", type=_src_id_arg, metavar="xr_src_NNNN")
+    archive_parser.add_argument(
+        "--repair",
+        action="store_true",
+        help="re-verify the attached capture at its exact timestamp; replace it only if it fails",
+    )
 
     note_parser = sub.add_parser(
         "note", help="set a pin's notes label (offline; nothing else moves)"

@@ -473,6 +473,17 @@ unarchived, per the courtlistener fallback, and are listed for `pin archive`. Th
 records that can be fetched again by file number, and each pin's sha256 is what any copy has to
 match.
 
+**The manifest lists what can be checked; the record lists what was pinned.**
+`pin ledger --format manifest` prints `sha256sum` lines only for pins whose drift key is `sha256`,
+the ones whose bytes can be re-obtained and checked, and names the rest on stderr. It is the same
+list, byte for byte, as the `MANIFEST.sha256` that `pin blobs` writes for the same pins.
+`pin ledger --format record` lists every pin: sha256, id, fetch time (UTC), drift key, `manifest`
+or `record-only`, and citation. The three U.S. Code prelims (`xr_src_0005`, `xr_src_0024`,
+`xr_src_0056`) are record-only. Their pages vary per request, so the bytes they hash to exist
+nowhere, and their Wayback copies are their preservation copies. Both formats end lines with
+`\n` on every platform, because a Windows redirect of `print()` wrote `\r\n`, and
+`sha256sum -c` read the `\r` as part of each filename.
+
 **The preservation copy.** For FEC filings, the preservation copy is New Gray's hashed blob, saved
 under its manifest name; the FEC is the repository of record, with a statutory retention floor of
 ten years from receipt, five for filings relating solely to House candidates (52 U.S.C.
@@ -698,20 +709,54 @@ hour.** Ask SPN2 to capture a URL it captured within the last hour and it does n
 again: it answers `success` with the OLDER capture's timestamp and says so in `message` ("The same
 snapshot had been made 18 minutes ago. You can make new capture of this URL after 1 hour").
 Observed on 2026-09-20 against `harvard_pdf/102372.pdf` — `duration_sec: 0.52`, `resources: []`,
-nothing fetched. `archive()` accepts that answer, because it points at a real capture of the same
-document, which is all the pin needs. But it means `archives[0].captured_at` can be up to an hour
+nothing fetched. `archive()` treats that answer like any new capture: it fetches the `id_` copy at
+the timestamp Save Page Now reported and attaches it only if that copy reproduces the pin (below).
+But it means `archives[0].captured_at` can be up to an hour
 EARLIER than `artifact.fetched_at` on a freshly written record, and a second pin of one document
 inside that hour carries the first pin's capture. Neither is a fault; read a capture that predates
 its fetch as "this is the copy Wayback already had", not as a clock problem.
 
-Because of that, `archive()` asks first. It queries `https://archive.org/wayback/available` before
-requesting anything, and **an archive is reused only when its bytes hash to the pinned artifact** —
-fetched through the `id_` form, which serves the archived response as it was rather than wrapped in
-Wayback's toolbar. An availability hit alone is not enough: it says something was captured at that
-url, which is a different claim from "the bytes we pinned are recoverable", and a url that served a
-different document last year has a capture too. No hash, no reuse; a mismatch, no reuse; either way
-it falls through and asks Save Page Now for a real one. The probe is an optimisation, so a broken
-availability API cannot refuse a pin — it just means the long way round.
+**Every capture is checked against its pin before it is attached, reused or new.** The rule is
+one sentence: a capture is attached only if its `id_` copy, fetched at its exact 14-digit
+timestamp, reproduces the pin's drift value. For a fixed document that is the sha256 of the bytes.
+For a U.S. Code prelim it is the section's last amendment, because the page carries per-request
+session data and its bytes never match twice; the prelims are the one case where the match is by
+date, not by bytes. The `id_` form serves the archived response as it was, not wrapped in
+Wayback's toolbar. The exact timestamp matters because Wayback redirects a timestamp it doesn't
+hold to the nearest capture it does, so drift values are compared only when the capture it served,
+read from the final URL and `Memento-Datetime`, is the one asked for.
+
+So `archive()` asks first. It lists the URL's captures from the CDX API, newest first, and reuses
+the first that reproduces the pin. It skips any capture whose CDX digest already failed, since a
+digest names a payload. A capture of that URL is not enough on its own: a URL that served a
+different document last year has a capture too. If none reproduces the pin, Save Page Now is asked
+for a new capture, and that capture is fetched back at the timestamp it reported:
+- If it's served and reproduces the pin, it is attached.
+- If it's served and doesn't, it is refused ("new capture does not reproduce the pin's
+  `<drift key>`").
+- If nothing is stored at that timestamp yet (a 404, or a redirect to a different capture, even
+  one whose bytes would match), it is tried three times over ten minutes, then reported as
+  "capture not stored at returned timestamp" with nothing attached.
+- If the last try fails for another reason (a timeout, or an HTTP error other than 404), it is
+  reported as "new capture could not be checked", since that says nothing about what is stored.
+
+The listing is an optimisation, so a broken CDX API can't refuse a pin; it just means the long way
+round. A 5xx or 429 from it is retried the way Save Page Now's are: on 2026-09-24 it answered 503
+twice in a row and then served the listing.
+
+Why the new capture is checked too: on 2026-09-22 Save Page Now reported captures for
+`xr_src_0012` and `xr_src_0013` at timestamps the CDX API still didn't hold two days later, and
+Wayback served both only by redirecting to a 2026-07-11 capture. Nothing checked them before the
+records were written. A read-only check of all twenty attached captures on 2026-09-24 found those
+two and no others: the other eighteen reproduce their pins at their exact timestamps.
+
+**`pin archive --repair xr_src_NNNN`** re-verifies a pin's attached capture at its exact
+timestamp. If it verifies, nothing changes. If Wayback serves another capture for that timestamp,
+answers 404 for it, or the bytes don't reproduce the pin, the newest existing capture that does
+replaces the entry, and only the record's `archives` field is rewritten. Nothing changes, and the
+reason is reported, if no existing capture can be verified, if the attached capture can't be
+reached at all, or if it isn't a Wayback capture with a timestamp (a Perma.cc or GovInfo copy is
+left alone). It never asks for a new capture.
 
 **A 5xx from Wayback is retried; a 4xx is not.** `POST /save` answered 503 with an HTML "Internet
 Archive: Temporarily Offline" page at 19:22 UTC on 2026-09-20 and was serving normally by 19:23.

@@ -7,8 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from registers_crosswalk.models import ArchiveCopy
-from registers_crosswalk.pin import ArchiveFailure, main, sha256_hex, to_manifest_line
+from registers_crosswalk.models import ArchiveCopy, Source
+from registers_crosswalk.pin import (
+    ArchiveFailure,
+    main,
+    save_blobs,
+    sha256_hex,
+    to_manifest_line,
+)
 from registers_crosswalk.registry import Crosswalk
 
 DATA = Path(__file__).resolve().parents[1] / "data"
@@ -325,6 +331,218 @@ def test_the_manifest_verifies_with_real_sha256sum(tmp_path, capsys):
 
     assert verify() == 0
     victim = next(pins.iterdir())
+    victim.write_bytes(b"X" + victim.read_bytes()[1:])  # one byte changed
+    assert verify() == 1
+
+
+# ------------------------------------------------------------------------- blobs
+
+
+def _by_url(bodies):
+    """A fetch answering each url with its own bytes, recording every call."""
+    calls = []
+
+    def fetch(url, headers=None):
+        calls.append(url)
+        return bodies[url], "application/pdf"
+
+    fetch.calls = calls
+    return fetch
+
+
+def _blobs(data, out, fetch, *extra):
+    return main(["--data-dir", str(data), "blobs", "--out", str(out), *extra], fetch=fetch)
+
+
+def _name(data, xr_id):
+    return to_manifest_line(Crosswalk(data).sources[xr_id]).split("  ", 1)[1]
+
+
+def _snapshot(directory):
+    return {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in sorted(directory.iterdir())}
+
+
+def test_blobs_writes_a_matching_document_under_its_manifest_name(tmp_path, capsys):
+    data, out = tmp_path / "data", tmp_path / "pins"
+    _add(data)
+    capsys.readouterr()
+    assert _blobs(data, out, _fetch()) == 0
+    assert (out / _name(data, "xr_src_0001")).read_bytes() == BODY
+    assert "WRITTEN" in capsys.readouterr().out
+
+
+def test_blobs_writes_nothing_for_a_mismatch_and_reports_it(tmp_path, capsys):
+    data, out = tmp_path / "data", tmp_path / "pins"
+    _add(data)
+    capsys.readouterr()
+    assert _blobs(data, out, _fetch(body=b"changed")) == 1
+    report = capsys.readouterr().out
+    assert "MISMATCH" in report and "xr_src_0001" in report
+    assert list(out.iterdir()) == []  # no blob, and no manifest listing nothing
+
+
+def test_blobs_manifest_lists_only_what_was_written(tmp_path, capsys):
+    data, out = tmp_path / "data", tmp_path / "pins"
+    other = URL.replace("2023-01", "2023-02")
+    _add(data)
+    _add(data, url=other, citation="AO 2023-02", fetch=_fetch(body=b"the other"))
+    capsys.readouterr()
+    assert _blobs(data, out, _by_url({URL: BODY, other: b"not what was pinned"})) == 1
+    first = Crosswalk(data).sources["xr_src_0001"]
+    manifest = (out / "MANIFEST.sha256").read_bytes()
+    assert manifest == (to_manifest_line(first) + "\n").encode()
+    assert sorted(p.name for p in out.iterdir()) == sorted(
+        [_name(data, "xr_src_0001"), "MANIFEST.sha256"]
+    )
+
+
+def test_blobs_second_run_changes_nothing(tmp_path, capsys):
+    data, out = tmp_path / "data", tmp_path / "pins"
+    other = URL.replace("2023-01", "2023-02")
+    _add(data)
+    _add(data, url=other, citation="AO 2023-02", fetch=_fetch(body=b"the other"))
+    assert _blobs(data, out, _by_url({URL: BODY, other: b"the other"})) == 0
+    before = _snapshot(out)
+    capsys.readouterr()
+
+    again = _by_url({})  # any request at all would raise KeyError
+    assert _blobs(data, out, again) == 0
+    assert again.calls == []  # a verified file is not fetched again
+    assert _snapshot(out) == before  # same files, same bytes, not even rewritten
+    assert capsys.readouterr().out.count("PRESENT") == 2
+
+
+def test_blobs_never_overwrites_a_file_whose_bytes_differ(tmp_path, capsys):
+    data, out = tmp_path / "data", tmp_path / "pins"
+    _add(data)
+    out.mkdir()
+    squatter = out / _name(data, "xr_src_0001")
+    squatter.write_bytes(b"somebody else's bytes")
+    capsys.readouterr()
+    assert _blobs(data, out, _fetch()) == 1
+    assert "CONFLICT" in capsys.readouterr().out
+    assert squatter.read_bytes() == b"somebody else's bytes"
+    assert not (out / "MANIFEST.sha256").exists()
+
+
+def test_blobs_a_prelim_mismatch_is_expected_and_fails_nothing(tmp_path, capsys):
+    # uscode's prelim pages vary per request, so their bytes never hash to the pin: the drift key
+    # is the last-amended date, and the Wayback copy is the preservation copy.
+    data, out = tmp_path / "data", tmp_path / "pins"
+    _add(data)
+    path = data / "sources" / "xr_src_0001.json"
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["fetcher"] = "uscode"
+    record["artifact"].update(drift_key="last_amended", drift_value="2002-10-29")
+    path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+    capsys.readouterr()
+    assert _blobs(data, out, _fetch(body=b"this request's session tokens")) == 0
+    report = capsys.readouterr().out
+    assert "MISMATCH" in report and "preservation copy" in report
+    assert list(out.iterdir()) == []
+
+
+def test_blobs_only_adds_to_the_manifest_instead_of_shrinking_it(tmp_path, capsys):
+    data, out = tmp_path / "data", tmp_path / "pins"
+    other = URL.replace("2023-01", "2023-02")
+    _add(data)
+    _add(data, url=other, citation="AO 2023-02", fetch=_fetch(body=b"the other"))
+    fetch = _by_url({URL: BODY, other: b"the other"})
+    assert _blobs(data, out, fetch, "--only", "xr_src_0001") == 0
+    assert fetch.calls == [URL]  # --only fetches its target and nothing else
+    assert not (out / _name(data, "xr_src_0002")).exists()
+    assert _blobs(data, out, fetch, "--only", "xr_src_0002") == 0
+    assert fetch.calls == [URL, other]
+    assert len((out / "MANIFEST.sha256").read_text(encoding="utf-8").splitlines()) == 2
+    assert _blobs(data, out, fetch, "--only", "xr_src_9999") == 1  # unknown id
+
+
+def test_blobs_never_drops_a_manifest_line_it_cannot_keep(tmp_path, capsys):
+    # Someone else's line, or the line of a copy that has since changed: either way the manifest
+    # is left exactly as it is and the run fails, so `sha256sum -c` keeps flagging the damage.
+    data, out = tmp_path / "data", tmp_path / "pins"
+    _add(data)
+    out.mkdir()
+    foreign = b"0" * 64 + b"  somebody-elses-file.pdf\n"
+    (out / "MANIFEST.sha256").write_bytes(foreign)
+    capsys.readouterr()
+    assert _blobs(data, out, _fetch()) == 1
+    assert "somebody-elses-file.pdf" in capsys.readouterr().out
+    assert (out / "MANIFEST.sha256").read_bytes() == foreign
+
+    (out / "MANIFEST.sha256").unlink()
+    assert _blobs(data, out, _fetch()) == 0  # a clean manifest this time
+    listed = (out / "MANIFEST.sha256").read_bytes()
+    blob = out / _name(data, "xr_src_0001")
+    blob.write_bytes(b"X" + blob.read_bytes()[1:])  # the copy is damaged afterwards
+    capsys.readouterr()
+    assert _blobs(data, out, _fetch()) == 1
+    assert "CONFLICT" in capsys.readouterr().out
+    assert (out / "MANIFEST.sha256").read_bytes() == listed  # its line is still there
+
+
+def test_blobs_fetch_through_the_fetchers_own_request_path(tmp_path):
+    # govinfo re-attaches its key to a URL on the API host; `blobs` must ask the fetcher, as
+    # `check` does, rather than fetch the stored canonical URL as it stands.
+    source = Source.model_validate(
+        {
+            "xr_id": "xr_src_0001",
+            "kind": "source",
+            "citation": "60 FR 7862",
+            "title": "Notice",
+            "canonical_url": "https://api.govinfo.gov/packages/X/granules/X/pdf",
+            "fetcher": "govinfo",
+            "published_at": "1995-02-09",
+            "artifact": {
+                "sha256": sha256_hex(BODY),
+                "byte_length": len(BODY),
+                "media_type": "application/pdf",
+                "fetched_at": "2026-09-17T12:00:00Z",
+                "drift_key": "sha256",
+                "drift_value": sha256_hex(BODY),
+            },
+            "grade": {"reliability": "A", "credibility": 1},
+        }
+    )
+    fetch = _by_url({"https://api.govinfo.gov/packages/X/granules/X/pdf?api_key=SECRET": BODY})
+    [missing] = save_blobs([source], tmp_path / "a", fetch=fetch, env={})
+    assert missing.status == "key_missing" and fetch.calls == []
+    [written] = save_blobs([source], tmp_path / "b", fetch=fetch, env={"GOVINFO_API_KEY": "SECRET"})
+    assert written.status == "written"
+    assert fetch.calls == ["https://api.govinfo.gov/packages/X/granules/X/pdf?api_key=SECRET"]
+
+
+def test_blobs_refuses_a_directory_inside_this_repo(tmp_path, capsys):
+    _add(tmp_path)
+    capsys.readouterr()
+    inside = DATA.parent / "blobs-must-never-land-here"
+
+    def boom(url, headers=None):
+        raise AssertionError("fetched although the directory was refused")
+
+    assert _blobs(tmp_path, inside, boom) == 1
+    assert "never stores document bytes" in capsys.readouterr().err
+    assert not inside.exists()
+
+
+@pytest.mark.skipif(shutil.which("sha256sum") is None, reason="needs coreutils sha256sum")
+def test_blobs_output_verifies_with_real_sha256sum(tmp_path, capsys):
+    data, out = tmp_path / "data", tmp_path / "pins"
+    bodies = {URL: b"one document", URL + "?2": b"another", URL + "?3": b"a third"}
+    for url, body in bodies.items():
+        # two of the three share a citation, the case the id in the filename exists for
+        citation = "FEC MUR 8098" if url != URL else "FEC Advisory Opinion 2023-01"
+        assert _add(data, url=url, citation=citation, fetch=_fetch(body)) == 0
+    capsys.readouterr()
+    assert _blobs(data, out, _by_url(bodies)) == 0
+
+    def verify():
+        return subprocess.run(
+            ["sha256sum", "-c", "--strict", "MANIFEST.sha256"], cwd=out, capture_output=True
+        ).returncode
+
+    assert verify() == 0
+    victim = out / _name(data, "xr_src_0002")
     victim.write_bytes(b"X" + victim.read_bytes()[1:])  # one byte changed
     assert verify() == 1
 

@@ -5,7 +5,7 @@ that resolves inside the repo root, and a `Source` holds only facts about the do
 (where it lives, when it was fetched, what it hashes to, who published it, when). Blobs live in the
 consuming project or in the archive copy; the artifact hash verifies either.
 
-CLI: `python -m registers_crosswalk.pin {add,archive,note,search,check,ledger}`.
+CLI: `python -m registers_crosswalk.pin {add,archive,note,search,check,blobs,ledger}`.
 """
 
 from __future__ import annotations
@@ -201,13 +201,13 @@ def _extension(media_type: str, url: str) -> str:
     return _EXTENSIONS.get(media_type, ".bin")
 
 
-def _check_blob_dir(blob_dir: Path) -> Path:
+def _check_blob_dir(blob_dir: Path, *, flag: str = "--blob-dir") -> Path:
     """A blob dir belongs to the CONSUMING project. Refuse anything inside this repo."""
     resolved = blob_dir.expanduser().resolve()
     if resolved.is_relative_to(REPO_ROOT):
         raise ValueError(
             f"blob_dir {resolved} is inside {REPO_ROOT}; this repo never stores document bytes. "
-            "Point --blob-dir at the consuming project (e.g. New Gray's pins/)."
+            f"Point {flag} at the consuming project (e.g. New Gray's pins/)."
         )
     return resolved
 
@@ -817,9 +817,136 @@ def to_manifest_line(source: Source) -> str:
     travels with the file into a `pins/` directory, so no trailing comment is needed to say which
     pin a line is — and `sha256sum` would read such a comment as part of the filename.
     """
+    return f"{source.artifact.sha256}  {manifest_name(source)}"
+
+
+def manifest_name(source: Source) -> str:
+    """The file name a pin's bytes go under in a consuming project's pins/ directory."""
     ext = _extension(source.artifact.media_type, source.canonical_url)
-    name = f"{source.xr_id}-{_slug(source.citation)}{ext}"
-    return f"{source.artifact.sha256}  {name}"
+    return f"{source.xr_id}-{_slug(source.citation)}{ext}"
+
+
+# --------------------------------------------------------------------------- blobs
+
+MANIFEST_FILE = "MANIFEST.sha256"
+
+BlobStatus = Literal[
+    "written", "present", "mismatch", "conflict", "key_missing", "fetch_failed", "error"
+]
+
+
+@dataclass(frozen=True)
+class BlobReport:
+    """What `save_blobs` did with one pin. Only `written` and `present` leave its bytes in DIR."""
+
+    xr_id: str
+    name: str
+    status: BlobStatus
+    detail: str | None = None
+    # A pin whose drift key is not its hash never promised the same bytes twice: uscode's prelim
+    # pages carry per-request session tokens, so they cannot hash to the pin, and their Wayback copy
+    # is their preservation copy. Such a mismatch is reported, but it is not a failure.
+    expected: bool = False
+
+
+def save_blobs(
+    targets: Sequence[Source],
+    out_dir: Path,
+    *,
+    fetch: FetchFn = default_fetch,
+    env: Mapping[str, str] | None = None,
+) -> list[BlobReport]:
+    """Put each target's bytes in `out_dir` under its manifest name, but only bytes that hash to
+    the pin. They are re-fetched through the fetcher's own request path, exactly as `check` does.
+
+    A file already there is never overwritten. Identical bytes are left as they are (`present`, and
+    not re-fetched); different bytes are reported (`conflict`) and left alone. A download that does
+    not hash to the pin writes nothing (`mismatch`). Each write goes through a `.part` file and a
+    rename, so a crash never leaves a truncated file under a pin's name.
+    """
+    from . import fetchers
+
+    out = _check_blob_dir(out_dir, flag="--out")
+    out.mkdir(parents=True, exist_ok=True)
+    env = os.environ if env is None else env
+    reports = []
+    for source in targets:
+        name = manifest_name(source)
+        target = out / name
+        base = {"xr_id": source.xr_id, "name": name}
+        if target.exists():
+            held = sha256_hex(target.read_bytes())
+            if held == source.artifact.sha256:
+                reports.append(BlobReport(**base, status="present"))
+            else:
+                detail = f"a file with other bytes is already there ({held}); left as it is"
+                reports.append(BlobReport(**base, status="conflict", detail=detail))
+            continue
+        try:
+            url, headers = fetchers.content_request(source.fetcher, source.canonical_url, env=env)
+        except MissingKey as exc:
+            reports.append(BlobReport(**base, status="key_missing", detail=str(exc)))
+            continue
+        try:
+            body, _ = fetch(url, headers)
+        except _TRANSPORT as exc:
+            detail = f"{type(exc).__name__}: {exc}"
+            reports.append(BlobReport(**base, status="fetch_failed", detail=detail))
+            continue
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"
+            reports.append(BlobReport(**base, status="error", detail=detail))
+            continue
+        actual = sha256_hex(body)
+        if actual != source.artifact.sha256:
+            expected = source.artifact.drift_key != "sha256"
+            detail = f"expected {source.artifact.sha256}, got {actual}"
+            if expected:
+                detail += (
+                    "; its bytes vary per request, so its Wayback copy is its preservation copy"
+                )
+            reports.append(BlobReport(**base, status="mismatch", detail=detail, expected=expected))
+            continue
+        part = target.with_name(target.name + ".part")
+        part.write_bytes(body)
+        os.replace(part, target)
+        reports.append(BlobReport(**base, status="written"))
+    return reports
+
+
+def write_blob_manifest(sources: Iterable[Source], out_dir: Path) -> tuple[list[str], list[str]]:
+    """Write `out_dir/MANIFEST.sha256`: one `sha256sum` line for every pin whose file in `out_dir`
+    hashes to the pin, whether this run wrote it or an earlier run did. Nothing else is listed, so
+    `sha256sum -c` passes there. Returns (the lines that verify, the lines the manifest could not
+    keep).
+
+    Every pin in `sources` is looked for, not only this run's targets, so an `--only` run adds to
+    the manifest instead of shrinking it. The manifest only ever grows: when the one already there
+    lists a line that no longer verifies (a copy changed or went missing) or that this command did
+    not write, the file is left exactly as it is, and those lines come back for the caller to
+    report. Quietly dropping the line of a damaged copy would let `sha256sum -c` pass over it. An
+    unchanged manifest is not rewritten, and none is written when no file verifies, because
+    `sha256sum -c` fails on an empty one.
+    """
+    out = _check_blob_dir(out_dir, flag="--out")
+    lines = []
+    for source in sorted(sources, key=manifest_name):
+        held = out / manifest_name(source)
+        if held.is_file() and sha256_hex(held.read_bytes()) == source.artifact.sha256:
+            lines.append(to_manifest_line(source))
+    manifest = out / MANIFEST_FILE
+    old = manifest.read_bytes() if manifest.is_file() else b""
+    kept = set(lines)
+    dropped = [line for line in old.decode("utf-8", "replace").splitlines() if line not in kept]
+    if dropped or not lines:
+        return lines, dropped
+    # "\n" on every platform: `sha256sum -c` would read a "\r" as part of the filename.
+    content = ("\n".join(lines) + "\n").encode("utf-8")
+    if old != content:
+        part = manifest.with_name(MANIFEST_FILE + ".part")
+        part.write_bytes(content)
+        os.replace(part, manifest)
+    return lines, dropped
 
 
 # --------------------------------------------------------------------------- CLI
@@ -1298,6 +1425,51 @@ def _cmd_search(
     return 0
 
 
+def _cmd_blobs(
+    args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
+) -> int:
+    """Write verified copies of the pinned documents to a consuming project's directory."""
+    del archive_fn, sleep_fn  # blobs never archives, and a mismatch is not retried
+    xw = Crosswalk(args.data_dir)
+    everything = sorted(xw.sources.values(), key=lambda s: s.xr_id)
+    if args.only:
+        unknown = [x for x in args.only if x not in xw.sources]
+        if unknown:
+            print(f"unknown source(s): {', '.join(unknown)}", file=sys.stderr)
+            return 1
+        targets = [xw.sources[x] for x in sorted(set(args.only))]
+    else:
+        targets = everything
+    try:
+        reports = save_blobs(targets, args.out, fetch=fetch)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    for r in reports:
+        line = f"{r.status.upper():<12} {r.xr_id}  {r.name}"
+        if r.detail:
+            line += f"\n             {r.detail}"
+        print(line)
+    listed, dropped = write_blob_manifest(everything, args.out)
+    if dropped:
+        print(
+            f"{'CONFLICT':<12} {MANIFEST_FILE}  left as it is; it lists lines this run can't keep:"
+        )
+        for line in dropped:
+            print(f"             {line}")
+        manifest_state = f"{MANIFEST_FILE} left as it is"
+    else:
+        manifest_state = f"{MANIFEST_FILE} lists {len(listed)} file(s)"
+    written = sum(r.status == "written" for r in reports)
+    present = sum(r.status == "present" for r in reports)
+    print(
+        f"{written} written, {present} already present, {len(reports) - written - present} not "
+        f"written; {manifest_state}"
+    )
+    failed = [r for r in reports if r.status not in ("written", "present") and not r.expected]
+    return 1 if failed or dropped else 0
+
+
 def _cmd_ledger(
     args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
 ) -> int:
@@ -1390,6 +1562,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="; ".join(f"{n}: {'|'.join(fetchers.search_types(n))}" for n in fetchers.SEARCHABLE),
     )
     search_parser.add_argument("--json", action="store_true")
+
+    blobs = sub.add_parser(
+        "blobs",
+        help="write each pinned document, verified against its sha256, to a consuming project",
+    )
+    blobs.set_defaults(handler=_cmd_blobs)
+    blobs.add_argument(
+        "--out",
+        type=Path,
+        required=True,
+        metavar="DIR",
+        help="the consuming project's pins directory; must be OUTSIDE this repo",
+    )
+    blobs.add_argument(
+        "--only", nargs="+", type=_src_id_arg, metavar="XR_ID", help="default: every pin"
+    )
 
     ledger = sub.add_parser("ledger", help="emit entries for the New Gray ledgers")
     ledger.set_defaults(handler=_cmd_ledger)

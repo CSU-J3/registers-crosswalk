@@ -2,14 +2,18 @@ import json
 import re
 import shutil
 import subprocess
+import urllib.error
 from datetime import UTC, datetime
+from email.utils import format_datetime
 from pathlib import Path
 
 import pytest
 
+from registers_crosswalk import pin as pinmod
 from registers_crosswalk.models import ArchiveCopy, Source
 from registers_crosswalk.pin import (
     ArchiveFailure,
+    ExpectedDrift,
     main,
     save_blobs,
     sha256_hex,
@@ -547,6 +551,251 @@ def test_blobs_output_verifies_with_real_sha256sum(tmp_path, capsys):
     assert verify() == 1
 
 
+# ------------------------------------------------------------------ archive --repair
+
+TS_ATTACHED = "20260922175016"
+TS_OLDER = "20260711041727"
+
+
+def _add_archived(tmp_path, timestamp=TS_ATTACHED):
+    capture = ArchiveCopy(
+        service="wayback",
+        url=f"https://web.archive.org/web/{timestamp}/{URL}",
+        captured_at=datetime.strptime(timestamp, "%Y%m%d%H%M%S").replace(tzinfo=UTC),
+    )
+    assert _add(tmp_path, extra=["--archive"], archive_fn=lambda url, **_: capture) == 0
+
+
+def _wayback(monkeypatch, bodies, *, redirect=None, cdx=(), calls=None):
+    """Fake the two Wayback seams `repair_archive` uses: the CDX listing and the `id_` fetch.
+
+    `bodies` maps a timestamp to the bytes held there; `redirect` maps a timestamp Wayback does not
+    hold to the one it serves instead. A timestamp in neither is unreachable.
+    """
+
+    def json_call(url, headers=None, data=None, *, timeout=90):
+        if calls is not None:
+            calls.append(url)
+        assert url.startswith("https://web.archive.org/cdx/"), url
+        rows = [[ts, "200", f"D{ts}"] for ts in cdx]
+        return [["timestamp", "statuscode", "digest"], *rows] if rows else []
+
+    def fetch_capture(url, *, timeout=90):
+        if calls is not None:
+            calls.append(url)
+        asked = re.search(r"/web/(\d{14})id_/", url).group(1)
+        served = (redirect or {}).get(asked, asked)
+        if served not in bodies:
+            raise ConnectionResetError("wayback went away")
+        when = datetime.strptime(served, "%Y%m%d%H%M%S").replace(tzinfo=UTC)
+        final = url.replace(f"/web/{asked}id_/", f"/web/{served}id_/")
+        return bodies[served], final, {"memento-datetime": format_datetime(when, usegmt=True)}
+
+    monkeypatch.setattr("registers_crosswalk.pin._json_call", json_call)
+    monkeypatch.setattr("registers_crosswalk.pin._fetch_capture", fetch_capture)
+
+
+def _record_bytes(tmp_path):
+    return (tmp_path / "sources" / "xr_src_0001.json").read_bytes()
+
+
+def _repair(tmp_path, sleep_fn=lambda _s: None):
+    return main(
+        ["--data-dir", str(tmp_path), "archive", "--repair", "xr_src_0001"], sleep_fn=sleep_fn
+    )
+
+
+def test_repair_changes_nothing_when_the_attached_capture_verifies(tmp_path, monkeypatch, capsys):
+    _add_archived(tmp_path)
+    before = _record_bytes(tmp_path)
+    calls = []
+    _wayback(monkeypatch, {TS_ATTACHED: BODY}, calls=calls)
+    capsys.readouterr()
+    assert _repair(tmp_path) == 0
+    assert "nothing changed" in capsys.readouterr().out
+    assert _record_bytes(tmp_path) == before
+    assert not any("/cdx/" in c for c in calls)  # nothing looked for, nothing needed
+
+
+def test_repair_replaces_a_capture_wayback_serves_as_another(tmp_path, monkeypatch, capsys):
+    """The xr_src_0012 case, and only the `archives` field of the record is rewritten."""
+    _add_archived(tmp_path)
+    before = json.loads(_record_bytes(tmp_path))
+    _wayback(
+        monkeypatch,
+        {TS_OLDER: BODY},
+        redirect={TS_ATTACHED: TS_OLDER},
+        cdx=(TS_OLDER, TS_ATTACHED),
+    )
+    capsys.readouterr()
+    assert _repair(tmp_path) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("repaired xr_src_0001: ")
+    after = json.loads(_record_bytes(tmp_path))
+    assert [a["url"] for a in after["archives"]] == [
+        f"https://web.archive.org/web/{TS_OLDER}/{URL}"
+    ]
+    assert list(after) == list(before)  # same keys, same order
+    assert {k: v for k, v in after.items() if k != "archives"} == {
+        k: v for k, v in before.items() if k != "archives"
+    }
+
+
+def test_repair_replaces_a_served_capture_whose_bytes_do_not_reproduce(
+    tmp_path, monkeypatch, capsys
+):
+    _add_archived(tmp_path)
+    calls = []
+    _wayback(
+        monkeypatch,
+        {TS_ATTACHED: b"not the pinned bytes", TS_OLDER: BODY},
+        cdx=(TS_OLDER, TS_ATTACHED),
+        calls=calls,
+    )
+    capsys.readouterr()
+    assert _repair(tmp_path) == 0
+    assert capsys.readouterr().out.startswith("repaired xr_src_0001: ")
+    assert any("/cdx/" in c for c in calls)
+    after = json.loads(_record_bytes(tmp_path))
+    assert [a["url"] for a in after["archives"]] == [
+        f"https://web.archive.org/web/{TS_OLDER}/{URL}"
+    ]
+
+
+def test_repair_treats_a_404_at_the_attached_timestamp_as_nothing_stored(
+    tmp_path, monkeypatch, capsys
+):
+    _add_archived(tmp_path)
+    _wayback(monkeypatch, {TS_OLDER: BODY}, cdx=(TS_OLDER,))
+    real = pinmod._fetch_capture  # the fake just installed
+
+    def fetch_capture(url, *, timeout=90):
+        if f"/web/{TS_ATTACHED}id_/" in url:
+            raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+        return real(url, timeout=timeout)
+
+    monkeypatch.setattr("registers_crosswalk.pin._fetch_capture", fetch_capture)
+    capsys.readouterr()
+    assert _repair(tmp_path) == 0
+    assert "(HTTP 404)" in capsys.readouterr().out
+    after = json.loads(_record_bytes(tmp_path))
+    assert [a["url"] for a in after["archives"]] == [
+        f"https://web.archive.org/web/{TS_OLDER}/{URL}"
+    ]
+
+
+def test_repair_re_verifies_the_url_the_record_holds(tmp_path, monkeypatch, capsys):
+    # The attached capture is the record's own URL at its own timestamp, even where Save Page Now
+    # spelled the original differently from the pin's canonical URL (here, http for https).
+    held = URL.replace("https://", "http://")
+    capture = ArchiveCopy(
+        service="wayback", url=f"https://web.archive.org/web/{TS_ATTACHED}/{held}"
+    )
+    assert _add(tmp_path, extra=["--archive"], archive_fn=lambda url, **_: capture) == 0
+    calls = []
+    _wayback(monkeypatch, {TS_ATTACHED: BODY}, calls=calls)
+    capsys.readouterr()
+    assert _repair(tmp_path) == 0
+    assert calls == [f"https://web.archive.org/web/{TS_ATTACHED}id_/{held}"]
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://perma.cc/ABCD-1234",
+        # the service decides, not the URL's shape: this one would otherwise pass for Wayback's
+        f"https://web.archive.org/web/{TS_ATTACHED}/{URL}",
+    ],
+)
+def test_repair_never_touches_a_copy_that_is_not_a_wayback_capture(
+    tmp_path, monkeypatch, capsys, url
+):
+    # A Perma.cc copy is valid and unchecked; repair must not swap it for a Wayback capture.
+    perma = ArchiveCopy(service="perma", url=url)
+    assert _add(tmp_path, extra=["--archive"], archive_fn=lambda url, **_: perma) == 0
+    before = _record_bytes(tmp_path)
+    # Were it checked, its timestamp would not verify and the older capture would replace it.
+    _wayback(
+        monkeypatch,
+        {TS_ATTACHED: b"not the pinned bytes", TS_OLDER: BODY},
+        cdx=(TS_OLDER, TS_ATTACHED),
+    )
+    capsys.readouterr()
+    assert _repair(tmp_path) == 1
+    assert "nothing changed" in capsys.readouterr().err
+    assert _record_bytes(tmp_path) == before
+
+
+def test_repair_changes_nothing_when_no_capture_reproduces_the_pin(tmp_path, monkeypatch, capsys):
+    _add_archived(tmp_path)
+    before = _record_bytes(tmp_path)
+    _wayback(
+        monkeypatch,
+        {TS_ATTACHED: b"not the pinned bytes", TS_OLDER: b"nor these"},
+        cdx=(TS_OLDER, TS_ATTACHED),
+    )
+    capsys.readouterr()
+    assert _repair(tmp_path) == 1
+    err = capsys.readouterr().err
+    assert "none of the 2 capture(s)" in err and "2 did not match" in err
+    assert err.rstrip().endswith("nothing changed")
+    assert _record_bytes(tmp_path) == before
+
+
+def test_repair_retries_a_cdx_503_and_says_so_when_it_persists(tmp_path, monkeypatch, capsys):
+    # 2026-09-24: the CDX API answered 503 twice, then served the listing.
+    _add_archived(tmp_path)
+    _wayback(monkeypatch, {TS_OLDER: BODY}, redirect={TS_ATTACHED: TS_OLDER}, cdx=(TS_OLDER,))
+    listing = pinmod._json_call  # the fake just installed
+    answers = [503, 503]
+
+    def flaky(url, headers=None, data=None, *, timeout=90):
+        if answers:
+            raise urllib.error.HTTPError(url, answers.pop(), "Service Unavailable", {}, None)
+        return listing(url, headers, data)
+
+    monkeypatch.setattr("registers_crosswalk.pin._json_call", flaky)
+    slept = []
+    capsys.readouterr()
+    assert _repair(tmp_path, sleep_fn=slept.append) == 0  # retried through the blip, repaired
+    assert slept == [10.0, 20.0]
+
+    def down(url, headers=None, data=None, *, timeout=90):
+        raise urllib.error.HTTPError(url, 503, "Service Unavailable", {}, None)
+
+    second = tmp_path / "second"
+    _add_archived(second)
+    monkeypatch.setattr("registers_crosswalk.pin._json_call", down)
+    before = _record_bytes(second)
+    capsys.readouterr()
+    assert _repair(second, sleep_fn=lambda _s: None) == 1
+    err = capsys.readouterr().err
+    assert "the CDX listing of" in err and "could not be read (HTTP 503)" in err
+    assert _record_bytes(second) == before
+
+
+def test_repair_changes_nothing_when_the_attached_capture_is_unreachable(
+    tmp_path, monkeypatch, capsys
+):
+    # Unreachable is not the same as wrong: an outage must not swap a good capture for another.
+    _add_archived(tmp_path)
+    before = _record_bytes(tmp_path)
+    calls = []
+    _wayback(monkeypatch, {TS_OLDER: BODY}, cdx=(TS_OLDER,), calls=calls)
+    capsys.readouterr()
+    assert _repair(tmp_path) == 1
+    assert "could not reach" in capsys.readouterr().err
+    assert _record_bytes(tmp_path) == before
+    assert not any("/cdx/" in c for c in calls)
+
+
+def test_repair_refuses_a_pin_with_no_archive(tmp_path, capsys):
+    _add(tmp_path)
+    capsys.readouterr()
+    assert _repair(tmp_path) == 1
+    assert "no archive copy to repair" in capsys.readouterr().err
+
+
 def test_ledger_since_filters_on_the_fetch_date(tmp_path, capsys):
     _add(tmp_path)
     capsys.readouterr()
@@ -1038,14 +1287,14 @@ def test_archive_is_handed_the_artifact_hash_so_a_matching_capture_is_reused(tmp
     capsys.readouterr()
     seen = {}
 
-    def archive_fn(url, *, expected_sha256=None):
+    def archive_fn(url, *, expected=None):
         seen["url"] = url
-        seen["expected_sha256"] = expected_sha256
+        seen["expected"] = expected
         return CAPTURE
 
     assert _archive(tmp_path, archive_fn=archive_fn) == 0
     assert seen["url"] == URL
-    assert seen["expected_sha256"] == sha256_hex(BODY)
+    assert seen["expected"] == ExpectedDrift("manual", "sha256", sha256_hex(BODY))
 
 
 def test_archive_changes_only_the_archives_field(tmp_path, capsys):

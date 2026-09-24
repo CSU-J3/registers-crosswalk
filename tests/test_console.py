@@ -668,6 +668,15 @@ def test_state_says_which_pins_have_no_archive(client):
     assert {p["xr_id"]: p for p in after["pins"]}[written["xr_id"]]["archived"] is True
 
 
+def test_the_page_says_an_archiving_request_can_wait_on_wayback(client):
+    # A new capture is checked before it is attached, which can take up to ten minutes; both
+    # requests that archive (Pin with the box ticked, and Archive now) say so while they wait.
+    page = client.page()
+    assert "Archiving: Wayback can take up to ten minutes to store a new capture." in page
+    assert "say(outcome, WAYBACK_WAIT" in page
+    assert "note.textContent = WAYBACK_WAIT;" in page
+
+
 def test_the_page_carries_the_unarchived_list(client):
     page = client.page()
     assert 'id="unarchived-card"' in page
@@ -928,9 +937,15 @@ def test_a_console_pin_archives_with_the_keys_from_its_own_env(tmp_path, monkeyp
 
     def fake_json_call(url, headers=None, data=None, *, timeout=90):
         seen.append((url, dict(headers or {}), data))
+        if url.startswith("https://web.archive.org/cdx/"):
+            return []  # nothing to reuse, so a new capture is asked for
         if data is not None:
             return {"job_id": "spn2-console"}
         return {"status": "success", "timestamp": "20260920190851"}
+
+    def fake_capture(url, *, timeout=90):
+        # the new capture, served at the timestamp SPN2 reported, holding the pinned bytes
+        return PDF_BYTES, url, {"memento-datetime": "Sun, 20 Sep 2026 19:08:51 GMT"}
 
     def no_anonymous(url, headers=None, *, timeout=90):
         raise AssertionError(f"the anonymous Wayback path was taken for {url}")
@@ -941,6 +956,7 @@ def test_a_console_pin_archives_with_the_keys_from_its_own_env(tmp_path, monkeyp
     # offline whichever path the code takes, and names the bug if it takes the wrong one.
     monkeypatch.setattr("registers_crosswalk.pin._json_call", fake_json_call)
     monkeypatch.setattr("registers_crosswalk.pin._response_headers", no_anonymous)
+    monkeypatch.setattr("registers_crosswalk.pin._fetch_capture", fake_capture)
 
     (tmp_path / "sources").mkdir()
     console = Console(data_dir=tmp_path, env=ENV_WITH_WAYBACK, fetch=cl_fetch())

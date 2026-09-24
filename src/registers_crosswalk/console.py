@@ -1005,6 +1005,9 @@ _JS = """
   // -- pin ------------------------------------------------------------------
 
   var outcome = byId('outcome-card');
+  // A new capture is fetched back and checked before it is attached, and Wayback can take a while
+  // to store one, so a request that archives says so while it waits. Not progress: one line.
+  var WAYBACK_WAIT = 'Archiving: Wayback can take up to ten minutes to store a new capture.';
 
   function doPin() {
     if (!resolved) { return; }
@@ -1017,6 +1020,7 @@ _JS = """
       supersedes: sup ? (sup.value || null) : null,
       notes: byId('opt-notes').value || null
     };
+    if (body.archive) { outcome.classList.remove('hidden'); say(outcome, WAYBACK_WAIT, 'note'); }
     api('/api/pin', { method: 'POST', body: JSON.stringify(body) }).then(function (r) {
       outcome.classList.remove('hidden');
       if (!r.ok) { say(outcome, r.body.error || 'pin failed', 'note warn'); return; }
@@ -1088,6 +1092,8 @@ _JS = """
       go.addEventListener('click', function () {
         go.disabled = true;
         go.textContent = 'Archiving\\u2026';
+        note.className = 'muted';
+        note.textContent = WAYBACK_WAIT;
         api('/api/archive', { method: 'POST', body: JSON.stringify({ xr_id: pin.xr_id }) })
           .then(function (r) {
             if (!r.ok) {

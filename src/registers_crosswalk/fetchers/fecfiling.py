@@ -38,6 +38,9 @@ from ..pin import FetchFn, MissingKey, PinSpec, default_fetch, sha256_hex
 NAME = "fecfiling"
 HELP = "a committee's FEC filing as filed: the .fec file or its image PDF (by file number)"
 DRIFT_KEY = "sha256"
+# A superseded filing (the original, or an earlier amendment) is still a fixed document at its own
+# URL, so `pin check` keeps re-testing it. See `fetchers.check_superseded`.
+CHECK_SUPERSEDED = True
 # Exercised against the live API on 2026-09-23 (UTC) through the current code path: a scratch
 # `add fecfiling --file-number 1903438 --document fec` into a data dir outside the repo, every
 # mapped field compared against the captured metadata (tests/fixtures/fecfiling_filings_*), the

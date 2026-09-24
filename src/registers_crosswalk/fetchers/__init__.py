@@ -9,6 +9,7 @@ A fetcher module exposes:
     VERIFIED_AT     the date of that run, or None
     ENV_KEY         optional; the environment variable holding this fetcher's API key
     REQUIRES_ARCHIVE  optional; True refuses an `add` through this fetcher without --archive
+    CHECK_SUPERSEDED  optional; True has `pin check` re-test this fetcher's superseded pins too
     spec(...)       -> PinSpec, keyword-only, the API the tests drive
     add_arguments(parser) / spec_from_args(args, *, fetch, env)   the CLI adapter for spec()
     drift_value(body) -> str
@@ -127,6 +128,18 @@ def requires_archive(name: str) -> bool:
     to "DRIFT unrecoverable (no archive)".
     """
     return bool(getattr(get(name), "REQUIRES_ARCHIVE", False))
+
+
+def check_superseded(name: str) -> bool:
+    """Whether `pin check` re-tests this fetcher's SUPERSEDED pins by default, not only live ones.
+
+    True only where a superseded pin's canonical URL still serves exactly what was pinned. An FEC
+    filing is: an amendment is a new filing with its own file number and URL, and the original
+    never changes. The default is False, and ecfr and uscode must keep it. A superseded eCFR pin was
+    superseded because its part was amended, so it would report AMENDED forever. A uscode URL serves
+    only the current text, so the retired pin would read as DRIFT.
+    """
+    return bool(getattr(get(name), "CHECK_SUPERSEDED", False))
 
 
 def amended_since(name: str) -> Callable[..., date | None] | None:

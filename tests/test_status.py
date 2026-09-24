@@ -372,6 +372,31 @@ def test_merged_loser_is_absent_and_a_superseded_pin_names_its_successor(tmp_pat
     assert _cell(_row(page, "xr_src_0006"), "check") == '<span class="none">—</span>'
 
 
+def test_a_superseded_pin_the_run_checked_shows_its_verdict(tmp_path):
+    # fecfiling's superseded pins are in `check`'s default targets, so their reports reach the
+    # band's count; the row has to show the same verdict. One the run did not check stays blank.
+    _write_source(tmp_path, SOURCES[0])
+    _write_node(tmp_path)
+    _write_source(
+        tmp_path,
+        {
+            **SOURCES[0],
+            "xr_id": "xr_src_0006",
+            "canonical_url": ECFR_URL.format(date="2026-09-18", title="11", part="114"),
+            "point_in_time": "2026-09-18",
+            "sha256": "6" * 64,
+            "supersedes": "xr_src_0001",
+        },
+    )
+    xw = Crosswalk(tmp_path)
+    checked = _page(xw, _reports(xw, xr_src_0001="drift"))
+    assert (
+        _cell(_row(checked, "xr_src_0001"), "check") == '<span class="pill pill-drift">DRIFT</span>'
+    )
+    unchecked = _page(xw, [r for r in _reports(xw) if r.xr_id != "xr_src_0001"])
+    assert _cell(_row(unchecked, "xr_src_0001"), "check") == ""
+
+
 # --------------------------------------------------------------------------- the copy button
 
 

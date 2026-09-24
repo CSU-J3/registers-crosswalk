@@ -89,7 +89,8 @@ serves both documents without one, so `check` needs no key.
 
     python -m registers_crosswalk.pin search <fetcher> <query>   # identifiers, then the add to paste
     python -m registers_crosswalk.pin check        # 0 clean, 1 drift, 2 missing key, 3 fetch failed
-    python -m registers_crosswalk.pin ledger       # entries for the New Gray ledgers
+    python -m registers_crosswalk.pin ledger       # entries for the New Gray ledgers (--format manifest|record)
+    python -m registers_crosswalk.pin archive --repair xr_src_NNNN   # re-verify an attached capture
     python -m registers_crosswalk.pin blobs --out DIR   # verified copies + MANIFEST.sha256, outside the repo
     python -m registers_crosswalk.pin note xr_src_NNNN "<label>"   # offline; rewrites only notes
 
@@ -113,8 +114,10 @@ archive is practice rather than requirement. This is the other order: pin now, a
 service is up.
 
 It does not re-fetch the document and does not re-decide anything about it. It goes through the
-same reuse-or-capture path `add` uses — an existing capture whose bytes hash to the pinned artifact
-is adopted without asking Save Page Now for anything — and rewrites only the record's `archives`
+same reuse-or-capture path `add` uses — an existing capture whose `id_` copy, fetched at its exact
+timestamp, reproduces the pin's drift value (the sha256 for a fixed document, the last amendment
+for a U.S. Code prelim) is adopted without asking Save Page Now for anything, and a new capture is
+checked the same way before it is attached — and rewrites only the record's `archives`
 field, so the diff is the one fact that changed. It refuses a pin that already has an archive, an
 unknown id, and a failed capture (with the reason). The console lists every pin with no archive
 copy and offers the same thing as a button.

@@ -1044,6 +1044,21 @@ def to_manifest_line(source: Source) -> str:
     return f"{source.artifact.sha256}  {manifest_name(source)}"
 
 
+def to_record_line(source: Source) -> str:
+    """One line of the record: every pin's sha256 with its id, fetch time, drift key and citation.
+
+    The record is what was pinned; the manifest is what can be re-obtained and checked. A pin whose
+    drift key is not `sha256` (a U.S. Code prelim, whose page varies per request) is in the record
+    and marked `record-only`, because its bytes exist nowhere and no manifest line could verify.
+    """
+    kind = "manifest" if source.artifact.drift_key == "sha256" else "record-only"
+    fetched = source.artifact.fetched_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return (
+        f"{source.artifact.sha256}  {source.xr_id}  {fetched}  {source.artifact.drift_key}  "
+        f"{kind}  {source.citation}"
+    )
+
+
 def manifest_name(source: Source) -> str:
     """The file name a pin's bytes go under in a consuming project's pins/ directory."""
     ext = _extension(source.artifact.media_type, source.canonical_url)
@@ -1814,8 +1829,30 @@ def _cmd_ledger(
     sources = sorted(xw.sources.values(), key=lambda s: s.xr_id)
     if args.since is not None:
         sources = [s for s in sources if s.artifact.fetched_at.date() >= args.since]
+    if args.format in ("manifest", "record"):
+        # "\n" on every platform: redirected on Windows, print() writes "\r\n", and `sha256sum -c`
+        # reads the "\r" as part of each filename (it failed exactly so on 2026-09-24).
+        try:
+            sys.stdout.reconfigure(newline="\n")
+        except (AttributeError, ValueError):
+            pass  # a replaced stdout that cannot be reconfigured already writes what it is given
+    if args.format == "manifest":
+        # Only pins whose bytes can be re-obtained and checked, so `sha256sum -c` passes over the
+        # manifest wherever those bytes are kept. The rest are named on stderr, never dropped
+        # silently; `--format record` lists them.
+        for source in sources:
+            if source.artifact.drift_key == "sha256":
+                print(to_manifest_line(source))
+            else:
+                print(
+                    f"left out of the manifest: {source.xr_id} ({source.citation}): its drift key "
+                    f"is {source.artifact.drift_key}, so its bytes cannot be re-obtained to check; "
+                    "`--format record` lists it",
+                    file=sys.stderr,
+                )
+        return 0
     for source in sources:
-        print(to_manifest_line(source) if args.format == "manifest" else to_ledger_markdown(source))
+        print(to_record_line(source) if args.format == "record" else to_ledger_markdown(source))
     return 0
 
 
@@ -1922,7 +1959,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     ledger = sub.add_parser("ledger", help="emit entries for the New Gray ledgers")
     ledger.set_defaults(handler=_cmd_ledger)
-    ledger.add_argument("--format", choices=("md", "manifest"), default="md")
+    ledger.add_argument(
+        "--format",
+        choices=("md", "manifest", "record"),
+        default="md",
+        help="md: ledger entries; manifest: sha256sum lines for the pins whose bytes can be "
+        "checked; record: every pin's sha256, id, fetch time and drift key",
+    )
     ledger.add_argument(
         "--since",
         type=date.fromisoformat,

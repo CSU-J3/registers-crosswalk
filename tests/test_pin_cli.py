@@ -2,6 +2,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import urllib.error
 from datetime import UTC, datetime
 from email.utils import format_datetime
@@ -18,6 +19,7 @@ from registers_crosswalk.pin import (
     save_blobs,
     sha256_hex,
     to_manifest_line,
+    write_blob_manifest,
 )
 from registers_crosswalk.registry import Crosswalk
 
@@ -794,6 +796,78 @@ def test_repair_refuses_a_pin_with_no_archive(tmp_path, capsys):
     capsys.readouterr()
     assert _repair(tmp_path) == 1
     assert "no archive copy to repair" in capsys.readouterr().err
+
+
+# --------------------------------------------------- the manifest verifies; the record lists all
+
+
+def test_the_ledger_manifest_is_what_pin_blobs_would_write(tmp_path, monkeypatch, capsys):
+    """Over the real data dir: the manifest lists exactly the pins `pin blobs` can write.
+
+    The bytes are not here (this repo never holds them), so the simulation stands each document in
+    with its own sha256 and hashes by reading it back: every pin whose bytes can be re-obtained
+    verifies, and a U.S. Code prelim, whose page varies per request, does not.
+    """
+    xw = Crosswalk(DATA)
+    by_url = {}
+    for s in xw.sources.values():
+        by_url.setdefault(s.canonical_url, set()).add(s.artifact.sha256)
+    assert all(len(v) == 1 for v in by_url.values())
+
+    def fetch(url, headers=None):
+        (sha,) = by_url[url]
+        varies = any(s.canonical_url == url and s.fetcher == "uscode" for s in xw.sources.values())
+        return (b"this request's session tokens" if varies else sha.encode()), "application/pdf"
+
+    monkeypatch.setattr(pinmod, "sha256_hex", lambda body: body.decode("utf-8", "replace"))
+    out = tmp_path / "pins"
+    save_blobs(sorted(xw.sources.values(), key=lambda s: s.xr_id), out, fetch=fetch, env={})
+    write_blob_manifest(xw.sources.values(), out)
+    monkeypatch.undo()
+
+    main(["--data-dir", str(DATA), "ledger", "--format", "manifest"], fetch=_fetch())
+    printed = capsys.readouterr()
+    assert printed.out.encode() == (out / "MANIFEST.sha256").read_bytes()
+    prelims = sorted(s.xr_id for s in xw.sources.values() if s.artifact.drift_key != "sha256")
+    assert prelims and all(x in printed.err for x in prelims)
+    assert not any(x in printed.out for x in prelims)
+
+
+@pytest.mark.parametrize("fmt", ["manifest", "record"])
+def test_the_ledger_writes_lf_line_endings_even_when_redirected(fmt):
+    # Redirected on Windows, print() wrote "\r\n" and `sha256sum -c` read the "\r" as part of each
+    # filename. A real subprocess, because only a real redirected stdout translates newlines.
+    out = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "registers_crosswalk.pin",
+            "--data-dir",
+            str(DATA),
+            "ledger",
+            "--format",
+            fmt,
+        ],
+        capture_output=True,
+        check=True,
+    ).stdout
+    assert out.count(b"\n") >= 54
+    assert b"\r" not in out
+
+
+def test_the_ledger_record_lists_every_pin_and_marks_the_prelims(capsys):
+    xw = Crosswalk(DATA)
+    main(["--data-dir", str(DATA), "ledger", "--format", "record"], fetch=_fetch())
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == len(xw.sources) == 57
+    for line in lines:
+        sha, xr_id, fetched, drift_key, kind, citation = line.split("  ", 5)
+        source = xw.sources[xr_id]
+        assert sha == source.artifact.sha256 and drift_key == source.artifact.drift_key
+        assert citation == source.citation and fetched.endswith("Z")
+        assert kind == ("manifest" if drift_key == "sha256" else "record-only")
+    record_only = sorted(line.split("  ")[1] for line in lines if "  record-only  " in line)
+    assert record_only == ["xr_src_0005", "xr_src_0024", "xr_src_0056"]
 
 
 def test_ledger_since_filters_on_the_fetch_date(tmp_path, capsys):

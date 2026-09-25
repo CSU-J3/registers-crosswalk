@@ -150,7 +150,8 @@ def test_default_fetch_sends_gzip_and_a_ua(monkeypatch):
             return False
 
     def _urlopen(req, timeout=None):
-        seen.update(req.headers)
+        seen.update(req.header_items())  # every header the request sends
+        seen["redirected"] = dict(req.headers)  # the ones a redirect would carry on
         return _Resp()
 
     monkeypatch.setattr(pinmod.urllib.request, "urlopen", _urlopen)
@@ -159,6 +160,8 @@ def test_default_fetch_sends_gzip_and_a_ua(monkeypatch):
     assert seen["Accept-encoding"] == "gzip"
     assert "registers-crosswalk" in seen["User-agent"]
     assert seen["Authorization"] == "Token x"
+    # Sent, but unredirected: a redirect to another host does not carry the credential on.
+    assert "Authorization" not in seen["redirected"]
 
 
 # --------------------------------------------------------------------------- blobs

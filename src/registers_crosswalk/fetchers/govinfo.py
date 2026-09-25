@@ -36,7 +36,7 @@ from urllib.parse import quote, urlsplit
 
 from ..apikey import keyed_fetch, keyed_url
 from ..models import Grade
-from ..pin import FetchFn, MissingKey, PinSpec, default_fetch, sha256_hex
+from ..pin import FetchFn, PinSpec, default_fetch, read_key, sha256_hex
 
 NAME = "govinfo"
 HELP = "a GovInfo package or granule (GPO)"
@@ -47,8 +47,8 @@ DRIFT_KEY = "sha256"
 # tests now read. Every field spec() maps was checked against that capture, and a keyless `check`
 # of the scratch record exited 0. Any further edit to spec() or its parsing resets this to False —
 # see the convention in docs/operations.md — unless a test proves the requests byte-identical for
-# every recorded verification input. The move onto `apikey.keyed_fetch` on 2026-09-25 kept it that
-# way: tests/test_verified_requests.py.
+# every recorded verification input. The move onto `apikey.keyed_fetch`, and reading the key
+# through `pin.read_key`, both on 2026-09-25, kept it that way: tests/test_verified_requests.py.
 VERIFIED = True
 VERIFIED_AT = date(2026, 9, 22)
 PUBLISHER = "U.S. Government Publishing Office"
@@ -71,10 +71,7 @@ def content_url(package: str, granule: str | None = None) -> str:
 
 
 def _key(env: Mapping[str, str]) -> str:
-    key = env.get(ENV_KEY)
-    if not key:
-        raise MissingKey(ENV_KEY, NAME)
-    return key
+    return read_key(env, ENV_KEY, NAME)
 
 
 def spec(

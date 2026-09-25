@@ -41,11 +41,13 @@ from .apikey import CredentialFailure
 from .pin import (
     AddOutcome,
     FetchFn,
+    MalformedKey,
     MissingKey,
     PinSpec,
     add_source,
     archive,
     archive_source,
+    clean_credential,
     default_fetch,
     to_manifest_line,
 )
@@ -208,12 +210,21 @@ def state(data_dir: Path, env: Mapping[str, str]) -> dict[str, Any]:
 
     `key_present` is a bool and `env_key` is a NAME. No value from `env` reaches this dict, which
     is the whole reason the console parses `.env` into a private mapping instead of exporting it.
+    The key is judged the way the fetchers read it (`pin.clean_credential`): present means usable,
+    and `key_malformed` marks one that is set but will be refused.
     """
     modules = []
     for name in fetchers.NAMES:
         module = fetchers.get(name)
         env_key = getattr(module, "ENV_KEY", None)
         verified_at = getattr(module, "VERIFIED_AT", None)
+        key_present: bool | None = None
+        key_malformed = False
+        if env_key:
+            try:
+                key_present = clean_credential(env, env_key, name) is not None
+            except MalformedKey:
+                key_present, key_malformed = False, True
         modules.append(
             {
                 "name": name,
@@ -224,7 +235,8 @@ def state(data_dir: Path, env: Mapping[str, str]) -> dict[str, Any]:
                 "search_types": list(fetchers.search_types(name)),
                 "requires_archive": fetchers.requires_archive(name),
                 "env_key": env_key,
-                "key_present": bool(env.get(env_key)) if env_key else None,
+                "key_present": key_present,
+                "key_malformed": key_malformed,
             }
         )
     xw = Crosswalk(data_dir)
@@ -1207,10 +1219,12 @@ def render_page(token: str, snapshot: dict[str, Any]) -> str:
             tone, label = "chip-grey", "unverified"
         key = ""
         if f["env_key"]:
-            key = (
-                f'<span class="key">{"key present" if f["key_present"] else "no key in .env"}'
-                "</span>"
+            said = (
+                "key malformed"
+                if f.get("key_malformed")
+                else ("key present" if f["key_present"] else "no key in .env")
             )
+            key = f'<span class="key">{said}</span>'
         chips.append(
             f'<span class="chip {tone}"><span class="mono">{e(f["name"])}</span> {e(label)}'
             f"{key}</span>"

@@ -88,7 +88,7 @@ pin is the filing itself. `add fecfiling` needs `OPENFEC_API_KEY` for the metada
 serves both documents without one, so `check` needs no key.
 
     python -m registers_crosswalk.pin search <fetcher> <query>   # identifiers, then the add to paste
-    python -m registers_crosswalk.pin check        # 0 clean, 1 drift, 2 missing key, 3 fetch failed
+    python -m registers_crosswalk.pin check        # 0 clean, 1 drift, 2 missing or malformed key, 3 fetch failed
     python -m registers_crosswalk.pin ledger       # entries for the New Gray ledgers (--format manifest|record)
     python -m registers_crosswalk.pin archive --repair xr_src_NNNN   # re-verify an attached capture
     python -m registers_crosswalk.pin blobs --out DIR   # verified copies + MANIFEST.sha256, outside the repo
@@ -96,10 +96,12 @@ serves both documents without one, so `check` needs no key.
 
 A transport failure (exit 3) is deliberately not reported as drift (exit 1) — a dead endpoint and
 a changed document demand opposite responses. `add` and `search` exit 2 when a key is not set,
-after one line naming the variable, and 4 when api.data.gov refuses it, after one line on stderr,
-`CREDENTIAL FAILURE <fetcher> <status> <code>`. Every record also carries `fetcher_verified`:
-false means that fetcher's field mapping has never been exercised against the live API, so a
-silent mapping error could be sitting in the record. `validate` counts them.
+or is set but still holds whitespace or a control character once its surrounding whitespace is
+stripped, after one line naming the variable, never the value. They exit 4 when api.data.gov
+refuses the key, after one line on stderr, `CREDENTIAL FAILURE <fetcher> <status> <code>`. Every
+record also carries `fetcher_verified`: false means that fetcher's field mapping has never been
+exercised against the live API, so a silent mapping error could be sitting in the record.
+`validate` counts them.
 
 API keys (`GOVINFO_API_KEY`, `OPENFEC_API_KEY`, `COURTLISTENER_TOKEN`) come from the environment and
 never enter a stored URL — see `docs/operations.md`, which also explains what each drift status

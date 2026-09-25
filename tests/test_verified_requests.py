@@ -2,14 +2,16 @@
 
 The rule is the `fetcher_verified` convention in docs/operations.md. On 2026-09-25 govinfo, openfec
 and fecfiling moved their keyed calls onto `apikey.keyed_fetch`, which URL-encodes every parameter,
-and all three kept `VERIFIED = True` on the strength of this file. It holds the URL templates they
-had before, copied verbatim from `b06bfde`, as the oracle, and checks the current code against them
-two ways:
+and all three, with courtlistener, moved reading their key onto `pin.read_key`. All four kept
+`VERIFIED = True` on the strength of this file. It holds the templates they had before, copied
+verbatim from `b06bfde`, as the oracle, and checks the current code against them two ways. Both
+compare what is handed to the fetch function; tests/test_credentials.py holds the wire below it.
 
 1. End to end, every request each verification run made: `pin add` through the real CLI, served
-   the captured responses, then the keyless `check` each run ended with, compared in order. That
-   is the keyed metadata call, the keyless content fetch and the check's keyless re-fetch, full URL
-   including parameter order, and which of them carries the key.
+   the captured responses, then the keyless `check` the run ended with where one was recorded
+   (none was after courtlistener's), compared in order. That is the keyed metadata call, the
+   keyless content fetch and the check's keyless re-fetch, full URL including parameter order,
+   and which of them carries the key.
 2. Old URL against new for every keyed builder. govinfo's summary URL and openfec's number search
    put operator input and the key into the URL raw, so for those the old template is an oracle
    only on inputs from the unreserved set `[A-Za-z0-9._~-]`; outside it they sent a malformed URL,
@@ -31,7 +33,8 @@ from urllib.parse import urlencode, urljoin
 
 import pytest
 
-from registers_crosswalk.fetchers import fecfiling, govinfo, openfec
+from registers_crosswalk.fetchers import courtlistener, fecfiling, govinfo, openfec
+from registers_crosswalk.models import ArchiveCopy
 from registers_crosswalk.pin import main
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -309,7 +312,8 @@ def test_openfec_free_text_url_is_unchanged_on_unreserved_input(key, doc_type):
 # The two templates that already went through `urlencode` are exact oracles on any input, so they
 # are held to it on the input an operator actually types: spaces, reserved characters, non-ASCII.
 _ARBITRARY = ["Cory Mills", "a/b", "a&b=c", "x+y", "#frag", "100%", "é", "中文", " lead", "trail "]
-_ANY_KEYS = [*KEYS, "k y+/&=é", "%41%", "#?"]
+# No whitespace: a key holding any is refused before a request is built (tests/test_credentials.py).
+_ANY_KEYS = [*KEYS, "k+y/&=é", "%41%", "#?"]
 
 
 def _arbitrary(seed, n=60):
@@ -359,3 +363,68 @@ def test_the_generated_inputs_really_are_unreserved_and_really_vary():
         assert set("".join(generated)) == set(_UNRESERVED), seed
         assert len({len(v) for v in generated}) > 10, seed
     assert all(set(k) <= set(_UNRESERVED) for k in KEYS) and len(set(KEYS)) == len(KEYS)
+
+
+# --------------------------------------------------------------------------- courtlistener
+#
+# Reading the token through `pin.read_key` put an edit on courtlistener's `spec()` path too, so its
+# verification run is held to the same proof: `add courtlistener --cluster-id 1481640 --archive`
+# on 2026-09-20, four authenticated API calls and then the document. No `check` after it is
+# recorded, so none is replayed.
+
+_OLD_CL_API = "https://www.courtlistener.com/api/rest/v4"
+_OLD_CL_STORAGE = "https://storage.courtlistener.com/"
+
+
+def old_courtlistener_cluster_url(cluster_id):
+    return f"{_OLD_CL_API}/clusters/{cluster_id}/"
+
+
+def old_courtlistener_auth_headers(token):
+    return {"Authorization": f"Token {token}"}
+
+
+def test_the_courtlistener_verification_run_sends_exactly_what_it_sent(
+    tmp_path, monkeypatch, capsys
+):
+    cluster = _capture("courtlistener_cluster_1481640")
+    docket = _capture("courtlistener_docket_2577633")
+    served = {
+        old_courtlistener_cluster_url(1481640): cluster,
+        cluster["sub_opinions"][0]: _capture("courtlistener_opinion_1481640"),
+        cluster["docket"]: docket,
+        docket["court"]: _capture("courtlistener_court_ca8"),
+    }
+    calls, archived = [], []
+
+    def fetch(url, headers=None):
+        calls.append((url, headers))
+        if url in served:
+            return json.dumps(served[url]).encode(), "application/json"
+        return b"%PDF-1.4 dunne", "application/pdf"
+
+    def archive_fn(url, **_):
+        archived.append(url)
+        return ArchiveCopy(service="wayback", url=f"https://web.archive.org/web/1/{url}")
+
+    monkeypatch.setenv("COURTLISTENER_TOKEN", SENTINEL)
+    argv = ["--data-dir", str(tmp_path), "add", "courtlistener", "--cluster-id", "1481640"]
+    code = main([*argv, "--archive"], fetch=fetch, archive_fn=archive_fn)
+    assert code == 0, capsys.readouterr().err
+    auth = old_courtlistener_auth_headers(SENTINEL)
+    document = urljoin(_OLD_CL_STORAGE, cluster["filepath_pdf_harvard"])
+    assert calls == [
+        (old_courtlistener_cluster_url(1481640), auth),
+        (cluster["sub_opinions"][0], auth),
+        (cluster["docket"], auth),
+        (docket["court"], auth),
+        (document, None),  # the document itself goes without the token
+    ]
+    assert archived == [document]
+
+
+@pytest.mark.parametrize("key", KEYS)
+def test_courtlistener_auth_header_is_unchanged(key):
+    assert courtlistener.auth_headers({"COURTLISTENER_TOKEN": key}) == (
+        old_courtlistener_auth_headers(key)
+    )

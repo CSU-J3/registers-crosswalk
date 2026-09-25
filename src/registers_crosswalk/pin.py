@@ -107,6 +107,50 @@ class MissingKey(RuntimeError):
         self.fetcher = fetcher
 
 
+class MalformedKey(MissingKey):
+    """A key is set, but even with its surrounding whitespace stripped it holds whitespace or a
+    control character, so whatever it is, it is not the key.
+
+    A MissingKey, so every place that reports a missing key reports this one the same way: exit 2
+    from `add` and `search`, KEY_MISSING from `check`, 400 from the console. The message names the
+    variable and never the value.
+    """
+
+    def __init__(self, env_var: str, fetcher: str) -> None:
+        RuntimeError.__init__(
+            self,
+            f"{fetcher}: environment variable {env_var} contains whitespace or a control character",
+        )
+        self.env_var = env_var
+        self.fetcher = fetcher
+
+
+# Whitespace and the C0/C1 control characters (Unicode category Cc). None belongs inside a key.
+_NOT_IN_A_KEY = re.compile(r"[\s\x00-\x1f\x7f-\x9f]")
+
+
+def clean_credential(env: Mapping[str, str], env_var: str, fetcher: str) -> str | None:
+    """The credential under `env_var` with its surrounding whitespace stripped, or None if unset.
+
+    Stripped the way the console's `.env` parser strips a value: a `.env` saved with CRLF line
+    endings and sourced by bash leaves a CR on the end of every value, and a CR sent as part of a
+    key is a key api.data.gov does not know. What is left is refused if it still holds whitespace
+    or a control character (MalformedKey), naming `env_var` and never the value.
+    """
+    value = (env.get(env_var) or "").strip()
+    if value and _NOT_IN_A_KEY.search(value):
+        raise MalformedKey(env_var, fetcher)
+    return value or None
+
+
+def read_key(env: Mapping[str, str], env_var: str, fetcher: str) -> str:
+    """`clean_credential`, for a fetcher that cannot run without it: unset is MissingKey."""
+    value = clean_credential(env, env_var, fetcher)
+    if value is None:
+        raise MissingKey(env_var, fetcher)
+    return value
+
+
 def sha256_hex(body: bytes) -> str:
     return hashlib.sha256(body).hexdigest()
 
@@ -118,11 +162,51 @@ def _media_type(content_type: str | None) -> str:
     return content_type.split(";", 1)[0].strip().lower() or "application/octet-stream"
 
 
+def _request(
+    url: str,
+    headers: Mapping[str, str] | None = None,
+    *,
+    base: Mapping[str, str] = _BASE_HEADERS,
+    data: bytes | None = None,
+) -> urllib.request.Request:
+    """A request carrying `base` and `headers`, with any Authorization header unredirected.
+
+    urllib copies a request's ordinary headers onto the request a redirect makes, to whatever host
+    the Location names, so a credential among them would follow the redirect there. An
+    unredirected header goes only to the host that was asked.
+
+    urllib writes unredirected headers first, so an Authorization header added that way alone would
+    go out ahead of Host and change the request on the wire. On a request that carries one, every
+    header urllib would have written is laid down unredirected in the order it would have written
+    them: the body's Content-Type and Content-Length, then Host, then the rest. The first request's
+    bytes are what they were; the ordinary headers still ride on a redirect; Authorization does not.
+
+    The price: a redirect on an authenticated call, even to the same host, arrives without the
+    credential and is answered as an anonymous request would be. The credential is never carried
+    on, and nothing says it was dropped.
+    """
+    merged = {**base, **(headers or {})}
+    ordinary = {name: value for name, value in merged.items() if name.lower() != "authorization"}
+    req = urllib.request.Request(url, data=data, headers=ordinary)
+    if len(ordinary) == len(merged):
+        return req
+    # What urllib's do_request_ would add to the unredirected headers, in its order. It skips each
+    # one already present, so it adds nothing more.
+    if data is not None:
+        if not req.has_header("Content-type"):
+            req.add_unredirected_header("Content-type", "application/x-www-form-urlencoded")
+        req.add_unredirected_header("Content-length", str(len(data)))
+    req.add_unredirected_header("Host", req.host)
+    for name, value in merged.items():
+        req.add_unredirected_header(name, value)
+    return req
+
+
 def default_fetch(
     url: str, headers: Mapping[str, str] | None = None, *, timeout: float = 60
 ) -> tuple[bytes, str]:
     """Fetch `url` and return (decompressed body, media type). Follows redirects."""
-    req = urllib.request.Request(url, headers={**_BASE_HEADERS, **(headers or {})})
+    req = _request(url, headers)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         raw = resp.read()
         media_type = _media_type(_header(resp.headers, "Content-Type"))
@@ -329,7 +413,7 @@ _SERVED_TS = re.compile(r"/web/(\d{14})id_/")
 def _response_headers(
     url: str, headers: Mapping[str, str] | None = None, *, timeout: float = 90
 ) -> Mapping[str, str]:
-    req = urllib.request.Request(url, headers={**_BASE_HEADERS, **(headers or {})})
+    req = _request(url, headers)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return dict(resp.headers)
 
@@ -352,7 +436,7 @@ def _json_call(
     timeout: float = 90,
 ) -> Mapping[str, object]:
     """POST (with `data`) or GET `url` and parse the JSON reply. No gzip: these bodies are tiny."""
-    req = urllib.request.Request(url, data=data, headers={"User-Agent": _UA, **(headers or {})})
+    req = _request(url, headers, base={"User-Agent": _UA}, data=data)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -803,7 +887,13 @@ def _new_capture(
 ) -> ArchiveCopy | ArchiveFailure:
     """Ask Save Page Now for a capture of `url`: SPN2 with keys, the anonymous save without."""
     auth: dict[str, str] = {}
-    access, secret = env.get("WAYBACK_ACCESS_KEY"), env.get("WAYBACK_SECRET_KEY")
+    try:
+        access = clean_credential(env, "WAYBACK_ACCESS_KEY", "archive")
+        secret = clean_credential(env, "WAYBACK_SECRET_KEY", "archive")
+    except MalformedKey as exc:
+        # Not the anonymous path instead: a malformed key is an operator's mistake to fix, and
+        # quietly archiving without it would hide it behind the anonymous save's own failures.
+        return ArchiveFailure(str(exc))
     if access and secret:
         auth["Authorization"] = f"LOW {access}:{secret}"
     try:

@@ -34,7 +34,7 @@ from urllib.parse import urlsplit
 
 from ..apikey import keyed_fetch
 from ..models import Grade
-from ..pin import FetchFn, MissingKey, PinSpec, default_fetch, sha256_hex
+from ..pin import FetchFn, PinSpec, default_fetch, read_key, sha256_hex
 
 NAME = "fecfiling"
 HELP = "a committee's FEC filing as filed: the .fec file or its image PDF (by file number)"
@@ -48,8 +48,8 @@ CHECK_SUPERSEDED = True
 # hash against an independent keyless fetch of the same .fec, and a `check` with no key in the
 # environment exited 0. Any further edit to spec() or its parsing resets this to False — see the
 # convention in docs/operations.md — unless a test proves the requests byte-identical for every
-# recorded verification input. The move onto `apikey.keyed_fetch` on 2026-09-25 kept it that way:
-# tests/test_verified_requests.py.
+# recorded verification input. The move onto `apikey.keyed_fetch`, and reading the key through
+# `pin.read_key`, both on 2026-09-25, kept it that way: tests/test_verified_requests.py.
 VERIFIED = True
 VERIFIED_AT = date(2026, 9, 23)
 PUBLISHER = "Federal Election Commission"
@@ -62,10 +62,7 @@ _TITLE = {"fec": "Form {} electronic filing (.fec)", "pdf": "Form {} image (PDF)
 
 
 def _key(env: Mapping[str, str]) -> str:
-    key = env.get(ENV_KEY)
-    if not key:
-        raise MissingKey(ENV_KEY, NAME)
-    return key
+    return read_key(env, ENV_KEY, NAME)
 
 
 def filings_params(file_number: int) -> dict[str, int]:

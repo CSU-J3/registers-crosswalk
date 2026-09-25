@@ -95,9 +95,11 @@ serves both documents without one, so `check` needs no key.
     python -m registers_crosswalk.pin note xr_src_NNNN "<label>"   # offline; rewrites only notes
 
 A transport failure (exit 3) is deliberately not reported as drift (exit 1) — a dead endpoint and
-a changed document demand opposite responses. Every record also carries `fetcher_verified`: false
-means that fetcher's field mapping has never been exercised against the live API, so a silent
-mapping error could be sitting in the record. `validate` counts them.
+a changed document demand opposite responses. `add` and `search` exit 2 when a key is not set,
+after one line naming the variable, and 4 when api.data.gov refuses it, after one line on stderr,
+`CREDENTIAL FAILURE <fetcher> <status> <code>`. Every record also carries `fetcher_verified`:
+false means that fetcher's field mapping has never been exercised against the live API, so a
+silent mapping error could be sitting in the record. `validate` counts them.
 
 API keys (`GOVINFO_API_KEY`, `OPENFEC_API_KEY`, `COURTLISTENER_TOKEN`) come from the environment and
 never enter a stored URL — see `docs/operations.md`, which also explains what each drift status

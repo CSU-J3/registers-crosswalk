@@ -132,7 +132,7 @@ def spec(
     if document_id is None and category is None:
         category = "Final Opinion"
     key = _key(os.environ if env is None else env)
-    body, _ = keyed_fetch(fetch, SEARCH, search_params(number, doc_type), key=key)
+    body, _ = keyed_fetch(fetch, SEARCH, search_params(number, doc_type), key=key, fetcher=NAME)
     records = _records(json.loads(body), doc_type)
     record, document = _pick_document(records, category=category, document_id=document_id)
     return PinSpec(
@@ -199,7 +199,7 @@ def search(
 ) -> list[SearchHit]:
     """Respondent or matter name in, AO/MUR numbers out. Never writes, never pins."""
     key = _key(os.environ if env is None else env)
-    body, _ = keyed_fetch(fetch, SEARCH, free_text_params(query, doc_type), key=key)
+    body, _ = keyed_fetch(fetch, SEARCH, free_text_params(query, doc_type), key=key, fetcher=NAME)
     return [_hit(r, doc_type) for r in _records(json.loads(body), doc_type)]
 
 

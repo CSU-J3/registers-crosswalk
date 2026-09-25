@@ -37,6 +37,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse, urlsplit
 
 from . import fetchers
+from .apikey import CredentialFailure
 from .pin import (
     AddOutcome,
     FetchFn,
@@ -371,6 +372,8 @@ class Console:
             hits = fetchers.search(name, text, doc_type=doc_type, fetch=self.fetch, env=self.env)
         except MissingKey as exc:
             return 400, {"error": str(exc)}
+        except CredentialFailure as exc:
+            return _credential_failure(exc)
         except (ValueError, OSError) as exc:
             return 502, {"error": f"{type(exc).__name__}: {exc}"}
         return 200, {
@@ -428,6 +431,8 @@ class Console:
             spec = module.spec_from_args(ns, fetch=self.fetch, env=self.env)
         except MissingKey as exc:
             return 400, {"error": str(exc)}
+        except CredentialFailure as exc:
+            return _credential_failure(exc)
         except ValueError as exc:
             # The cluster has no pinnable document. Not an error in the console: it is the
             # answer, and the page says so where the Pin button would have been.
@@ -509,6 +514,17 @@ class Console:
         except (ValueError, OSError) as exc:
             return 200, {"status": "refused", "message": f"{type(exc).__name__}: {exc}"}
         return 200, _outcome_payload(outcome)
+
+
+def _credential_failure(exc: CredentialFailure) -> tuple[int, dict[str, Any]]:
+    """api.data.gov refused the key: the line goes in the pane and on the terminal.
+
+    The terminal as well because the handler's request log is silenced, and this is the one
+    failure only the operator can fix: the key in `.env`, not the page, is what has to change.
+    502, because it is an upstream answer, as for any other failure of the call behind the page.
+    """
+    print(str(exc), file=sys.stderr, flush=True)
+    return 502, {"error": str(exc)}
 
 
 def _outcome_payload(outcome: AddOutcome) -> dict[str, Any]:

@@ -30,7 +30,7 @@ from pathlib import Path, PurePosixPath
 from typing import Literal
 from urllib.parse import urlencode, urljoin, urlsplit
 
-from .apikey import redact
+from .apikey import CredentialFailure, redact
 from .ids import SRC_ID
 from .models import (
     ArchiveCopy,
@@ -893,6 +893,12 @@ _EXIT_CODES: dict[str, int] = {
     "key_missing": 2,
     "fetch_failed": 3,
 }
+# `add` and `search` exit with this when api.data.gov refuses the key, after printing one line,
+# `CREDENTIAL FAILURE <fetcher> <status> <code>`. `check` never does: no pin sits on a keyed host.
+# It is not 2, which says a key is absent, because this one is present and was turned away, and
+# the fix is different: read the code, not the environment.
+EXIT_CREDENTIAL_FAILURE = 4
+
 # Reporting precedence, which is NOT numeric order: 2 and 3 outrank 1 because they mean the check
 # never ran. Keyed by exit code.
 _EXIT_RANK: dict[int, int] = {0: 0, 1: 1, 3: 2, 2: 3}
@@ -1656,7 +1662,14 @@ def _cmd_add(
         return 1
 
     module = fetchers.get(args.fetcher)
-    spec = module.spec_from_args(args, fetch=fetch)
+    try:
+        spec = module.spec_from_args(args, fetch=fetch)
+    except MissingKey as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except CredentialFailure as exc:
+        print(str(exc), file=sys.stderr)
+        return EXIT_CREDENTIAL_FAILURE
 
     outcome = add_source(
         spec,
@@ -1768,6 +1781,9 @@ def _cmd_search(
     except MissingKey as exc:
         print(str(exc), file=sys.stderr)
         return 2
+    except CredentialFailure as exc:
+        print(str(exc), file=sys.stderr)
+        return EXIT_CREDENTIAL_FAILURE
 
     if args.json:
         print(json.dumps([asdict(h) for h in hits], indent=2))
@@ -2011,8 +2027,8 @@ if __name__ == "__main__":
     # beside the `registers_crosswalk.pin` that every fetcher imports MissingKey from. An `except
     # MissingKey` in this copy names a different class and never matches, so under -m a missing key
     # was a traceback and exit 1 that ended the run at the first keyed pin, where `main()` reports
-    # it: one line and exit 2 from `search`, a KEY_MISSING row from `check` (exit 2) and from
-    # `blobs` (exit 1). Hand off to the imported module, so the CLI runs what the tests run.
+    # it: one line and exit 2 from `search` and `add`, a KEY_MISSING row from `check` (exit 2) and
+    # from `blobs` (exit 1). Hand off to the imported module, so the CLI runs what the tests run.
     from registers_crosswalk.pin import main as _main
 
     sys.exit(_main())

@@ -7,12 +7,16 @@ name: sources-drift
 # Weekly, not per-push: a pin drifts on the publisher's schedule, not ours, and re-fetching every
 # pinned document on every commit would be rude to the services and slow.
 #
-# No fetcher needs a key to re-fetch what it stored: govinfo, openfec and courtlistener all pin a
-# key-free public URL and use their keys only for the metadata call at `add` time (see
-# docs/operations.md). The secrets below are optional and unset. They stay wired so a future pin
-# that DOES need one makes `check` exit 2 and fails this job — deliberately. A drift check that
-# silently skipped the sources it couldn't reach would report green while telling you nothing, so
-# there is no continue-on-error here.
+# No fetcher needs a key to re-fetch what it stored: govinfo, openfec, fecfiling and courtlistener
+# all pin a key-free public URL and use their keys only for the metadata call at `add` time (see
+# docs/operations.md), so CI needs no API secret. The api.data.gov key (GOVINFO_API_KEY /
+# OPENFEC_API_KEY) lives only in the local `.env` and is not wired here: a copy in Actions would
+# authorize nothing and would be one more place to rotate. COURTLISTENER_TOKEN below is optional
+# and unset; it stays wired so that setting the secret is all a courtlistener pin under the API
+# would take. A pin that needs a key this job doesn't have fails the job, deliberately; what an
+# api.data.gov one would take is under "Source API keys" in docs/operations.md. A drift check
+# that silently skipped the sources it couldn't reach would report green while telling you
+# nothing, so there is no continue-on-error here.
 on:
   schedule:
     - cron: "0 12 * * 1"
@@ -34,7 +38,5 @@ jobs:
 
       - name: Re-fetch pinned documents and compare
         env:
-          GOVINFO_API_KEY: ${{ secrets.GOVINFO_API_KEY }}
-          OPENFEC_API_KEY: ${{ secrets.OPENFEC_API_KEY }}
           COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
         run: python -m registers_crosswalk.pin check

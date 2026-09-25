@@ -115,7 +115,13 @@ To lift this **when Sovereign mints stable per-entity keys**, change three files
 ## Source API keys (and why none of them may enter a stored URL)
 
 Pinning documents needs four optional credentials. All four are read from the **environment** at
-fetch time; in CI they are repo secrets wired into `.github/workflows/sources-drift.yml`.
+fetch time. CI needs no API secret: every stored canonical URL is key-free, so `check` sends no
+credential. The api.data.gov key behind `GOVINFO_API_KEY` and `OPENFEC_API_KEY` lives only in the
+local `.env` and is not an Actions secret. A govinfo pin stored on `api.govinfo.gov` would need
+`GOVINFO_API_KEY` wired back into `sources-drift.yml` and `status-page.yml` on purpose; openfec
+and fecfiling never attach their key in `check`, so a pin stored on `api.open.fec.gov` would need
+code before it needed a secret. `COURTLISTENER_TOKEN` stays wired in both as an optional secret,
+unset (below).
 
 | env var | needed for | where to get it |
 |---|---|---|
@@ -588,8 +594,9 @@ drift run. On the six MUR pins currently in `data/`, four were going unchecked.
   what we parse out of it (`ERROR` — uscode dropped its source credit, an API changed shape). All
   three are real findings about the world, and all three need a human to look and re-pin.
 - **2 — the check could not run: an API key isn't set** (`KEY_MISSING`). A configuration problem
-  on our side, not a finding. The failing line names the env var. Fix the secret and re-run; until
-  then you know nothing about those sources.
+  on our side, not a finding. The failing line names the env var. In CI only `COURTLISTENER_TOKEN`
+  is wired; any other key has to be wired into the workflows on purpose first (*Source API keys*,
+  above). Set it and re-run; until then you know nothing about those sources.
 - **3 — the check could not run: the transport failed** (`FETCH_FAILED`) — timeout, non-2xx, DNS,
   connection refused. Also not a finding. Usually transient, so re-run before investigating; if it
   persists, a 404 on a canonical URL means the document moved, which *is* a finding.
@@ -871,9 +878,9 @@ build/status/index.html` (add `--drift-json` if you have a check's JSON to hand)
   `REQUIRES_ARCHIVE` is aimed at never seeing that line.
 - **Pages must be switched on once, by hand:** Settings → Pages → Source → **GitHub Actions**.
   Until then the deploy step fails and nothing else is wrong.
-- **`sources-drift.yml` is untouched.** It stays the check to watch, and its red badge keeps its
-  meaning. This job is a second reader of the same answer, not a replacement — which is also why
-  the section above still describes the only drift runbook there is.
+- **`sources-drift.yml`'s red badge keeps its meaning.** It stays the check to watch. This job is
+  a second reader of the same answer, not a replacement — which is also why the section above
+  still describes the only drift runbook there is.
 
 ## Scheduled workflows go dark on a quiet repo
 

@@ -30,8 +30,9 @@ import json
 import os
 from collections.abc import Mapping
 from datetime import date
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlsplit
 
+from ..apikey import keyed_fetch
 from ..models import Grade
 from ..pin import FetchFn, MissingKey, PinSpec, default_fetch, sha256_hex
 
@@ -46,7 +47,9 @@ CHECK_SUPERSEDED = True
 # mapped field compared against the captured metadata (tests/fixtures/fecfiling_filings_*), the
 # hash against an independent keyless fetch of the same .fec, and a `check` with no key in the
 # environment exited 0. Any further edit to spec() or its parsing resets this to False — see the
-# convention in docs/operations.md.
+# convention in docs/operations.md — unless a test proves the requests byte-identical for every
+# recorded verification input. The move onto `apikey.keyed_fetch` on 2026-09-25 kept it that way:
+# tests/test_verified_requests.py.
 VERIFIED = True
 VERIFIED_AT = date(2026, 9, 23)
 PUBLISHER = "Federal Election Commission"
@@ -65,9 +68,9 @@ def _key(env: Mapping[str, str]) -> str:
     return key
 
 
-def filings_url(file_number: int, key: str) -> str:
-    """The metadata query. Carries the key, so it is requested and then forgotten."""
-    return f"{FILINGS}?{urlencode({'file_number': file_number, 'api_key': key})}"
+def filings_params(file_number: int) -> dict[str, int]:
+    """The metadata query's parameters; `keyed_fetch` encodes them and adds the key."""
+    return {"file_number": file_number}
 
 
 def _the_filing(payload: Mapping, file_number: int) -> Mapping:
@@ -110,7 +113,7 @@ def spec(
     if document not in DOCUMENTS:
         raise ValueError(f"document must be one of {', '.join(DOCUMENTS)}, not {document!r}")
     key = _key(os.environ if env is None else env)
-    body, _ = fetch(filings_url(file_number, key), None)
+    body, _ = keyed_fetch(fetch, FILINGS, filings_params(file_number), key=key)
     filing = _the_filing(json.loads(body), file_number)
     form = str(filing["form_type"]).removeprefix("F")
     return PinSpec(

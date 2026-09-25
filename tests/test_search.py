@@ -153,7 +153,9 @@ def test_a_docket_hit_offers_no_add_because_its_id_is_not_a_cluster_id():
 def test_openfec_search_url_carries_the_key_and_the_hit_never_does():
     # openfec's search has never been run live, so nothing here claims to know its response shape.
     # What IS testable without a capture: the key goes in the query and comes out of nothing else.
-    url = openfec.free_text_search_url("Osborn", "murs", "SECRET")
+    fetch = _fetch({"murs": []})
+    openfec.search("Osborn", doc_type="murs", fetch=fetch, env={"OPENFEC_API_KEY": "SECRET"})
+    [(url, _)] = fetch.calls
     assert url.startswith("https://api.open.fec.gov/v1/legal/search/?")
     assert "q=Osborn" in url and "type=murs" in url and "api_key=SECRET" in url
     record = {"no": "7700", "name": "X", "url": "/legal/matter-under-review/7700/"}

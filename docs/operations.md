@@ -450,11 +450,13 @@ between 16:56 and 21:15 UTC on 2026-09-16 (`403 API_KEY_DISABLED`). This repo ne
 disabling shows up here. From git: the switch to the `GOVINFO_API_KEY` value is recorded on
 2026-09-21 (`6b01c05`), and `OPENFEC_API_KEY` was copied from it the same day. The first live
 keyed runs on that value are openfec on 2026-09-21, govinfo on 2026-09-22 and fecfiling on
-2026-09-23. The 2026-09-17 "verified live" comments in `openfec.py` and `fetchers/__init__.py` are
-not runs in this repo: `b9afc01`, the commit that added the fetchers, shipped openfec and govinfo
-unverified because those notes "came from the spec work, not from a run here", and they are no
-evidence about either key. What followed from the disabling — the one-key-per-project rule, no
-LegiScan key, and the secret-audit rule — is under *Source API keys*, above.
+2026-09-23. The 2026-09-17 date that `openfec.py` gives its advisory-opinion notes is the spec
+handoff's, not a run in this repo: `b9afc01`, the commit that added the fetchers, shipped openfec
+and govinfo unverified because the behaviour their docstrings recorded "came from the spec work,
+not from a run here", and nothing from either keyed host was captured or pinned here before
+2026-09-21. The date is no evidence about either key. What followed from the disabling — the
+one-key-per-project rule, no LegiScan key, and the secret-audit rule — is under *Source API keys*,
+above.
 
 **The free-text `search()` is still unexercised.** The run went through `spec()` by number, which is
 a different query shape; `q=` has never been asked of the live endpoint. What the captures do cover

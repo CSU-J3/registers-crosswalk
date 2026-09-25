@@ -81,9 +81,10 @@ CaptureFn = Callable[[str], tuple[bytes, str, Mapping[str, str]]]
 ArchiveFn = Callable[..., "ArchiveCopy | ArchiveFailure | None"]
 
 _UA = "registers-crosswalk/0.1 (+https://github.com/CSU-J3/registers-crosswalk)"
-# eCFR's versioner returns 406 without an Accept-Encoding the client will take (verified
-# 2026-09-17), so gzip is requested on every fetch and decompressed here. The hash is ALWAYS over
-# the decompressed bytes, so a server switching its transfer encoding is not drift.
+# eCFR's versioner returns 406 without an Accept-Encoding the client will take (the spec
+# handoff's claim, dated 2026-09-17; never observed from this tree, whose `default_fetch` has
+# always sent gzip), so gzip is requested on every fetch and decompressed here. The hash is
+# ALWAYS over the decompressed bytes, so a server switching its transfer encoding is not drift.
 _BASE_HEADERS = {"User-Agent": _UA, "Accept-Encoding": "gzip"}
 
 _EXTENSIONS = {

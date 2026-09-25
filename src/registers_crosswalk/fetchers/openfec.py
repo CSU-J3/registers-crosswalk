@@ -1,6 +1,13 @@
 """OpenFEC legal search — advisory opinions and MURs.
 
-Verified live 2026-09-17 for advisory opinions:
+Advisory opinions, from the spec work behind `b9afc01`, the commit that added this module. The spec
+handoff dated its findings "verified live on 2026-09-17". That date is the handoff's, kept as
+given, and not a run from this tree: no advisory opinion has been fetched, captured or pinned here,
+and the tests' advisory-opinion response is authored. `ao_no` is the spec's parameter and has never
+been sent from here, and the MUR run below showed that an ignored parameter still answers 200, so
+nothing yet shows that it filters. The handoff records the endpoint, the `Final Opinion` pick and
+the fec.gov join. That the other categories are drafts and requests, and that fec.gov serves an
+advisory opinion's PDF with no key, came with `b9afc01` and are unchecked as well:
   * `https://api.open.fec.gov/v1/legal/search/?type=advisory_opinions&ao_no={n}&api_key=...`
     returns records carrying `documents[]`, each with a `category` and a RELATIVE `url`.
   * The document to pin is the one with `category == "Final Opinion"`; the other categories are
@@ -30,7 +37,7 @@ Verified live 2026-09-21 for MURs, on FEC MURs 8098 and 8111:
   * the record's `name` is the primary respondent ("Cory Mills"), not a captioned matter name, and
     it is the same string for both matters — which is why the citation stays `FEC MUR {n}` and
     `--citation` exists for the cases where that is not enough.
-  * fec.gov served every PDF with no key, as for advisory opinions.
+  * fec.gov served every PDF with no key.
 """
 
 from __future__ import annotations
@@ -54,7 +61,9 @@ DRIFT_KEY = "sha256"
 # against the captured search response, then `check` clean. Editing `spec()` voids that run and
 # resets this to False — the convention in docs/operations.md — unless a test proves the requests
 # byte-identical for every recorded verification input. The move onto `apikey.keyed_fetch` on
-# 2026-09-25 kept it that way: tests/test_verified_requests.py.
+# 2026-09-25 kept it that way: tests/test_verified_requests.py. That run was a MUR. The
+# advisory-opinion path shares `spec()`, but its query has never been sent from this tree, so an
+# advisory-opinion record's `fetcher_verified: true` rests on the MUR run alone.
 VERIFIED = True
 VERIFIED_AT = date(2026, 9, 21)
 PUBLISHER = "Federal Election Commission"
@@ -141,9 +150,10 @@ def spec(
         citation=citation or _CITATION[doc_type].format(number),
         title=document.get("description") or record.get("name") or f"{doc_type} {number}",
         publisher=PUBLISHER,
-        # `document_date` is the MUR shape, observed 2026-09-21; `date` is what the advisory
-        # opinion fixture carries. `issue_date` is on the RECORD, not the document, and no MUR
-        # record has one — read all three rather than assert one shape.
+        # `document_date` is the MUR shape, observed 2026-09-21; `date` is what the tests'
+        # authored advisory-opinion response carries, since no real one has been captured.
+        # `issue_date` is on the RECORD, not the document, and no MUR record has one — read all
+        # three rather than assert one shape.
         published_at=_as_date(
             document.get("document_date") or document.get("date") or record.get("issue_date")
         ),

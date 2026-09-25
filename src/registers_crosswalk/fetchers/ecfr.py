@@ -2,9 +2,13 @@
 
 Verified live 2026-09-18 (UTC):
   * `/api/versioner/v1/full/{as_of}/title-{t}.xml?part={p}` returns the part's XML as of that date.
-    It answers 406 unless the request will accept gzip, which `pin.default_fetch` always sends.
-    Adding `&section=` or `&subpart=` narrows it to that provision — four distinct documents with
-    four distinct hashes, so the granularity is a property of the pinned document, not a display
+    That it answers 406 unless the request will accept gzip is the spec handoff's claim, dated
+    2026-09-17 as it was given, and not an observation from this tree: `pin.default_fetch` has
+    sent `Accept-Encoding: gzip` on every request since `b9afc01` added it, so no run here has
+    asked without it. `1f54549` moved this docstring's "Verified live" line to 2026-09-18 for
+    the runs made here and swept the claim along with it. Adding `&section=` or `&subpart=` to
+    the `full` URL narrows the document to that provision — four distinct documents with four
+    distinct hashes, so the granularity is a property of the pinned document, not a display
     choice. Pinning the part when the argument cites the section substitutes a different document.
   * `/api/versioner/v1/versions/title-{t}.json?part={p}` returns `content_versions[]`. Observed
     keys, captured 2026-09-18 (UTC): `amendment_date`, `date`, `identifier`, `issue_date`, `name`,

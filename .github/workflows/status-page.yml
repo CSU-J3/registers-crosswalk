@@ -33,8 +33,9 @@ name: status-page
 # (GOVINFO_API_KEY / OPENFEC_API_KEY) lives only in the local `.env` and is not wired here; what a
 # pin on an api.data.gov host would take is under "Source API keys" in docs/operations.md.
 # COURTLISTENER_TOKEN is an optional repo secret, unset, passed for the same reason
-# `sources-drift` passes it. Nothing in this job archives, so the Wayback keys are not needed and
-# are deliberately absent.
+# `sources-drift` passes it: without it, a pin that needs it reports KEY_MISSING, which is a grey
+# pill on the page and exit 2 here. Nothing in this job archives, so the Wayback keys are not
+# needed and are deliberately absent.
 #
 # One-time setup: repo Settings -> Pages -> Source must be "GitHub Actions" or the deploy step
 # fails. Nothing else needs fixing when it does.

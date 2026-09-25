@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -208,6 +209,76 @@ def test_check_exits_2_when_a_key_is_missing(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("GOVINFO_API_KEY")
     assert main(["--data-dir", str(tmp_path), "check"], fetch=fetch) == 2
     assert "KEY_MISSING" in capsys.readouterr().out
+
+
+# `python -m registers_crosswalk.pin` is how both workflows and the README run the CLI. It ran
+# pin.py as `__main__`, a second copy of the module whose `except MissingKey` named a different
+# class from the one every fetcher raises, so all three catch sites missed: a traceback and exit 1
+# where `main()` exits 2 (search, check) or reports KEY_MISSING (blobs). In-process tests are why
+# it hid, so these run a real child process. MissingKey is raised before any request is made, so
+# nothing here touches the network.
+
+
+def _dash_m(*argv, drop):
+    env = {k: v for k, v in os.environ.items() if k not in drop}
+    return subprocess.run(
+        [sys.executable, "-m", "registers_crosswalk.pin", *argv],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+
+def _pin_on_the_api_host(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("GOVINFO_API_KEY", "SECRET")
+    summary = {
+        "title": "United States Code, 2023 Edition, Title 52",
+        "dateIssued": "2024-01-08",
+        "download": {"pdfLink": "https://www.govinfo.gov/content/pkg/X/pdf/x.pdf"},
+    }
+
+    def fetch(url, headers=None):
+        if "api.govinfo.gov" in url:
+            return json.dumps(summary).encode(), "application/json"
+        return BODY, "application/pdf"
+
+    argv = ["--data-dir", str(tmp_path), "add", "govinfo", "--package", "USCODE-2023-title52"]
+    assert main(argv, fetch=fetch) == 0
+    capsys.readouterr()
+    _move_govinfo_pin_to_the_api_host(tmp_path)
+
+
+def test_python_m_search_with_no_key_exits_2_without_a_traceback():
+    done = _dash_m("search", "openfec", "x", drop=("OPENFEC_API_KEY",))
+    assert (done.returncode, done.stdout) == (2, "")
+    assert done.stderr == "openfec: environment variable OPENFEC_API_KEY is not set\n"
+
+
+@pytest.mark.parametrize("as_json", [False, True], ids=["text", "json"])
+def test_python_m_check_reports_key_missing_and_exits_2(as_json, tmp_path, monkeypatch, capsys):
+    _pin_on_the_api_host(tmp_path, monkeypatch, capsys)
+    argv = ["--data-dir", str(tmp_path), "check", *(["--json"] if as_json else [])]
+    done = _dash_m(*argv, drop=("GOVINFO_API_KEY",))
+    assert done.returncode == 2, done.stderr
+    assert "Traceback" not in done.stderr
+    if as_json:
+        # What status-page.yml redirects into build/drift.json: a report, not an empty file.
+        [report] = json.loads(done.stdout)
+        assert report["status"] == "key_missing"
+    else:
+        assert "KEY_MISSING" in done.stdout
+
+
+def test_python_m_blobs_reports_key_missing_without_a_traceback(tmp_path, monkeypatch, capsys):
+    _pin_on_the_api_host(tmp_path, monkeypatch, capsys)
+    out = tmp_path / "blobs"
+    done = _dash_m(
+        "--data-dir", str(tmp_path), "blobs", "--out", str(out), drop=("GOVINFO_API_KEY",)
+    )
+    assert done.returncode == 1, done.stderr
+    assert "Traceback" not in done.stderr
+    assert "KEY_MISSING" in done.stdout
 
 
 def test_check_only_one_pin(tmp_path, capsys):

@@ -2007,4 +2007,12 @@ def main(
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # `python -m registers_crosswalk.pin` runs this file as `__main__`, a second copy of the module
+    # beside the `registers_crosswalk.pin` that every fetcher imports MissingKey from. An `except
+    # MissingKey` in this copy names a different class and never matches, so under -m a missing key
+    # was a traceback and exit 1 that ended the run at the first keyed pin, where `main()` reports
+    # it: one line and exit 2 from `search`, a KEY_MISSING row from `check` (exit 2) and from
+    # `blobs` (exit 1). Hand off to the imported module, so the CLI runs what the tests run.
+    from registers_crosswalk.pin import main as _main
+
+    sys.exit(_main())

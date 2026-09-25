@@ -30,6 +30,7 @@ from pathlib import Path, PurePosixPath
 from typing import Literal
 from urllib.parse import urlencode, urljoin, urlsplit
 
+from .apikey import redact
 from .ids import SRC_ID
 from .models import (
     ArchiveCopy,
@@ -863,6 +864,18 @@ _TRANSPORT = OSError
 # each of the seven was OK on the next run that checked it.
 _CHECK_RETRY_WAIT = 30.0
 
+
+def _failure(exc: Exception, secret: str | None) -> str:
+    """A failed re-fetch as a report detail, with the fetcher's key masked out of it first.
+
+    A pin on a keyed host is re-fetched with its key attached, and urllib and http.client quote
+    the URL they were given in their errors. The detail goes to stdout, `--json` and the CI log.
+    """
+    if secret:
+        redact(exc, secret)
+    return f"{type(exc).__name__}: {exc}"
+
+
 DriftStatus = Literal["ok", "drift", "amended", "key_missing", "fetch_failed", "error"]
 
 # status -> process exit code. A check that could not RUN (2, 3) is reported separately from a
@@ -950,21 +963,25 @@ def check(
         "expected": source.artifact.drift_value,
         "archived": bool(source.archives),
     }
+    env = os.environ if env is None else env
     try:
-        url, headers = fetchers.content_request(
-            source.fetcher, source.canonical_url, env=os.environ if env is None else env
-        )
+        url, headers = fetchers.content_request(source.fetcher, source.canonical_url, env=env)
     except MissingKey as exc:
         return DriftReport(**base, status="key_missing", detail=str(exc))
+    except ValueError as exc:
+        # A stored URL no key can be attached to (`apikey.keyed_url`, which names only the URL).
+        # One pin's bad record is that pin's error, not the end of the run.
+        return DriftReport(**base, status="error", detail=f"{type(exc).__name__}: {exc}")
+    secret = fetchers.credential(source.fetcher, env)
     # The fetch and the parse are caught separately on purpose: whatever the fetch callable raises
     # is a transport problem, whatever the parse raises is a content problem, and they get
     # different exit codes.
     try:
         body, _ = fetch(url, headers)
     except _TRANSPORT as exc:
-        return DriftReport(**base, status="fetch_failed", detail=f"{type(exc).__name__}: {exc}")
+        return DriftReport(**base, status="fetch_failed", detail=_failure(exc, secret))
     except Exception as exc:
-        return DriftReport(**base, status="error", detail=f"{type(exc).__name__}: {exc}")
+        return DriftReport(**base, status="error", detail=_failure(exc, secret))
     try:
         actual = fetchers.drift_value(source.fetcher, body)
     except Exception as exc:
@@ -1126,15 +1143,18 @@ def save_blobs(
         except MissingKey as exc:
             reports.append(BlobReport(**base, status="key_missing", detail=str(exc)))
             continue
+        except ValueError as exc:  # a stored URL no key can be attached to, as in `check`
+            detail = f"{type(exc).__name__}: {exc}"
+            reports.append(BlobReport(**base, status="error", detail=detail))
+            continue
+        secret = fetchers.credential(source.fetcher, env)
         try:
             body, _ = fetch(url, headers)
         except _TRANSPORT as exc:
-            detail = f"{type(exc).__name__}: {exc}"
-            reports.append(BlobReport(**base, status="fetch_failed", detail=detail))
+            reports.append(BlobReport(**base, status="fetch_failed", detail=_failure(exc, secret)))
             continue
         except Exception as exc:
-            detail = f"{type(exc).__name__}: {exc}"
-            reports.append(BlobReport(**base, status="error", detail=detail))
+            reports.append(BlobReport(**base, status="error", detail=_failure(exc, secret)))
             continue
         actual = sha256_hex(body)
         if actual != source.artifact.sha256:

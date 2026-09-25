@@ -40,8 +40,9 @@ import json
 import os
 from collections.abc import Mapping
 from datetime import date
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urljoin
 
+from ..apikey import keyed_fetch
 from ..models import Grade
 from ..pin import FetchFn, MissingKey, PinSpec, SearchHit, default_fetch, sha256_hex
 
@@ -51,7 +52,9 @@ DRIFT_KEY = "sha256"
 # Exercised against the live API from this tree on 2026-09-21: a scratch `add --number 8098
 # --type murs --document 100512215` into a data dir outside the repo, every mapped field compared
 # against the captured search response, then `check` clean. Editing `spec()` voids that run and
-# resets this to False — the convention in docs/operations.md.
+# resets this to False — the convention in docs/operations.md — unless a test proves the requests
+# byte-identical for every recorded verification input. The move onto `apikey.keyed_fetch` on
+# 2026-09-25 kept it that way: tests/test_verified_requests.py.
 VERIFIED = True
 VERIFIED_AT = date(2026, 9, 21)
 PUBLISHER = "Federal Election Commission"
@@ -76,9 +79,11 @@ def _key(env: Mapping[str, str]) -> str:
     return key
 
 
-def search_url(number: str, doc_type: str, key: str) -> str:
-    """The metadata query. Carries the key, so it is requested and then forgotten."""
-    return f"{SEARCH}?type={doc_type}&{_NUMBER_PARAM[doc_type]}={number}&api_key={key}"
+def search_params(number: str, doc_type: str) -> dict[str, str]:
+    """The metadata query's parameters, in the order they are sent. `keyed_fetch` encodes them
+    and adds the key, so a number typed with a space in it is a query that finds nothing, not a
+    request line that `http.client` refuses by quoting it back with the key inside."""
+    return {"type": doc_type, _NUMBER_PARAM[doc_type]: number}
 
 
 def _records(payload: dict, doc_type: str) -> list[dict]:
@@ -127,7 +132,7 @@ def spec(
     if document_id is None and category is None:
         category = "Final Opinion"
     key = _key(os.environ if env is None else env)
-    body, _ = fetch(search_url(number, doc_type, key), None)
+    body, _ = keyed_fetch(fetch, SEARCH, search_params(number, doc_type), key=key)
     records = _records(json.loads(body), doc_type)
     record, document = _pick_document(records, category=category, document_id=document_id)
     return PinSpec(
@@ -163,9 +168,9 @@ def drift_value(body: bytes) -> str:
 SEARCH_TYPES = ("advisory_opinions", "murs")
 
 
-def free_text_search_url(query: str, doc_type: str, key: str) -> str:
-    """The free-text query. Carries the key, like `search_url`, and is likewise never stored."""
-    return f"{SEARCH}?{urlencode({'q': query, 'type': doc_type, 'api_key': key})}"
+def free_text_params(query: str, doc_type: str) -> dict[str, str]:
+    """The free-text query's parameters, in the order they are sent; `keyed_fetch` adds the key."""
+    return {"q": query, "type": doc_type}
 
 
 def _hit(record: dict, doc_type: str) -> SearchHit:
@@ -194,7 +199,7 @@ def search(
 ) -> list[SearchHit]:
     """Respondent or matter name in, AO/MUR numbers out. Never writes, never pins."""
     key = _key(os.environ if env is None else env)
-    body, _ = fetch(free_text_search_url(query, doc_type, key), None)
+    body, _ = keyed_fetch(fetch, SEARCH, free_text_params(query, doc_type), key=key)
     return [_hit(r, doc_type) for r in _records(json.loads(body), doc_type)]
 
 

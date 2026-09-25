@@ -142,6 +142,20 @@ one before it makes any request, and a test asserts no file under `data/sources/
 If a key does leak into a stored URL: rotate it first (assume it is burned), then fix the fetcher,
 then re-pin. Deleting the file is not enough — it is in the git history.
 
+**Nor does a key reach an error.** api.data.gov takes its key as the `api_key` query parameter, and
+urllib and http.client copy the request URL into their exceptions: `HTTPError` keeps it as `url`
+and `filename`, `InvalidURL` quotes the whole path and query in its message. So govinfo, openfec
+and fecfiling build every keyed URL with `apikey.keyed_url` and make every keyed metadata call
+through `apikey.keyed_fetch`, which URL-encodes every value in the query and masks the key in any
+exception that leaves the call, keeping its type so every handler still matches. `check` and
+`blobs` re-fetch a pin on a keyed host with its key attached, and mask it out of the detail they
+report; no pin is on one. Before `keyed_fetch`, `pin add openfec --number "MUR 8098"` put the space
+into the URL raw, and http.client refused the request line with an `InvalidURL` that printed the
+key. `tests/test_apikey.py` fails transports on purpose, quoting the URL they were given, and
+checks stdout, stderr, the printed traceback and the console's JSON for a sentinel key. What it
+does not cover: a locals-capturing traceback (`pytest -l`, rich, Sentry) still shows the key in the
+frames that held it.
+
 Local use: export the keys in your shell, or keep them in an untracked `.env` you source. Never put
 a key on a command line you'll push, and never paste one into a PR or chat.
 
@@ -185,6 +199,15 @@ rule, and it is the whole point of the field:
   live again. This includes changing a URL template, a field name read out of a response, a date
   parse, or a fallback. The flag records "this code path has been run against the real API", and
   the moment the code path changes, the old run no longer covers it.
+- **The one exception is narrow:** a `spec()` edit keeps `VERIFIED` only when a test proves
+  byte-identical requests for every recorded verification input. `tests/test_verified_requests.py`
+  is that test for govinfo, openfec and fecfiling, which kept the flag when their keyed calls
+  moved onto `apikey.keyed_fetch` on 2026-09-25. It replays each verification run's captures
+  through `pin add` and the keyless `check` that followed, and compares every request, keyed and
+  keyless, in order, against the old URL templates kept verbatim as the oracle. Then it compares
+  old and new over generated inputs: from the unreserved set `[A-Za-z0-9._~-]` where the old
+  template put input into the URL raw, and on any input where it already encoded it. If it ever
+  fails, the fetcher it names goes back to `False`.
 
 **How a first live run actually goes.** A verifying `add` straight into `data/` cannot work.
 `spec()` stamps the record when it is minted, the stamp is never retyped per record, and the flag

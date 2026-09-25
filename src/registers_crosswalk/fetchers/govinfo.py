@@ -32,8 +32,9 @@ import json
 import os
 from collections.abc import Mapping
 from datetime import date
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
+from ..apikey import keyed_fetch, keyed_url
 from ..models import Grade
 from ..pin import FetchFn, MissingKey, PinSpec, default_fetch, sha256_hex
 
@@ -45,7 +46,9 @@ DRIFT_KEY = "sha256"
 # summary responses are captured at tests/fixtures/govinfo_summary_*_2026-09-22.json and which the
 # tests now read. Every field spec() maps was checked against that capture, and a keyless `check`
 # of the scratch record exited 0. Any further edit to spec() or its parsing resets this to False —
-# see the convention in docs/operations.md.
+# see the convention in docs/operations.md — unless a test proves the requests byte-identical for
+# every recorded verification input. The move onto `apikey.keyed_fetch` on 2026-09-25 kept it that
+# way: tests/test_verified_requests.py.
 VERIFIED = True
 VERIFIED_AT = date(2026, 9, 22)
 PUBLISHER = "U.S. Government Publishing Office"
@@ -56,9 +59,10 @@ CONTENT = "https://www.govinfo.gov/content/pkg"
 
 
 def summary_url(package: str, granule: str | None = None) -> str:
+    """The summary endpoint, each id quoted as one path segment. No key: `keyed_fetch` adds it."""
     if granule:
-        return f"{API}/{package}/granules/{granule}/summary"
-    return f"{API}/{package}/summary"
+        return f"{API}/{quote(package, safe='')}/granules/{quote(granule, safe='')}/summary"
+    return f"{API}/{quote(package, safe='')}/summary"
 
 
 def content_url(package: str, granule: str | None = None) -> str:
@@ -73,11 +77,6 @@ def _key(env: Mapping[str, str]) -> str:
     return key
 
 
-def with_key(url: str, key: str) -> str:
-    """Re-attach the API key for an actual request. Never store the result."""
-    return f"{url}{'&' if '?' in url else '?'}api_key={key}"
-
-
 def spec(
     *,
     package: str,
@@ -87,7 +86,7 @@ def spec(
     env: Mapping[str, str] | None = None,
 ) -> PinSpec:
     key = _key(os.environ if env is None else env)
-    body, _ = fetch(with_key(summary_url(package, granule), key), None)
+    body, _ = keyed_fetch(fetch, summary_url(package, granule), {}, key=key)
     payload = json.loads(body)
     # `pdfLink` is read only to insist the API says a PDF exists. What is stored and fetched is
     # the content-host copy, which needs no key, so `check` needs no key either.
@@ -118,7 +117,7 @@ def content_request(url: str, *, env: Mapping[str, str]) -> tuple[str, dict[str,
     so a pin stored there re-fetches with no key in the environment, as courtlistener's does."""
     if urlsplit(url).netloc != API_HOST:
         return url, {}
-    return with_key(url, _key(env)), {}
+    return keyed_url(url, {}, _key(env)), {}
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

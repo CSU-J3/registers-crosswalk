@@ -147,7 +147,9 @@ urllib and http.client copy the request URL into their exceptions: `HTTPError` k
 and `filename`, `InvalidURL` quotes the whole path and query in its message. So govinfo, openfec
 and fecfiling build every keyed URL with `apikey.keyed_url` and make every keyed metadata call
 through `apikey.keyed_fetch`, which URL-encodes every value in the query and masks the key in any
-exception that leaves the call, keeping its type so every handler still matches. `check` and
+exception that leaves the call, keeping its type so every handler still matches. The one
+exception is a refusal of the key itself, a 401 or 403 from a keyed host or an `API_KEY_*` code,
+which leaves as a `CredentialFailure` (exit 4, *Source drift: what red means*, below). `check` and
 `blobs` re-fetch a pin on a keyed host with its key attached, and mask it out of the detail they
 report; no pin is on one. Before `keyed_fetch`, `pin add openfec --number "MUR 8098"` put the space
 into the URL raw, and http.client refused the request line with an `InvalidURL` that printed the
@@ -436,9 +438,10 @@ keeps one, but it attaches the key only to the API host, which no govinfo pin st
 **The key itself is worth a note.** `OPENFEC_API_KEY` is an api.data.gov key and any api.data.gov
 key works — but they are account-level and can be disabled account-wide. The first attempt at this
 run used the same value as `CONGRESS_API_KEY` and got `403 API_KEY_DISABLED` on every call. The
-value now in `.env` is the one `GOVINFO_API_KEY` uses. If openfec starts returning 403, read the
-body before assuming anything about the endpoint: api.data.gov says which of "invalid", "disabled"
-and "over rate limit" it means.
+value now in `.env` is the one `GOVINFO_API_KEY` uses. If openfec starts returning 403, `pin add`
+and `pin search` read api.data.gov's code out of the body themselves and print it, `CREDENTIAL
+FAILURE openfec 403 <code>`, exit 4 (*Source drift: what red means*, below). A rate limit is not
+one of those: api.data.gov answers `OVER_RATE_LIMIT` with a 429, which stays the HTTPError it was.
 
 **The disabled key was shared with psephos.** The value under `CONGRESS_API_KEY` was the
 api.data.gov key this repo shared with psephos, and api.data.gov disabled it for both projects
@@ -653,6 +656,24 @@ drift run. On the six MUR pins currently in `data/`, four were going unchecked.
   connection refused. Also not a finding. Usually transient, so re-run before investigating; if it
   persists, a 404 on a canonical URL means the document moved, which *is* a finding.
   `check` retries these once, after one 30-second wait per run, so a reported one failed twice.
+- **4 — `pin add` or `pin search` only: api.data.gov refused the key.** One line on stderr,
+  `CREDENTIAL FAILURE <fetcher> <status> <code>`, and nothing written; the console shows the same
+  line in its pane and prints it on its terminal. `check` never exits 4: it makes no keyed
+  metadata call, and no pin sits on a keyed host. It is not retried: a refused key stays refused.
+  (A key that is not set at all is exit 2 from `add` and `search`, after one line naming the
+  variable.) The code is api.data.gov's, echoed only when it is shaped like one:
+  - `API_KEY_DISABLED`: api.data.gov has turned the key off account-wide, for every project that
+    holds it. Stop using it, and get a new one for this project alone (*Source API keys*, above).
+  - `API_KEY_INVALID`: the value is not a key api.data.gov knows: a typo, a truncation, a stray
+    quote. Compare its hash prefix against the one you expect, never the value itself.
+  - `API_KEY_MISSING`: the request reached api.data.gov with no key although one was set. Check
+    the variable in-process for surrounding whitespace or quotes, by its length and hash prefix,
+    never by printing it.
+  - `UNKNOWN`: a 401 or 403 whose body names no code. The tool keeps only the code, so to read the
+    rest, repeat the call in a Python session through `pin.default_fetch` and print the
+    `HTTPError`'s body, never its URL.
+  - any other code: api.data.gov's own, echoed because it came with a 401 or 403 from a keyed
+    host. Look it up in api.data.gov's developer manual before changing anything.
 
 **Why 3 is separate from 1**, and the rule to keep: a dead endpoint must never be reported as a
 changed document. They demand opposite responses — one is "wait and retry", the other is "read the

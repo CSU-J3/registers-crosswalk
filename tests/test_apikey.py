@@ -78,11 +78,11 @@ class _Response(io.BytesIO):
         self.url = url
 
 
-def _http_error(url, msg="Forbidden"):
+def _http_error(url, msg="Internal Server Error", code=500):
     headers = email.message.Message()
     headers["Content-Type"] = "application/json"
     headers["Location"] = url
-    return urllib.error.HTTPError(url, 403, msg, headers, _Response(url))
+    return urllib.error.HTTPError(url, code, msg, headers, _Response(url))
 
 
 def _chained(url):
@@ -115,7 +115,7 @@ REQUEST_LINE = f"GET /packages/X\xe9/summary?api_key={SENTINEL} HTTP/1.1"
 QUOTING = {
     "HTTPError url, filename, headers and response": lambda u: _http_error(u),
     "HTTPError message (a disallowed-scheme redirect)": lambda u: _http_error(
-        u, f"Found - Redirection to url '{u}' is not allowed"
+        u, f"Found - Redirection to url '{u}' is not allowed", 302
     ),
     "URLError around an OSError": lambda u: urllib.error.URLError(OSError(0, f"cannot reach {u}")),
     "InvalidURL": lambda u: http.client.InvalidURL(
@@ -200,7 +200,11 @@ def test_keyed_fetch_lets_nothing_out_with_the_key_in_it(build):
     kind = type(build(URL))
     with pytest.raises(kind) as caught:
         keyed_fetch(
-            fetch, "https://api.open.fec.gov/v1/legal/search/", {"case_no": "8098"}, key=SENTINEL
+            fetch,
+            "https://api.open.fec.gov/v1/legal/search/",
+            {"case_no": "8098"},
+            key=SENTINEL,
+            fetcher="openfec",
         )
     assert fetch.calls == [
         (f"https://api.open.fec.gov/v1/legal/search/?case_no=8098&api_key={SENTINEL}", None)
@@ -213,7 +217,7 @@ def test_keyed_fetch_returns_what_the_transport_returns():
     def fetch(url, headers=None):
         return b"body", "application/json"
 
-    assert keyed_fetch(fetch, "https://api.govinfo.gov/x", {}, key="K") == (
+    assert keyed_fetch(fetch, "https://api.govinfo.gov/x", {}, key="K", fetcher="govinfo") == (
         b"body",
         "application/json",
     )

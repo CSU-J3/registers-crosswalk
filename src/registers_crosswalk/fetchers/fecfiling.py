@@ -113,7 +113,7 @@ def spec(
     if document not in DOCUMENTS:
         raise ValueError(f"document must be one of {', '.join(DOCUMENTS)}, not {document!r}")
     key = _key(os.environ if env is None else env)
-    body, _ = keyed_fetch(fetch, FILINGS, filings_params(file_number), key=key)
+    body, _ = keyed_fetch(fetch, FILINGS, filings_params(file_number), key=key, fetcher=NAME)
     filing = _the_filing(json.loads(body), file_number)
     form = str(filing["form_type"]).removeprefix("F")
     return PinSpec(

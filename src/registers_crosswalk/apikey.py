@@ -13,18 +13,49 @@ API host, which no pin is; `check` and `blobs` mask the key out of what they rep
 Every value in the query is URL-encoded here, operator input included. Before this, a MUR number
 typed as `MUR 8098` went into the URL raw, and `http.client` refused the request line with an
 `InvalidURL` that quoted the key.
+
+When api.data.gov refuses the key, `keyed_fetch` says so by name: a `CredentialFailure` whose
+message is the one line an operator needs, `CREDENTIAL FAILURE <fetcher> <status> <code>`.
+Before this, a disabled, invalid or missing key was a bare `HTTP Error 403: Forbidden`, identical
+for all three, with the code that told them apart left unread in the response body.
 """
 
 from __future__ import annotations
 
+import json
 import re
+import urllib.error
 from collections.abc import Callable, Mapping
 from email.message import Message
-from urllib.parse import quote, quote_plus, urlencode
+from urllib.parse import quote, quote_plus, urlencode, urlsplit
 
 # What http.client refuses in a request line (`_contains_disallowed_url_pchar_re`), plus anything
 # non-ASCII, which it cannot encode. Either makes it raise an error that repeats the whole URL.
 _UNSENDABLE = re.compile(r"[\x00-\x20\x7f]|[^\x00-\x7f]")
+
+# The hosts that take an api.data.gov key, and the codes api.data.gov answers with when it refuses
+# one (https://api.data.gov/docs/developer-manual/#general-web-service-errors).
+KEYED_HOSTS = frozenset({"api.govinfo.gov", "api.open.fec.gov"})
+CREDENTIAL_CODES = frozenset({"API_KEY_DISABLED", "API_KEY_INVALID", "API_KEY_MISSING"})
+# What is echoed from a response body is only ever a code of this shape, never free text.
+_CODE = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
+_BODY_LIMIT = 64 * 1024
+
+
+class CredentialFailure(Exception):
+    """api.data.gov refused the key: a 401 or 403 from a keyed host, or an `API_KEY_*` code.
+
+    Its message is the whole report, `CREDENTIAL FAILURE <fetcher> <status> <code>`, with `UNKNOWN`
+    when the body names no code. It is defined here, in a module that never runs as `__main__`, so
+    it is the same class wherever it is caught. It is not an OSError: nothing that retries a
+    transport failure retries a refused key, which stays refused.
+    """
+
+    def __init__(self, fetcher: str, status: int, code: str) -> None:
+        super().__init__(f"CREDENTIAL FAILURE {fetcher} {status} {code}")
+        self.fetcher = fetcher
+        self.status = status
+        self.code = code
 
 
 def keyed_url(base: str, params: Mapping[str, object], key: str) -> str:
@@ -46,19 +77,53 @@ def keyed_fetch(
     params: Mapping[str, object],
     *,
     key: str,
+    fetcher: str,
 ) -> tuple[bytes, str]:
     """Request `base` with the key attached, and let no exception out with the key inside it.
 
     An exception keeps its type and its traceback, so every `except OSError` and `except
     ValueError` that matched before still matches. Only the key is gone, from the exception and
     from anything chained to it, so there is no unredacted original left to print either.
+
+    The one exception that changes type is a refusal of the key itself, which becomes a
+    `CredentialFailure` naming `fetcher`, the status and api.data.gov's code. It is raised `from
+    None`: the HTTPError behind it has nothing more to say, and is redacted all the same. Nothing
+    retries it.
     """
     url = keyed_url(base, params, key)
     try:
         return fetch(url, None)
+    except urllib.error.HTTPError as exc:
+        failure = _credential_failure(exc, fetcher=fetcher, host=urlsplit(base).hostname)
+        redact(exc, key)
+        if failure is None:
+            raise
+        raise failure from None
     except Exception as exc:
         redact(exc, key)
         raise
+
+
+def _credential_failure(
+    exc: urllib.error.HTTPError, *, fetcher: str, host: str | None
+) -> CredentialFailure | None:
+    code = _error_code(exc)
+    if (exc.code in (401, 403) and host in KEYED_HOSTS) or code in CREDENTIAL_CODES:
+        return CredentialFailure(fetcher, exc.code, code or "UNKNOWN")
+    return None
+
+
+def _error_code(exc: urllib.error.HTTPError) -> str | None:
+    """api.data.gov's `error.code`, or None. The body is read once, bounded, and decoded first:
+    `default_fetch` asks for gzip, so an error body may come back compressed."""
+    from .pin import _decoded  # here, not at the top: pin imports this module
+
+    try:
+        payload = json.loads(_decoded(exc.read(_BODY_LIMIT), exc.headers))
+        code = payload["error"]["code"]
+    except Exception:  # noqa: BLE001 - no readable code is an answer: UNKNOWN
+        return None
+    return code if isinstance(code, str) and _CODE.fullmatch(code) else None
 
 
 def redact(exc: BaseException, secret: str) -> BaseException:

@@ -86,7 +86,7 @@ def spec(
     env: Mapping[str, str] | None = None,
 ) -> PinSpec:
     key = _key(os.environ if env is None else env)
-    body, _ = keyed_fetch(fetch, summary_url(package, granule), {}, key=key)
+    body, _ = keyed_fetch(fetch, summary_url(package, granule), {}, key=key, fetcher=NAME)
     payload = json.loads(body)
     # `pdfLink` is read only to insist the API says a PDF exists. What is stored and fetched is
     # the content-host copy, which needs no key, so `check` needs no key either.

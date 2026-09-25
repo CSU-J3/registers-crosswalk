@@ -28,8 +28,9 @@ a caller can hand the adapter a private mapping without knowing which fetchers n
 itself, so running the console never modifies the process environment.
 
 Every metadata call goes through the same injectable `FetchFn` the pin itself uses, so tests never
-touch the network. Endpoint behaviour recorded in these modules was verified live on 2026-09-17
-unless a comment says otherwise.
+touch the network. Each module's docstring dates the endpoint behaviour it records. A date on a
+claim inherited from a handoff is the handoff's, kept as given, and is not a verification: what a
+run from this tree covered is what `VERIFIED` and `VERIFIED_AT` record.
 """
 
 from __future__ import annotations

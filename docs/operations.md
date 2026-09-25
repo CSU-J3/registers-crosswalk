@@ -145,6 +145,22 @@ then re-pin. Deleting the file is not enough — it is in the git history.
 Local use: export the keys in your shell, or keep them in an untracked `.env` you source. Never put
 a key on a command line you'll push, and never paste one into a PR or chat.
 
+**One api.data.gov key per project.** That is the ruling across CSU-J3: a project that calls an
+api.data.gov API must hold a key no other project uses, so one project's traffic can't disable
+another's fetchers. The rule exists because the key under `CONGRESS_API_KEY` was shared with
+psephos and api.data.gov disabled it for both (the record is in the `openfec` section, below).
+
+**No LegiScan key.** This repo holds none and makes no LegiScan call. A future unit that wants
+state-legislation data reads psephos's published `data/state_bills.json` (CC BY 4.0, attributed)
+and never registers a second LegiScan key: a second registered key is what LegiScan bans for.
+
+**Secret audits.** The standing rule, in the text psephos adopted on 2026-09-24:
+
+> Secret audits search by variable name or compare against a hash of the value. They never match
+> on the value itself, never snapshot process lists while a secret is in flight, and stay inside
+> the repos and services the handoff names. "Anywhere" means the project's own surfaces, not the
+> user folder, registry, Recycle Bin, or mail cache.
+
 **`COURTLISTENER_TOKEN` is a local key, not a CI one.** It is needed for `pin search
 courtlistener` and for `pin add courtlistener`, which read the v4 API. It is **not** needed by
 `check`: what a courtlistener pin stores is a public file — a court's own PDF, or a scan on
@@ -400,6 +416,19 @@ run used the same value as `CONGRESS_API_KEY` and got `403 API_KEY_DISABLED` on 
 value now in `.env` is the one `GOVINFO_API_KEY` uses. If openfec starts returning 403, read the
 body before assuming anything about the endpoint: api.data.gov says which of "invalid", "disabled"
 and "over rate limit" it means.
+
+**The disabled key was shared with psephos.** The value under `CONGRESS_API_KEY` was the
+api.data.gov key this repo shared with psephos, and api.data.gov disabled it for both projects
+between 16:56 and 21:15 UTC on 2026-09-16 (`403 API_KEY_DISABLED`). This repo never read
+`CONGRESS_API_KEY` itself (there is no Congress.gov fetcher); the 403 above is the only place the
+disabling shows up here. From git: the switch to the `GOVINFO_API_KEY` value is recorded on
+2026-09-21 (`6b01c05`), and `OPENFEC_API_KEY` was copied from it the same day. The first live
+keyed runs on that value are openfec on 2026-09-21, govinfo on 2026-09-22 and fecfiling on
+2026-09-23. The 2026-09-17 "verified live" comments in `openfec.py` and `fetchers/__init__.py` are
+not runs in this repo: `b9afc01`, the commit that added the fetchers, shipped openfec and govinfo
+unverified because those notes "came from the spec work, not from a run here", and they are no
+evidence about either key. What followed from the disabling — the one-key-per-project rule, no
+LegiScan key, and the secret-audit rule — is under *Source API keys*, above.
 
 **The free-text `search()` is still unexercised.** The run went through `spec()` by number, which is
 a different query shape; `q=` has never been asked of the live endpoint. What the captures do cover

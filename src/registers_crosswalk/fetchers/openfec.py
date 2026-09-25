@@ -51,7 +51,7 @@ from urllib.parse import urljoin
 
 from ..apikey import keyed_fetch
 from ..models import Grade
-from ..pin import FetchFn, MissingKey, PinSpec, SearchHit, default_fetch, sha256_hex
+from ..pin import FetchFn, PinSpec, SearchHit, default_fetch, read_key, sha256_hex
 
 NAME = "openfec"
 HELP = "an FEC advisory opinion or MUR document (OpenFEC legal search)"
@@ -60,10 +60,11 @@ DRIFT_KEY = "sha256"
 # --type murs --document 100512215` into a data dir outside the repo, every mapped field compared
 # against the captured search response, then `check` clean. Editing `spec()` voids that run and
 # resets this to False — the convention in docs/operations.md — unless a test proves the requests
-# byte-identical for every recorded verification input. The move onto `apikey.keyed_fetch` on
-# 2026-09-25 kept it that way: tests/test_verified_requests.py. That run was a MUR. The
-# advisory-opinion path shares `spec()`, but its query has never been sent from this tree, so an
-# advisory-opinion record's `fetcher_verified: true` rests on the MUR run alone.
+# byte-identical for every recorded verification input. The move onto `apikey.keyed_fetch`, and
+# reading the key through `pin.read_key`, both on 2026-09-25, kept it that way:
+# tests/test_verified_requests.py. That run was a MUR. The advisory-opinion path shares `spec()`,
+# but its query has never been sent from this tree, so an advisory-opinion record's
+# `fetcher_verified: true` rests on the MUR run alone.
 VERIFIED = True
 VERIFIED_AT = date(2026, 9, 21)
 PUBLISHER = "Federal Election Commission"
@@ -82,10 +83,7 @@ _CITATION = {"advisory_opinions": "FEC Advisory Opinion {}", "murs": "FEC MUR {}
 
 
 def _key(env: Mapping[str, str]) -> str:
-    key = env.get(ENV_KEY)
-    if not key:
-        raise MissingKey(ENV_KEY, NAME)
-    return key
+    return read_key(env, ENV_KEY, NAME)
 
 
 def search_params(number: str, doc_type: str) -> dict[str, str]:

@@ -45,7 +45,7 @@ from datetime import date
 from urllib.parse import urlencode, urljoin
 
 from ..models import Grade
-from ..pin import FetchFn, MissingKey, PinSpec, SearchHit, default_fetch, sha256_hex
+from ..pin import FetchFn, PinSpec, SearchHit, default_fetch, read_key, sha256_hex
 
 NAME = "courtlistener"
 HELP = "a court opinion by CourtListener cluster id"
@@ -53,7 +53,9 @@ DRIFT_KEY = "sha256"
 # Exercised live 2026-09-20: a scratch `add --cluster-id 1481640 --archive` outside the repo ran
 # the current code path end to end, and every field of the record it minted was compared against
 # the four captured responses. Editing `spec()` voids this and resets it to False — the convention
-# in docs/operations.md.
+# in docs/operations.md — unless a test proves the requests byte-identical for every recorded
+# verification input. Reading the token through `pin.read_key` on 2026-09-25 kept it that way:
+# tests/test_verified_requests.py.
 VERIFIED = True
 VERIFIED_AT = date(2026, 9, 20)
 PUBLISHER = "CourtListener (Free Law Project)"
@@ -68,10 +70,7 @@ def cluster_url(cluster_id: int | str) -> str:
 
 
 def _token(env: Mapping[str, str]) -> str:
-    token = env.get(ENV_KEY)
-    if not token:
-        raise MissingKey(ENV_KEY, NAME)
-    return token
+    return read_key(env, ENV_KEY, NAME)
 
 
 def auth_headers(env: Mapping[str, str]) -> dict[str, str]:

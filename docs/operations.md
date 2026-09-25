@@ -161,6 +161,22 @@ frames that held it.
 Local use: export the keys in your shell, or keep them in an untracked `.env` you source. Never put
 a key on a command line you'll push, and never paste one into a PR or chat.
 
+**Every credential is read the same way.** `pin.read_key` strips a value's surrounding whitespace,
+as the console's `.env` parser does, because a `.env` saved with CRLF line endings and sourced by
+bash leaves a CR on the end of every value, and a key sent with a CR on it is a key nobody issued.
+What is left is refused if it still holds whitespace or a control character: one line naming the
+variable, never the value, and exit 2 from `add` and `search`, `KEY_MISSING` from `check`. The
+Wayback keys are read the same way when a new capture has to be requested; when an existing capture
+already reproduces the pin, it is reused and they are never read. A malformed one fails the archive
+step by name rather than falling back to the anonymous save. A credential sent in a header
+(CourtListener's token, the Wayback keys) goes as an unredirected header: urllib copies a
+request's ordinary headers onto the request a redirect makes, to whatever host it names, and a
+token must not follow it there. `pin._request` lays the other headers down so the first request
+goes on the wire byte for byte as before (`tests/test_credentials.py` compares the two). The cost
+is that a redirect on an authenticated call, even to the same host, arrives without the credential
+and is answered as an anonymous request would be. Nothing reports that it was dropped; it just
+never reaches a host that was not asked.
+
 **One api.data.gov key per project.** That is the ruling across CSU-J3: a project that calls an
 api.data.gov API must hold a key no other project uses, so one project's traffic can't disable
 another's fetchers. The rule exists because the key under `CONGRESS_API_KEY` was shared with
@@ -204,9 +220,13 @@ rule, and it is the whole point of the field:
 - **The one exception is narrow:** a `spec()` edit keeps `VERIFIED` only when a test proves
   byte-identical requests for every recorded verification input. `tests/test_verified_requests.py`
   is that test for govinfo, openfec and fecfiling, which kept the flag when their keyed calls
-  moved onto `apikey.keyed_fetch` on 2026-09-25. It replays each verification run's captures
-  through `pin add` and the keyless `check` that followed, and compares every request, keyed and
-  keyless, in order, against the old URL templates kept verbatim as the oracle. Then it compares
+  moved onto `apikey.keyed_fetch` and their keys onto `pin.read_key` on 2026-09-25, and for
+  courtlistener, which kept it when its token moved onto `pin.read_key` the same day. It replays
+  each verification run's captures through `pin add`, then through the keyless `check` that
+  followed where one was recorded (none was after courtlistener's), and compares every request,
+  keyed and keyless, in order, against the old URL templates kept verbatim as the oracle. Below
+  the fetch function, `tests/test_credentials.py` holds an authenticated request's bytes on the
+  wire to what they were. Then it compares
   old and new over generated inputs: from the unreserved set `[A-Za-z0-9._~-]` where the old
   template put input into the URL raw, and on any input where it already encoded it. If it ever
   fails, the fetcher it names goes back to `False`.
@@ -650,10 +670,12 @@ drift run. On the six MUR pins currently in `data/`, four were going unchecked.
   (`DRIFT`), the eCFR part was amended since the pin (`AMENDED`), or the document no longer states
   what we parse out of it (`ERROR` — uscode dropped its source credit, an API changed shape). All
   three are real findings about the world, and all three need a human to look and re-pin.
-- **2 — the check could not run: an API key isn't set** (`KEY_MISSING`). A configuration problem
-  on our side, not a finding. The failing line names the env var. In CI only `COURTLISTENER_TOKEN`
-  is wired; any other key has to be wired into the workflows on purpose first (*Source API keys*,
-  above). Set it and re-run; until then you know nothing about those sources.
+- **2 — the check could not run: an API key isn't set, or is set but malformed** (`KEY_MISSING`):
+  it still holds whitespace or a control character once its surrounding whitespace is stripped. A
+  configuration problem on our side, not a finding. The failing line names the env var and says
+  which, never the value. In CI only `COURTLISTENER_TOKEN` is wired; any other key has to be wired
+  into the workflows on purpose first (*Source API keys*, above). Set it and re-run; until then you
+  know nothing about those sources.
 - **3 — the check could not run: the transport failed** (`FETCH_FAILED`) — timeout, non-2xx, DNS,
   connection refused. Also not a finding. Usually transient, so re-run before investigating; if it
   persists, a 404 on a canonical URL means the document moved, which *is* a finding.
@@ -662,14 +684,16 @@ drift run. On the six MUR pins currently in `data/`, four were going unchecked.
   `CREDENTIAL FAILURE <fetcher> <status> <code>`, and nothing written; the console shows the same
   line in its pane and prints it on its terminal. `check` never exits 4: it makes no keyed
   metadata call, and no pin sits on a keyed host. It is not retried: a refused key stays refused.
-  (A key that is not set at all is exit 2 from `add` and `search`, after one line naming the
-  variable.) The code is api.data.gov's, echoed only when it is shaped like one:
+  (A key that is not set, or is set but malformed, is exit 2 from `add` and `search`, after one
+  line naming the variable.) The code is api.data.gov's, echoed only when it is shaped like one:
   - `API_KEY_DISABLED`: api.data.gov has turned the key off account-wide, for every project that
     holds it. Stop using it, and get a new one for this project alone (*Source API keys*, above).
   - `API_KEY_INVALID`: the value is not a key api.data.gov knows: a typo, a truncation, a stray
     quote. Compare its hash prefix against the one you expect, never the value itself.
-  - `API_KEY_MISSING`: the request reached api.data.gov with no key although one was set. Check
-    the variable in-process for surrounding whitespace or quotes, by its length and hash prefix,
+  - `API_KEY_MISSING`: the request reached api.data.gov with no key although one was set.
+    Whitespace cannot cause it: surrounding whitespace is stripped before anything is sent, and a
+    value that is only whitespace is a missing key (exit 2) before any request. Look for whatever
+    dropped the key on the way, and check the variable in-process by its length and hash prefix,
     never by printing it.
   - `UNKNOWN`: a 401 or 403 whose body names no code. The tool keeps only the code, so to read the
     rest, repeat the call in a Python session through `pin.default_fetch` and print the
@@ -700,7 +724,8 @@ Each line is one of six statuses, and they mean genuinely different things:
   is neither: the drift key is the latest date in the section's source credit, so a later date
   means a law amended that section. Read what changed, pin the new text, and set `--supersedes` to
   the old id — the same response as `AMENDED`, reached by a different route.
-- **`KEY_MISSING`** — the check could not run because an API key isn't set. The run fails on
+- **`KEY_MISSING`** — the check could not run because an API key isn't set, or is set but
+  malformed (the line says which). The run fails on
   purpose: a check that quietly skipped the sources it couldn't reach would report green while
   telling you nothing.
 - **`FETCH_FAILED`** — the document could not be reached at all: timeout, non-2xx, DNS failure,

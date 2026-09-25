@@ -114,14 +114,15 @@ def content_request(name: str, url: str, *, env: Mapping[str, str]) -> tuple[str
 
 
 def credential(name: str, env: Mapping[str, str]) -> str | None:
-    """The fetcher's key as `env` holds it, or None if it has none or none is set.
+    """The fetcher's key as it was sent: `env`'s value with its surrounding whitespace stripped,
+    as `pin.clean_credential` strips it, or None if the fetcher has none or none is set.
 
     For masking, not for sending: `check` and `blobs` re-fetch a pin on a keyed host with the key
     attached by `content_request`, and this is the value to take out of any error that request
     raises before the error is reported.
     """
     var = getattr(get(name), "ENV_KEY", None)
-    return (env.get(var) or None) if var else None
+    return ((env.get(var) or "").strip() or None) if var else None
 
 
 def drift_value(name: str, body: bytes) -> str:

@@ -735,6 +735,33 @@ def test_repair_replaces_a_served_capture_whose_bytes_do_not_reproduce(
     ]
 
 
+def test_repair_replaces_a_served_prelim_the_parser_cannot_read(tmp_path, monkeypatch, capsys):
+    """`unreadable` takes the path `mismatch` takes: the search runs, and a capture the uscode
+    parser can read, with the pin's last amendment, replaces the one it cannot."""
+
+    def attach(url, **_):
+        return ArchiveCopy(
+            service="wayback",
+            url=f"https://web.archive.org/web/{TS_ATTACHED}/{url}",
+            captured_at=datetime.strptime(TS_ATTACHED, "%Y%m%d%H%M%S").replace(tzinfo=UTC),
+        )
+
+    assert _add_uscode(tmp_path, USCODE_PAGE, archive_fn=attach) == 0
+    unreadable = USCODE_PAGE.replace(b'class="source-credit"', b'class="gone"', 1)
+    _wayback(
+        monkeypatch,
+        {TS_ATTACHED: unreadable, TS_OLDER: USCODE_PAGE},
+        cdx=(TS_OLDER, TS_ATTACHED),
+    )
+    capsys.readouterr()
+    assert _repair(tmp_path) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("repaired xr_src_0001: ")
+    assert "could not read the capture" in out
+    after = json.loads(_record_bytes(tmp_path))
+    assert [a["url"].split("/")[4] for a in after["archives"]] == [TS_OLDER]
+
+
 def test_repair_treats_a_404_at_the_attached_timestamp_as_nothing_stored(
     tmp_path, monkeypatch, capsys
 ):

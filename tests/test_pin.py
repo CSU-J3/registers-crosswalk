@@ -1453,6 +1453,148 @@ def test_wayback_fixtures_keep_only_allowlisted_headers(path):
         assert {"set-cookie", "x-nid", "x-app-server"} <= set(answer["withheld"])
 
 
+# ----------------------------- one check of an attached capture, for repair and the weekly run
+
+SERVED_FIXTURE_URL, SERVED_FIXTURE_TS = _asked(_wayback_fixture("served"))
+SERVED_COPY = ArchiveCopy(
+    service="wayback",
+    url=f"https://web.archive.org/web/{SERVED_FIXTURE_TS}/{SERVED_FIXTURE_URL}",
+)
+USCODE_UNREADABLE = USCODE_PAGE.replace(b'class="source-credit"', b'class="gone"', 1)
+USCODE_DRIFT = ExpectedDrift("uscode", "last_amended", USCODE_LAST_AMENDED)
+
+
+def _raising(exc):
+    def capture_fn(url):
+        raise exc
+
+    return capture_fn
+
+
+@pytest.mark.parametrize(
+    "copy",
+    [
+        ArchiveCopy(service="perma", url="https://perma.cc/ABCD-1234"),
+        ArchiveCopy(service="wayback", url="https://web.archive.org/web/1/x"),
+    ],
+)
+def test_a_copy_that_is_not_a_wayback_capture_with_a_timestamp_is_not_checkable(copy):
+    check = pinmod._check_attached(  # noqa: SLF001
+        copy, STAND_IN_DRIFT, capture_fn=_raising(AssertionError("fetched"))
+    )
+    assert check.status == "not_checkable"
+    assert copy.url in check.detail
+
+
+@pytest.mark.parametrize(
+    "exc, detail, retry_after",
+    [
+        (urllib.error.HTTPError(ECFR_URL, 403, "Forbidden", {}, None), "HTTP 403", None),
+        (
+            urllib.error.HTTPError(
+                ECFR_URL, 429, "Too Many Requests", _message({"Retry-After": "120"}), None
+            ),
+            "HTTP 429",
+            120.0,
+        ),
+        (  # no Retry-After: the minute `_retrying` would wait
+            urllib.error.HTTPError(ECFR_URL, 429, "Too Many Requests", _message({}), None),
+            "HTTP 429",
+            60.0,
+        ),
+        (TimeoutError("read timed out"), "TimeoutError: read timed out", None),
+        (
+            ConnectionResetError("wayback went away"),
+            "ConnectionResetError: wayback went away",
+            None,
+        ),
+    ],
+)
+def test_no_answer_is_unreachable_never_a_verdict(exc, detail, retry_after):
+    check = pinmod._check_attached(  # noqa: SLF001
+        SERVED_COPY, STAND_IN_DRIFT, capture_fn=_raising(exc)
+    )
+    assert (check.status, check.detail, check.retry_after) == ("unreachable", detail, retry_after)
+
+
+@pytest.mark.parametrize(
+    "key, verdict", [("served", "ok"), ("missing", "not_served"), ("redirected", "not_served")]
+)
+def test_what_wayback_said_passes_through_as_it_was_said(key, verdict):
+    fixture = _wayback_fixture(key)
+    url, timestamp = _asked(fixture)
+    copy = ArchiveCopy(service="wayback", url=f"https://web.archive.org/web/{timestamp}/{url}")
+    check = pinmod._check_attached(  # noqa: SLF001
+        copy, STAND_IN_DRIFT, capture_fn=_answering_as(fixture)
+    )
+    assert check.status == verdict
+
+
+def test_a_served_capture_of_other_bytes_is_a_mismatch():
+    check = pinmod._check_attached(  # noqa: SLF001
+        SERVED_COPY,
+        STAND_IN_DRIFT,
+        capture_fn=_answering_as(_wayback_fixture("served"), body=b"other bytes"),
+    )
+    assert check.status == "mismatch"
+
+
+def test_a_served_prelim_the_parser_cannot_read_is_unreadable_not_a_mismatch():
+    served = _wayback_fixture("served")
+    copy = ArchiveCopy(
+        service="wayback", url=f"https://web.archive.org/web/{SERVED_FIXTURE_TS}/{USCODE_URL}"
+    )
+    served["requested_url"] = f"https://web.archive.org/web/{SERVED_FIXTURE_TS}id_/{USCODE_URL}"
+    served["final_url"] = served["requested_url"]
+    check = pinmod._check_attached(  # noqa: SLF001
+        copy, USCODE_DRIFT, capture_fn=_answering_as(served, body=USCODE_UNREADABLE)
+    )
+    assert check.status == "unreadable"
+    assert "no source-credit element" in check.detail
+
+
+def test_reuse_still_reads_an_unreadable_capture_as_a_mismatch():
+    """As before the weekly check: counted as not matching, and its digest is not tried again."""
+    why = []
+    tried = []
+    rows = _cdx(("20260922101010", "200", "SAME"), ("20260921101010", "200", "SAME"))
+
+    def capture_fn(url):
+        tried.append(url)
+        return _served({"20260922101010": USCODE_UNREADABLE})(url)
+
+    found = pinmod._existing_capture(  # noqa: SLF001
+        USCODE_URL,
+        USCODE_DRIFT,
+        json_fn=lambda url, h=None, d=None: rows,
+        capture_fn=capture_fn,
+        sleep_fn=lambda _s: None,
+        why=why,
+    )
+    assert found is None
+    assert len(tried) == 1  # the second row names the same payload, so it is skipped
+    assert "1 did not match" in why[-1]
+
+
+def test_a_new_capture_the_parser_cannot_read_is_refused_at_once():
+    """As before `unreadable` existed: refused as not reproducing the pin, on the first try,
+    never retried as a capture Wayback hasn't served yet."""
+    slept, tried = [], []
+    unreadable = _served({"20260919120000": USCODE_UNREADABLE}, calls=tried)
+    result = archive(
+        USCODE_URL,
+        expected=USCODE_DRIFT,
+        json_fn=_cdx_then_spn2(_cdx()),
+        capture_fn=unreadable,
+        sleep_fn=slept.append,
+        env=KEYS,
+    )
+    assert isinstance(result, ArchiveFailure)
+    assert result.reason.startswith("new capture does not reproduce the pin's last_amended")
+    assert len(tried) == 1
+    assert 300.0 not in slept
+
+
 def test_a_memento_datetime_that_names_no_time_is_said_to_be_there():
     fixture = _wayback_fixture("served")
     fixture["headers"]["memento-datetime"] = "garbage"

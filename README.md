@@ -89,6 +89,7 @@ serves both documents without one, so `check` needs no key.
 
     python -m registers_crosswalk.pin search <fetcher> <query>   # identifiers, then the add to paste
     python -m registers_crosswalk.pin check        # 0 clean, 1 drift, 2 missing or malformed key, 3 fetch failed
+    python -m registers_crosswalk.pin check --archives   # 0 clean, 5 lost, 6 missing, 7 unchecked (Wayback)
     python -m registers_crosswalk.pin ledger       # entries for the New Gray ledgers (--format manifest|record)
     python -m registers_crosswalk.pin archive --repair xr_src_NNNN   # re-verify an attached capture
     python -m registers_crosswalk.pin blobs --out DIR   # verified copies + MANIFEST.sha256, outside the repo
@@ -105,7 +106,7 @@ exercised against the live API, so a silent mapping error could be sitting in th
 
 API keys (`GOVINFO_API_KEY`, `OPENFEC_API_KEY`, `COURTLISTENER_TOKEN`) come from the environment and
 never enter a stored URL — see `docs/operations.md`, which also explains what each drift status
-means and why a quiet repo can silently stop drift-checking.
+and archive verdict means and why a quiet repo can silently stop drift-checking.
 
 ## Archiving a pin after the fact
 

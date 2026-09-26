@@ -953,7 +953,11 @@ record; `--json` prints one report per entry, each sample's answer included, and
   still reproduce the pin. What an amendment ends is fresh captures, so the pool repair can draw on
   stops growing and only shrinks with the index. The week's wait stands for every other pin. The
   detail's `Next:` still says to dispatch again after a day, a prelim's too; for a prelim this rule
-  stands over it. `xr_src_0024` was the first, on 2026-09-26 (below).
+  stands over it. `xr_src_0024` was the first, on 2026-09-26 (below). When a prelim's archive
+  predates its point in time, the record carries the archived page's banner in its note
+  (`pin note <xr_id> "<note>"`). The note is the record's label: the status page shows it as the
+  row's description, and `pin note` replaces the whole field, so it stays one short sentence naming
+  the capture and its banner.
 - **7 — `UNCHECKED`.** Usually Wayback slow, down, or refusing the machine that asked; the detail
   says which. An `UNCHECKED` from the runner means nothing until the check has been re-run from a
   machine Wayback answers (`python -m registers_crosswalk.pin check --archives`, paced as
@@ -1000,9 +1004,10 @@ the checks behind this command found on 2026-09-26 (UTC):
   morning. From 20:08 to about 20:24 it answered four times, five minutes apart, never serving
   that timestamp (the last answer a redirect to `20260415170221`), and the CDX listing held no
   capture at its timestamp. The runner had seen that redirect once.
-- `pin archive --repair xr_src_0024`, at 20:34, replaced it with the capture at
-  `20260415170221`, served at its own timestamp and giving the pin's last amendment, 2002-03-27.
-  Only the record's `archives` changed.
+- `pin archive --repair xr_src_0024`, at 20:34, replaced it with the capture at `20260415170221`,
+  served at its own timestamp and giving the pin's last amendment, 2002-03-27. Only the record's
+  `archives` changed. The capture's banner, read at 20:58, says "Text contains those laws in effect
+  on April 14, 2026", and it rides on the record as its note.
 
 **A 5xx from Wayback is retried; a 4xx is not.** `POST /save` answered 503 with an HTML "Internet
 Archive: Temporarily Offline" page at 19:22 UTC on 2026-09-20 and was serving normally by 19:23.

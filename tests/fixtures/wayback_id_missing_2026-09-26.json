@@ -1,0 +1,31 @@
+{
+  "requested_url": "https://web.archive.org/web/20260711041727id_/https://www.fec.gov/files/legal/murs/8111/registers-crosswalk-never-archived.pdf",
+  "captured_at": "2026-09-26T01:25:10.350764+00:00",
+  "status": 404,
+  "final_url": "https://web.archive.org/web/20260711041727id_/https://www.fec.gov/files/legal/murs/8111/registers-crosswalk-never-archived.pdf",
+  "redirects": [],
+  "headers": {
+    "content-type": "text/html",
+    "x-ts": "404"
+  },
+  "withheld": [
+    "connection",
+    "content-encoding",
+    "date",
+    "permissions-policy",
+    "referrer-policy",
+    "server",
+    "server-timing",
+    "set-cookie",
+    "transfer-encoding",
+    "x-app-server",
+    "x-na",
+    "x-nid",
+    "x-page-cache",
+    "x-rl",
+    "x-sd",
+    "x-tr"
+  ],
+  "body_sha256": "cf061fb48c2e00433432fd150d29395a16497f57df3a8784d42fe92476799077",
+  "body_length": 4668
+}

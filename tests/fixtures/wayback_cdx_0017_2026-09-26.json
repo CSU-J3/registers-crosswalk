@@ -1,0 +1,33 @@
+{
+  "requested_url": "https://web.archive.org/cdx/search/cdx?url=https%3A%2F%2Fstorage.courtlistener.com%2Fharvard_pdf%2F102821.pdf&output=json&fl=timestamp%2Cstatuscode%2Cdigest",
+  "captured_at": "2026-09-26T03:19:58.140842+00:00",
+  "status": 200,
+  "final_url": "https://web.archive.org/cdx/search/cdx?url=https%3A%2F%2Fstorage.courtlistener.com%2Fharvard_pdf%2F102821.pdf&output=json&fl=timestamp%2Cstatuscode%2Cdigest",
+  "redirects": [],
+  "headers": {
+    "content-type": "application/json",
+    "x-ts": "200"
+  },
+  "withheld": [
+    "connection",
+    "date",
+    "permissions-policy",
+    "referrer-policy",
+    "server",
+    "server-timing",
+    "set-cookie",
+    "transfer-encoding",
+    "x-app-server",
+    "x-be",
+    "x-location",
+    "x-na",
+    "x-nid",
+    "x-page-cache",
+    "x-rl",
+    "x-sd",
+    "x-tr"
+  ],
+  "body_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+  "body_length": 3,
+  "rows": []
+}

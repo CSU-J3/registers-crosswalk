@@ -1227,7 +1227,7 @@ def test_a_capture_fetch_decodes_lowercase_headers_and_says_what_was_served(monk
     body, served_url, headers = pinmod._fetch_capture(final)  # noqa: SLF001
     assert body == ARCHIVED_BODY
     assert served_url == final
-    assert pinmod._served_timestamps(served_url, headers) == {ARCHIVED_TS}  # noqa: SLF001
+    assert pinmod._served_timestamps(200, served_url, headers) == {ARCHIVED_TS}  # noqa: SLF001
 
 
 def test_default_fetch_decodes_a_lowercase_content_encoding(monkeypatch):
@@ -1238,6 +1238,230 @@ def test_default_fetch_decodes_a_lowercase_content_encoding(monkeypatch):
     )
     monkeypatch.setattr(pinmod.urllib.request, "urlopen", lambda req, timeout=None: response)
     assert default_fetch(ECFR_URL) == (BODY, "application/xml")
+
+
+# ---------------------------------- what Wayback served: the status first, then Memento-Datetime
+
+# Wayback's answers as captured live on 2026-09-26, loaded by exact name: a `wayback_id_served_*`
+# glob would also match `wayback_id_served_late_*`.
+WAYBACK_FIXTURES = {
+    "served": "wayback_id_served_2026-09-26.json",
+    "served_late": "wayback_id_served_late_2026-09-26.json",
+    "redirected": "wayback_id_redirected_2026-09-26.json",
+    "missing": "wayback_id_missing_2026-09-26.json",
+    "listing": "wayback_cdx_listing_2026-09-26.json",
+    "listing_0017": "wayback_cdx_0017_2026-09-26.json",
+}
+# The one exception to "trim nothing": a fixture keeps these headers and lists every other one's
+# name under `withheld`, so nothing that identifies the machine that asked enters the repo.
+WAYBACK_HEADER_ALLOWLIST = frozenset(
+    {
+        "memento-datetime",
+        "x-ts",
+        "link",
+        "location",
+        "content-type",
+        "content-length",
+        "x-archive-src",
+    }
+)
+WAYBACK_FIXTURE_KEYS = {
+    "requested_url",
+    "captured_at",
+    "status",
+    "final_url",
+    "redirects",
+    "headers",
+    "withheld",
+    "body_sha256",
+    "body_length",
+}
+# The fixtures hold a document's hash, never its bytes. A fake serves these instead, and the pin's
+# drift value is computed from them, so "reproduces the pin" is the same comparison it is live.
+STAND_IN = b"%PDF-1.4 stand-in for the captured bytes"
+STAND_IN_DRIFT = ExpectedDrift("courtlistener", "sha256", sha256_hex(STAND_IN))
+
+
+def _wayback_fixture(key):
+    return json.loads((FIXTURES / WAYBACK_FIXTURES[key]).read_text(encoding="utf-8"))
+
+
+def _asked(fixture):
+    """The original URL and the timestamp a captured `id_` request asked for."""
+    m = re.fullmatch(r"https://web\.archive\.org/web/(\d{14})id_/(.+)", fixture["requested_url"])
+    return m.group(2), m.group(1)
+
+
+def _message(headers):
+    message = email.message.Message()
+    for key, value in headers.items():
+        message[key] = value
+    return message
+
+
+def _answering_as(fixture, body=STAND_IN):
+    """An `id_` fetch that answers exactly as Wayback did in `fixture`: urllib returns a 200 and
+    raises anything else, with the fixture's final URL and headers either way."""
+
+    def capture_fn(url):
+        assert url == fixture["requested_url"]
+        if fixture["status"] != 200:
+            raise urllib.error.HTTPError(
+                fixture["final_url"], fixture["status"], "", _message(fixture["headers"]), None
+            )
+        return body, fixture["final_url"], dict(fixture["headers"])
+
+    return capture_fn
+
+
+@pytest.mark.parametrize(
+    "key, served, verdict",
+    [
+        ("served", {"20260920190851"}, "ok"),
+        ("served_late", {"20260922175016"}, "ok"),
+        ("redirected", {"20260711041727"}, "not_served"),
+        # a 404 comes back at the URL that was asked for, which names the timestamp; nothing served
+        ("missing", set(), "not_served"),
+    ],
+)
+def test_every_captured_id_answer_is_classified_as_wayback_meant_it(key, served, verdict):
+    fixture = _wayback_fixture(key)
+    url, timestamp = _asked(fixture)
+    assert (
+        pinmod._served_timestamps(fixture["status"], fixture["final_url"], fixture["headers"])  # noqa: SLF001
+        == served
+    )
+    got, _ = pinmod._check_capture(  # noqa: SLF001
+        url, timestamp, STAND_IN_DRIFT, capture_fn=_answering_as(fixture)
+    )
+    assert got == verdict
+
+
+def test_a_404_is_not_served_although_its_url_names_the_timestamp():
+    fixture = _wayback_fixture("missing")
+    url, timestamp = _asked(fixture)
+    assert pinmod._SERVED_TS.search(fixture["final_url"]).group(1) == timestamp  # noqa: SLF001
+    verdict, detail = pinmod._check_capture(  # noqa: SLF001
+        url, timestamp, STAND_IN_DRIFT, capture_fn=_answering_as(fixture)
+    )
+    assert (verdict, detail) == ("not_served", f"Wayback serves nothing at {timestamp} (HTTP 404)")
+
+
+def test_a_200_without_memento_datetime_serves_no_capture():
+    """The served capture minus its Memento-Datetime: the URL still names the timestamp and the
+    bytes still reproduce the pin, and it is not served."""
+    fixture = _wayback_fixture("served")
+    del fixture["headers"]["memento-datetime"]
+    url, timestamp = _asked(fixture)
+    assert pinmod._SERVED_TS.search(fixture["final_url"]).group(1) == timestamp  # noqa: SLF001
+    verdict, detail = pinmod._check_capture(  # noqa: SLF001
+        url, timestamp, STAND_IN_DRIFT, capture_fn=_answering_as(fixture)
+    )
+    assert verdict == "not_served"
+    assert "no Memento-Datetime" in detail
+
+
+def test_the_status_is_read_before_the_headers():
+    """A 404 carrying a Memento-Datetime that names the timestamp is still not served. Wayback's
+    404s carry none; this keeps the status rule from resting on that."""
+    fixture = _wayback_fixture("served")
+    fixture["status"] = 404
+    url, timestamp = _asked(fixture)
+    assert (
+        pinmod._served_timestamps(404, fixture["final_url"], fixture["headers"]) == set()  # noqa: SLF001
+    )
+    verdict, _ = pinmod._check_capture(  # noqa: SLF001
+        url, timestamp, STAND_IN_DRIFT, capture_fn=_answering_as(fixture)
+    )
+    assert verdict == "not_served"
+
+
+def test_a_final_url_naming_another_capture_is_not_served():
+    fixture = _wayback_fixture("served")
+    url, timestamp = _asked(fixture)
+    fixture["final_url"] = fixture["final_url"].replace(timestamp, "20260711041727")
+    verdict, detail = pinmod._check_capture(  # noqa: SLF001
+        url, timestamp, STAND_IN_DRIFT, capture_fn=_answering_as(fixture)
+    )
+    assert verdict == "not_served"
+    assert "20260711041727" in detail
+
+
+def test_reuse_passes_over_a_capture_served_without_memento_datetime():
+    """The listed capture holds the pinned bytes, but its answer names no capture: it is not
+    reused, and the pin goes on to Save Page Now."""
+    posted = []
+    new_capture = _served({"20260919120000": ARCHIVED_BODY})
+
+    def capture_fn(url):
+        if "/web/20260919120000id_/" in url:
+            return new_capture(url)
+        return ARCHIVED_BODY, url, {}  # the URL names the listed timestamp; no Memento-Datetime
+
+    copy = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=_cdx_then_spn2(_cdx((ARCHIVED_TS, "200", "AAA")), posted=posted),
+        capture_fn=capture_fn,
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert posted
+    assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
+
+
+def test_the_served_fixtures_hold_the_pinned_bytes():
+    """What the fixtures stand in for: 0007's capture, and 0012's at both of its timestamps."""
+
+    def pinned(xr_id):
+        record = json.loads((REPO / "data" / "sources" / f"{xr_id}.json").read_text("utf-8"))
+        return record["artifact"]["sha256"]
+
+    assert _wayback_fixture("served")["body_sha256"] == pinned("xr_src_0007")
+    assert _wayback_fixture("served_late")["body_sha256"] == pinned("xr_src_0012")
+    assert _wayback_fixture("redirected")["body_sha256"] == pinned("xr_src_0012")
+
+
+def test_every_wayback_fixture_on_disk_is_one_the_tests_load():
+    assert sorted(p.name for p in FIXTURES.glob("wayback_*.json")) == sorted(
+        WAYBACK_FIXTURES.values()
+    )
+
+
+@pytest.mark.parametrize("path", sorted(FIXTURES.glob("wayback_*.json")), ids=lambda p: p.name)
+def test_wayback_fixtures_keep_only_allowlisted_headers(path):
+    """The key set both ways, and the allowlist: a kept header is an allowed one, an allowed one
+    is never withheld, and what every answer carried and the rule keeps out is withheld: `x-nid`,
+    which names the requester's ISP; `set-cookie`; and the app server's name.
+
+    `null` means the headers were not recorded, never that nothing was withheld: it is allowed
+    only as both fields at once, only for the one answer Part A didn't record, and a recorded
+    answer's `withheld` is never empty."""
+    fixture = json.loads(path.read_text(encoding="utf-8"))
+    expected_keys = WAYBACK_FIXTURE_KEYS | (
+        {"rows"} if path.name.startswith("wayback_cdx_") else set()
+    )
+    assert set(fixture) == expected_keys
+    for answer in [fixture, *fixture["redirects"]]:
+        if answer["headers"] is None or answer["withheld"] is None:
+            assert answer["headers"] is None and answer["withheld"] is None  # not recorded
+            assert path.name == WAYBACK_FIXTURES["listing"]
+            continue
+        assert set(answer["headers"]) <= WAYBACK_HEADER_ALLOWLIST
+        assert answer["withheld"]
+        assert not set(answer["withheld"]) & WAYBACK_HEADER_ALLOWLIST
+        assert {"set-cookie", "x-nid", "x-app-server"} <= set(answer["withheld"])
+
+
+def test_a_memento_datetime_that_names_no_time_is_said_to_be_there():
+    fixture = _wayback_fixture("served")
+    fixture["headers"]["memento-datetime"] = "garbage"
+    url, timestamp = _asked(fixture)
+    verdict, detail = pinmod._check_capture(  # noqa: SLF001
+        url, timestamp, STAND_IN_DRIFT, capture_fn=_answering_as(fixture)
+    )
+    assert verdict == "not_served"
+    assert "a Memento-Datetime that names no time: 'garbage'" in detail
 
 
 # ------------------------------------------------------------------- 429 is a rate, not a fault

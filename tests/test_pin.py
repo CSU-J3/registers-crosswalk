@@ -8,7 +8,7 @@ import urllib.error
 from datetime import UTC, date, datetime, timedelta
 from email.utils import format_datetime
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
 
@@ -1636,6 +1636,29 @@ def test_reuse_still_reads_an_unreadable_capture_as_a_mismatch():
     assert "1 did not match" in why[-1]
 
 
+def test_reuse_counts_a_404_as_not_served_and_a_timeout_as_not_fetched():
+    """Item 1's one visible effect on reuse: a 404 is Wayback's answer, a timeout is none."""
+    why = []
+    rows = _cdx(("20260922101010", "200", "A"), ("20260921101010", "200", "B"))
+
+    def capture_fn(url):
+        if "/20260922101010id_/" in url:
+            return _not_found(url)
+        raise TimeoutError("timed out")
+
+    found = pinmod._existing_capture(  # noqa: SLF001
+        FR_URL,
+        STAND_IN_DRIFT,
+        json_fn=lambda url, h=None, d=None: rows,
+        capture_fn=capture_fn,
+        sleep_fn=lambda _s: None,
+        why=why,
+    )
+    assert found is None
+    assert "1 were not served at their timestamp" in why[-1]
+    assert "1 could not be fetched" in why[-1]
+
+
 def test_a_new_capture_the_parser_cannot_read_is_refused_at_once():
     """As before `unreadable` existed: refused as not reproducing the pin, on the first try,
     never retried as a capture Wayback hasn't served yet."""
@@ -1655,6 +1678,18 @@ def test_a_new_capture_the_parser_cannot_read_is_refused_at_once():
     assert 300.0 not in slept
 
 
+@pytest.mark.parametrize("value", ["Wed, 23 Sep 2026 01:38:00 -0000", "Wed, 23 Sep 2026 01:38:00"])
+def test_a_memento_datetime_without_a_zone_is_an_aware_utc_time(value):
+    """RFC 5322's "-0000", or no zone at all, is UTC. A naive datetime would be read as local time
+    by whatever converts it; asserting on the aware value gives this teeth on a UTC runner too."""
+    when = pinmod._memento_time(value)  # noqa: SLF001
+    assert when is not None and when.tzinfo is not None
+    assert when == datetime(2026, 9, 23, 1, 38, tzinfo=UTC)
+    url = f"https://web.archive.org/web/{TS_D}id_/{FR_URL}"
+    served = pinmod._served_timestamps(200, url, {"memento-datetime": value})  # noqa: SLF001
+    assert served == {TS_D}
+
+
 def test_a_memento_datetime_that_names_no_time_is_said_to_be_there():
     fixture = _wayback_fixture("served")
     fixture["headers"]["memento-datetime"] = "garbage"
@@ -1664,6 +1699,660 @@ def test_a_memento_datetime_that_names_no_time_is_said_to_be_there():
     )
     assert verdict == "not_served"
     assert "a Memento-Datetime that names no time: 'garbage'" in detail
+
+
+# ---------------------------------- the weekly archive check: samples, rounds, and the verdicts
+
+WEEKLY_NOW = datetime(2026, 9, 28, 12, 40, tzinfo=UTC)  # a Monday, when archives.yml runs
+FR_URL = "https://www.govinfo.gov/content/pkg/FR-1995-02-09/pdf/95-3162.pdf"
+TS_A, TS_B, TS_C, TS_D, TS_E = (
+    "20260920190851",
+    "20260921101010",
+    "20260922101010",
+    "20260923013800",
+    "20260924101010",
+)
+
+
+def _archived(*timestamps, xr_id="xr_src_0001", url=FR_URL, body=STAND_IN):
+    """A pin of `body` with one Wayback entry per timestamp, in order."""
+    return _fr_source(
+        xr_id=xr_id,
+        canonical_url=url,
+        artifact={
+            "sha256": sha256_hex(body),
+            "byte_length": len(body),
+            "media_type": "application/pdf",
+            "fetched_at": "2026-09-17T12:00:00Z",
+            "drift_key": "sha256",
+            "drift_value": sha256_hex(body),
+        },
+        archives=[
+            {"service": "wayback", "url": f"https://web.archive.org/web/{ts}/{url}"}
+            for ts in timestamps
+        ],
+    )
+
+
+def _asked_ts(url):
+    return re.search(r"/web/(\d{14})id_/", url).group(1)
+
+
+def _serves(body=STAND_IN, *, at=None):
+    """A 200 with the headers the served fixture shows Wayback sends, naming the capture it
+    served: the one asked for, or `at`."""
+    shape = _wayback_fixture("served")["headers"]
+
+    def answer(url):
+        served = at or _asked_ts(url)
+        final = url.replace(f"/web/{_asked_ts(url)}id_/", f"/web/{served}id_/")
+        return body, final, {**shape, "memento-datetime": _memento(served)}
+
+    return answer
+
+
+def _without_memento(body=STAND_IN):
+    """A 200 at the URL asked for, with the served fixture's headers minus Memento-Datetime."""
+
+    def answer(url):
+        headers = dict(_wayback_fixture("served")["headers"])
+        del headers["memento-datetime"]
+        return body, url, headers
+
+    return answer
+
+
+def _not_found(url):
+    """The missing fixture's 404: at the URL asked for, with no Memento-Datetime."""
+    headers = _message(_wayback_fixture("missing")["headers"])
+    raise urllib.error.HTTPError(url, 404, "NOT FOUND", headers, None)
+
+
+def _refused(code, retry_after=None):
+    def answer(url):
+        headers = {} if retry_after is None else {"Retry-After": retry_after}
+        raise urllib.error.HTTPError(url, code, "refused", _message(headers), None)
+
+    return answer
+
+
+def _times_out(url):
+    raise TimeoutError("timed out")
+
+
+class _Wayback:
+    """Wayback as the weekly check meets it, scripted. `answers` maps a timestamp to what it
+    answers, one per sample in order, the last repeated; `listings` maps an original URL to its
+    CDX reply, or to an exception to raise. Every request and every wait lands in `events`."""
+
+    def __init__(self, answers, listings=None, *, each_request_takes=0.0, sleep_overruns_by=0.0):
+        self.answers = {ts: list(seq) for ts, seq in answers.items()}
+        self.listings = listings or {}
+        self.events = []
+        # A clock the run reads its budget from: only its own waits and requests move it.
+        self.now, self.each_request_takes, self.waits = 0.0, each_request_takes, []
+        self.sleep_overruns_by = sleep_overruns_by
+
+    def capture_fn(self, url):
+        self.events.append(("capture", url))
+        self.now += self.each_request_takes
+        seq = self.answers[_asked_ts(url)]
+        return (seq.pop(0) if len(seq) > 1 else seq[0])(url)
+
+    def json_fn(self, url, headers=None, data=None):
+        self.events.append(("cdx", url))
+        self.now += self.each_request_takes
+        assert url.startswith("https://web.archive.org/cdx/search/cdx?"), url
+        reply = self.listings[parse_qs(urlsplit(url).query)["url"][0]]
+        if isinstance(reply, list | dict):
+            return reply
+        raise reply
+
+    def sleep(self, seconds):
+        self.events.append(("sleep", seconds))
+        self.waits.append((self.now, seconds))
+        self.now += seconds + self.sleep_overruns_by
+
+    def asked(self, ts):
+        return sum(1 for kind, url in self.events if kind == "capture" and f"/{ts}id_/" in url)
+
+    def run(self, *sources, on_final=None):
+        return pinmod.check_archives(
+            sources,
+            capture_fn=self.capture_fn,
+            json_fn=self.json_fn,
+            sleep_fn=self.sleep,
+            now=WEEKLY_NOW,
+            on_final=on_final,
+            clock=lambda: self.now,
+        )
+
+
+def _cdx_rows(*rows):
+    return [["timestamp", "statuscode", "digest"], *[list(r) for r in rows]]
+
+
+def test_a_capture_served_at_its_timestamp_is_ok_at_once():
+    wayback = _Wayback({TS_A: [_serves()]})
+    [report] = wayback.run(_archived(TS_A))
+    assert report.status == "ok"
+    assert [s.status for s in report.samples] == ["ok"]
+    assert wayback.events == [("capture", f"https://web.archive.org/web/{TS_A}id_/{FR_URL}")]
+
+
+def test_ok_in_a_later_round_after_404s_is_ok_and_ends_the_sampling():
+    wayback = _Wayback({TS_A: [_not_found, _not_found, _serves()]})
+    [report] = wayback.run(_archived(TS_A))
+    assert report.status == "ok"
+    assert [s.status for s in report.samples] == ["not_served", "not_served", "ok"]
+    assert "on sample 3 after not_served, not_served" in report.detail
+    assert wayback.asked(TS_A) == 3  # not a fourth time
+    assert not any(kind == "cdx" for kind, _ in wayback.events)
+
+
+def test_a_mismatch_at_the_timestamp_is_lost():
+    wayback = _Wayback({TS_A: [_serves(b"other bytes")]})
+    [report] = wayback.run(_archived(TS_A))
+    assert report.status == "lost"
+    assert len(report.samples) == 4
+    assert report.detail.endswith("Next: `pin archive --repair xr_src_0001`.")
+    assert "only preservation copy" not in report.detail
+    assert not any(kind == "cdx" for kind, _ in wayback.events)
+
+
+def test_a_mismatch_in_any_sample_is_lost_even_beside_404s():
+    wayback = _Wayback({TS_A: [_not_found, _serves(b"other bytes"), _not_found]})
+    [report] = wayback.run(_archived(TS_A))
+    assert report.status == "lost"
+
+
+def _prelim(timestamp):
+    return _uscode_source(
+        archives=[
+            {"service": "wayback", "url": f"https://web.archive.org/web/{timestamp}/{USCODE_URL}"}
+        ]
+    )
+
+
+def test_a_prelim_whose_bytes_differ_but_whose_last_amendment_matches_is_ok():
+    rerendered = USCODE_PAGE + b"<!-- another session -->"
+    wayback = _Wayback({TS_A: [_serves(rerendered)]})
+    [report] = wayback.run(_prelim(TS_A))
+    assert report.status == "ok"
+
+
+def test_a_prelim_whose_last_amendment_differs_is_lost_and_says_it_is_the_only_copy():
+    amended = _append_to_source_credit(USCODE_PAGE, b"; Pub. L. 119-40, Mar. 4, 2026")
+    wayback = _Wayback({TS_A: [_serves(amended)]})
+    [report] = wayback.run(_prelim(TS_A))
+    assert report.status == "lost"
+    assert "only preservation copy" in report.detail
+    assert "same last amendment" in report.detail
+
+
+def test_a_prelim_the_parser_cannot_read_is_unchecked():
+    wayback = _Wayback({TS_A: [_serves(USCODE_UNREADABLE)]})
+    [report] = wayback.run(_prelim(TS_A))
+    assert report.status == "unchecked"
+    assert "could not read" in report.detail
+    assert not any(kind == "cdx" for kind, _ in wayback.events)
+
+
+def test_every_answer_not_served_with_an_empty_listing_is_missing():
+    """xr_src_0017 as A2 found it: four 404s, and the listing it captured, `[]`."""
+    listing = _wayback_fixture("listing_0017")
+    url = parse_qs(urlsplit(listing["requested_url"]).query)["url"][0]
+    wayback = _Wayback({TS_D: [_not_found]}, listings={url: listing["rows"]})
+    [report] = wayback.run(_archived(TS_D, url=url))
+    assert listing["rows"] == []
+    assert report.status == "missing"
+    assert [s.status for s in report.samples] == ["not_served"] * 4
+    assert "the CDX listing is empty" in report.detail
+    assert "the capture is 5 day(s) old" in report.detail
+    assert "`pin archive --repair` has nothing to find" in report.detail
+    assert "dispatch the workflow again after a day" in report.detail
+
+
+def test_every_answer_not_served_with_the_row_gone_is_missing_and_names_repair():
+    listing = _wayback_fixture("listing")  # 0012's listing: holds neither TS_D nor TS_B
+    wayback = _Wayback({TS_D: [_not_found]}, listings={FR_URL: listing["rows"]})
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "missing"
+    assert f"has no capture at {TS_D}" in report.detail
+    assert "if it is still missing next Monday, run `pin archive --repair xr_src_0001`" in (
+        report.detail
+    )
+
+
+@pytest.mark.parametrize("statuscode", ["200", "-"])
+def test_every_answer_not_served_with_the_row_still_listed_is_unchecked(statuscode):
+    wayback = _Wayback(
+        {TS_D: [_not_found]}, listings={FR_URL: _cdx_rows((TS_D, statuscode, "DDD"))}
+    )
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "unchecked"
+    assert f"still holds {TS_D}" in report.detail
+
+
+def test_a_row_that_holds_no_document_does_not_count_as_listed():
+    wayback = _Wayback({TS_D: [_not_found]}, listings={FR_URL: _cdx_rows((TS_D, "404", "DDD"))})
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "missing"
+
+
+@pytest.mark.parametrize("body", [STAND_IN, b"<html>not the capture</html>"])
+def test_a_200_without_memento_datetime_is_never_lost_nor_ok(body):
+    """Whatever it carries, the pinned bytes or other ones: without the header it is no capture."""
+    wayback = _Wayback(
+        {TS_D: [_without_memento(body)]}, listings={FR_URL: _cdx_rows((TS_D, "200", "D"))}
+    )
+    [report] = wayback.run(_archived(TS_D))
+    assert [s.status for s in report.samples] == ["not_served"] * 4
+    assert report.status == "unchecked"
+
+
+def test_one_answer_only_is_unchecked():
+    wayback = _Wayback({TS_D: [_not_found, _times_out]})
+    [report] = wayback.run(_archived(TS_D))
+    assert [s.status for s in report.samples] == ["not_served"] + ["unreachable"] * 3
+    assert report.status == "unchecked"
+    assert "one is too few" in report.detail
+    assert not any(kind == "cdx" for kind, _ in wayback.events)
+
+
+@pytest.mark.parametrize(
+    "reply, said",
+    [
+        (urllib.error.HTTPError(FR_URL, 503, "busy", {}, None), "(HTTP 503)"),
+        ({"not": "a listing"}, "_NotAListing"),
+        ([["no", "header"], ["x"]], "_NotAListing"),
+    ],
+)
+def test_a_listing_that_cannot_be_read_is_unchecked(reply, said):
+    wayback = _Wayback({TS_D: [_not_found]}, listings={FR_URL: reply})
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "unchecked"
+    assert "the CDX listing could not be read" in report.detail and said in report.detail
+
+
+def test_a_listing_503_is_retried_as_reuse_retries_it():
+    listing = [urllib.error.HTTPError(FR_URL, 503, "busy", {}, None)]
+
+    class Flaky(_Wayback):
+        def json_fn(self, url, headers=None, data=None):
+            if listing:
+                self.events.append(("cdx", url))
+                raise listing.pop()
+            return super().json_fn(url, headers, data)
+
+    wayback = Flaky({TS_D: [_not_found]}, listings={FR_URL: []})
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "missing"
+    first, second = [i for i, (kind, _) in enumerate(wayback.events) if kind == "cdx"]
+    assert wayback.events[first + 1 : second] == [("sleep", 10.0)]
+
+
+@pytest.mark.parametrize("code", [403, 429, 500])
+def test_a_refusal_is_unchecked_never_lost_or_missing(code):
+    wayback = _Wayback({TS_D: [_refused(code)]}, listings={FR_URL: []})
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "unchecked"
+    assert [s.status for s in report.samples] == ["unreachable"] * 4
+    assert f"HTTP {code}" in report.detail
+
+
+def test_only_entries_not_yet_ok_are_sampled_again_five_minutes_apart():
+    wayback = _Wayback({TS_A: [_serves()], TS_D: [_not_found]}, listings={FR_URL: []})
+    reports = wayback.run(_archived(TS_A), _archived(TS_D, xr_id="xr_src_0002"))
+    assert [r.status for r in reports] == ["ok", "missing"]
+    assert (wayback.asked(TS_A), wayback.asked(TS_D)) == (1, 4)
+    assert [s for kind, s in wayback.events if kind == "sleep"] == [5.0, 300.0, 300.0, 300.0, 5.0]
+
+
+@pytest.mark.parametrize("retry_after, wait", [("420", 420.0), ("100", 300.0), ("9999", 600.0)])
+def test_a_429s_retry_after_stretches_the_wait_between_rounds_up_to_ten_minutes(retry_after, wait):
+    wayback = _Wayback({TS_D: [_refused(429, retry_after), _serves()]})
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "ok"
+    assert [s for kind, s in wayback.events if kind == "sleep"] == [wait]
+
+
+def test_three_unanswered_in_a_row_end_a_round_and_the_rest_wait_for_the_next():
+    wayback = _Wayback(
+        {
+            TS_A: [_times_out, _serves()],
+            TS_B: [_times_out, _serves()],
+            TS_C: [_times_out, _serves()],
+            TS_D: [_serves()],
+        }
+    )
+    sources = [
+        _archived(ts, xr_id=f"xr_src_000{i}") for i, ts in enumerate((TS_A, TS_B, TS_C, TS_D), 1)
+    ]
+    reports = wayback.run(*sources)
+    assert [r.status for r in reports] == ["ok"] * 4
+    first_wait = wayback.events.index(("sleep", 300.0))
+    assert [kind for kind, _ in wayback.events[:first_wait]].count("capture") == 3
+    d_asked = next(
+        i
+        for i, (kind, url) in enumerate(wayback.events)
+        if kind == "capture" and f"/{TS_D}id_/" in url
+    )
+    assert d_asked == first_wait + 1  # not reached in the first round; asked first in the second
+    assert [len(r.samples) for r in reports] == [2, 2, 2, 1]
+
+
+def test_entries_never_answered_are_unchecked_and_the_fetch_count_proves_each_round_stopped():
+    """Three requests a round, and each round starts where the last one stopped, so every entry
+    is asked at least twice."""
+    timestamps = (TS_A, TS_B, TS_C, TS_D, TS_E)
+    wayback = _Wayback({ts: [_times_out] for ts in timestamps})
+    sources = [_archived(ts, xr_id=f"xr_src_000{i}") for i, ts in enumerate(timestamps, 1)]
+    reports = wayback.run(*sources)
+    assert sum(kind == "capture" for kind, _ in wayback.events) == 12
+    assert [r.status for r in reports] == ["unchecked"] * 5
+    assert [len(r.samples) for r in reports] == [3, 3, 2, 2, 2]
+    assert all(r.detail.startswith("no answer in") for r in reports)
+
+
+def test_captures_that_always_fail_first_in_the_list_cannot_starve_the_rest():
+    """Three captures that always time out, listed first. Without the rotation every round would
+    stop on them, and the rest would never be asked."""
+    wayback = _Wayback(
+        {
+            TS_A: [_times_out],
+            TS_B: [_times_out],
+            TS_C: [_times_out],
+            TS_D: [_serves()],
+            TS_E: [_not_found],
+            "20260925101010": [_serves(b"other bytes")],
+        },
+        listings={FR_URL: []},
+    )
+    timestamps = (TS_A, TS_B, TS_C, TS_D, TS_E, "20260925101010")
+    sources = [_archived(ts, xr_id=f"xr_src_000{i}") for i, ts in enumerate(timestamps, 1)]
+    reports = wayback.run(*sources)
+    assert [r.status for r in reports] == [
+        "unchecked",
+        "unchecked",
+        "unchecked",
+        "ok",
+        "missing",
+        "lost",
+    ]
+
+
+def test_a_copy_that_is_not_checkable_is_settled_before_anything_is_asked():
+    """Placed after three captures that time out: it is NOT CHECKABLE at once, with no request,
+    and it doesn't wait for a round that reaches it."""
+    perma = _fr_source(
+        xr_id="xr_src_0004",
+        archives=[{"service": "perma", "url": "https://perma.cc/ABCD-1234"}],
+    )
+    wayback = _Wayback({TS_A: [_times_out], TS_B: [_times_out], TS_C: [_times_out]})
+    sources = [
+        *[_archived(ts, xr_id=f"xr_src_000{i}") for i, ts in enumerate((TS_A, TS_B, TS_C), 1)],
+        perma,
+    ]
+    reports = wayback.run(*sources, on_final=lambda r: wayback.events.append(("final", r.xr_id)))
+    assert (reports[-1].status, reports[-1].samples) == ("not_checkable", [])
+    assert wayback.events[0] == ("final", "xr_src_0004")
+    assert not any("perma.cc" in str(value) for _, value in wayback.events)
+
+
+def test_a_verdict_the_samples_decide_is_not_held_behind_another_entrys_listing():
+    wayback = _Wayback({TS_D: [_not_found], TS_E: [_serves(b"other bytes")]}, listings={FR_URL: []})
+    wayback.run(
+        _archived(TS_D),
+        _archived(TS_E, xr_id="xr_src_0002"),
+        on_final=lambda r: wayback.events.append(("final", r.xr_id)),
+    )
+    first_listing = next(i for i, (kind, _) in enumerate(wayback.events) if kind == "cdx")
+    assert wayback.events.index(("final", "xr_src_0002")) < first_listing
+
+
+@pytest.mark.parametrize(
+    "retry_after, wait",
+    [("420", 420.0), (None, 60.0), ("0", 60.0), ("9999", 600.0)],
+)
+def test_a_429_in_the_last_round_is_honoured_before_the_listing_is_read(retry_after, wait):
+    """As long as it asked, up to the rounds' ten minutes; without a Retry-After (or with 0),
+    the minute `_retrying` waits in the same case."""
+    wayback = _Wayback(
+        {TS_D: [_not_found, _not_found, _not_found, _refused(429, retry_after)]},
+        listings={FR_URL: []},
+    )
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "missing"
+    assert [s for kind, s in wayback.events if kind == "sleep"] == [300.0, 300.0, 300.0, wait]
+    assert wayback.events[-1][0] == "cdx"
+
+
+def test_a_prelim_missing_with_an_empty_listing_does_not_promise_a_repair():
+    wayback = _Wayback({TS_D: [_not_found]}, listings={USCODE_URL: []})
+    [report] = wayback.run(_prelim(TS_D))
+    assert report.status == "missing"
+    assert "only preservation copy" in report.detail
+    assert "`--repair` can find another" not in report.detail
+    assert "it needs a fresh capture" in report.detail
+
+
+@pytest.mark.parametrize("statuscode", ["404", "302"])
+def test_a_prelim_missing_whose_listing_holds_nothing_repair_could_use_does_not_promise_one(
+    statuscode,
+):
+    """Rows, but none holding a document: repair's search would try none of them."""
+    rows = _cdx_rows((TS_A, statuscode, "A"), (TS_D, statuscode, "D"))
+    wayback = _Wayback({TS_D: [_not_found]}, listings={USCODE_URL: rows})
+    [report] = wayback.run(_prelim(TS_D))
+    assert report.status == "missing"
+    assert "holds no capture that `--repair` could use" in report.detail
+    assert "`--repair` can find another" not in report.detail
+
+
+def test_a_prelim_missing_with_the_row_gone_says_repair_can_still_find_one():
+    wayback = _Wayback({TS_D: [_not_found]}, listings={USCODE_URL: _cdx_rows((TS_A, "200", "A"))})
+    [report] = wayback.run(_prelim(TS_D))
+    assert report.status == "missing"
+    assert "only preservation copy" in report.detail
+    assert "`--repair` can find another with the same last amendment" in report.detail
+
+
+def test_a_timestamp_that_names_no_date_is_missing_with_its_age_unknown():
+    """Only a hand edit can put one there; the check still answers instead of raising."""
+    wayback = _Wayback({"20260231000000": [_not_found]}, listings={FR_URL: []})
+    [report] = wayback.run(_archived("20260231000000"))
+    assert report.status == "missing"
+    assert "20260231000000 names no date, so the capture's age is unknown" in report.detail
+
+
+def _no_wait_passes_the_budget(wayback):
+    return all(start + seconds <= pinmod._ARCHIVE_BUDGET for start, seconds in wayback.waits)  # noqa: SLF001
+
+
+def test_a_cdx_retry_after_past_the_budget_is_not_waited_and_the_run_ends_on_its_own():
+    """The listing answers 429 with Retry-After 3600. The run doesn't take that wait: what is still
+    pending is UNCHECKED with the reason, nothing more is asked, and no wait passes the budget."""
+    refusal = [urllib.error.HTTPError(FR_URL, 429, "slow", _message({"Retry-After": "3600"}), None)]
+
+    class Limited(_Wayback):
+        def json_fn(self, url, headers=None, data=None):
+            if refusal:
+                self.events.append(("cdx", url))
+                raise refusal.pop()
+            return super().json_fn(url, headers, data)
+
+    wayback = Limited({TS_D: [_not_found], TS_E: [_not_found]}, listings={FR_URL: []})
+    reports = wayback.run(_archived(TS_D), _archived(TS_E, xr_id="xr_src_0002"))
+    assert [r.status for r in reports] == ["unchecked", "unchecked"]
+    for report in reports:
+        assert report.detail == (
+            "the CDX listing's Retry-After 3600 s exceeds the run's budget; its answers so far: "
+            "not_served, not_served, not_served, not_served"
+        )
+    assert ("sleep", 3600.0) not in wayback.events
+    assert sum(kind == "cdx" for kind, _ in wayback.events) == 1  # nothing asked after it
+    assert _no_wait_passes_the_budget(wayback)
+
+
+def test_a_round_that_would_start_past_the_budget_is_not_waited_for():
+    wayback = _Wayback({TS_D: [_not_found]}, listings={FR_URL: []}, each_request_takes=500.0)
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "unchecked"
+    assert report.detail == (
+        "budget spent before round 3; its answers so far: not_served, not_served"
+    )
+    assert _no_wait_passes_the_budget(wayback)
+
+
+def test_no_request_starts_past_the_budget_even_after_a_wait_that_fit_it():
+    """A sleep can run long. The third round's wait fits the budget as asked, but ends past it;
+    the request after it isn't made."""
+    wayback = _Wayback({TS_D: [_not_found]}, listings={FR_URL: []}, sleep_overruns_by=550.0)
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "unchecked"
+    assert report.detail == "budget spent in round 3; its answers so far: not_served, not_served"
+    assert wayback.asked(TS_D) == 2
+
+
+def test_a_mismatch_cut_short_by_the_budget_is_still_lost():
+    """Another entry's 429 stretches the rounds past the budget. The entry already served at its
+    timestamp with other bytes stays LOST: Wayback's own answer about it, which more samples
+    wouldn't change. The one with no answer is UNCHECKED."""
+    wayback = _Wayback({TS_D: [_serves(b"other bytes")], TS_E: [_refused(429, "600")]})
+    reports = wayback.run(_archived(TS_D), _archived(TS_E, xr_id="xr_src_0002"))
+    assert [(r.status, r.detail) for r in reports] == [
+        (
+            "lost",
+            "Retry-After 600 s exceeds the run's budget before round 4; its answers so far: "
+            "mismatch, mismatch, mismatch. Next: `pin archive --repair xr_src_0001`.",
+        ),
+        (
+            "unchecked",
+            "Retry-After 600 s exceeds the run's budget before round 4; its answers so far: "
+            "unreachable, unreachable, unreachable",
+        ),
+    ]
+    assert _no_wait_passes_the_budget(wayback)
+
+
+def test_a_captures_retry_after_that_would_pass_the_budget_is_not_waited():
+    """Rounds 520 s apart: the third wait would end at 1,560 s, a minute past 25 minutes, so the
+    budget is exactly what refuses it (26 minutes would take it)."""
+    wayback = _Wayback({TS_D: [_refused(429, "520")]})
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "unchecked"
+    assert report.detail.startswith("Retry-After 520 s exceeds the run's budget before round 4")
+    assert [s for kind, s in wayback.events if kind == "sleep"] == [520.0, 520.0]
+    assert _no_wait_passes_the_budget(wayback)
+
+
+def test_a_cdx_5xx_retry_past_the_budget_is_not_waited():
+    """Slow answers bring the listing's read to the budget's last minute; its 503 would be
+    retried after 10 s, which would end past the budget, so it isn't."""
+    refusal = [urllib.error.HTTPError(FR_URL, 503, "busy", {}, None)]
+
+    class Busy(_Wayback):
+        def json_fn(self, url, headers=None, data=None):
+            if refusal:
+                self.events.append(("cdx", url))
+                self.now += self.each_request_takes
+                raise refusal.pop()
+            return super().json_fn(url, headers, data)
+
+    wayback = Busy({TS_D: [_not_found]}, listings={FR_URL: []}, each_request_takes=145.0)
+    [report] = wayback.run(_archived(TS_D))
+    assert report.status == "unchecked"
+    assert report.detail == (
+        "a 10 s wait to retry the CDX listing exceeds the run's budget; its answers so far: "
+        "not_served, not_served, not_served, not_served"
+    )
+    assert ("sleep", 10.0) not in wayback.events
+    assert _no_wait_passes_the_budget(wayback)
+
+
+def test_the_wait_a_last_round_429_asks_for_is_not_taken_past_the_budget():
+    wayback = _Wayback(
+        {TS_D: [_not_found], TS_E: [_not_found, _not_found, _not_found, _refused(429, "600")]},
+        listings={FR_URL: []},
+    )
+    reports = wayback.run(_archived(TS_D), _archived(TS_E, xr_id="xr_src_0002"))
+    assert [r.status for r in reports] == ["unchecked", "unchecked"]
+    assert all(
+        r.detail.startswith("Retry-After 600 s exceeds the run's budget before the CDX listing")
+        for r in reports
+    )
+    assert not any(kind == "cdx" for kind, _ in wayback.events)
+    assert _no_wait_passes_the_budget(wayback)
+
+
+def test_every_wait_between_two_requests_is_at_least_five_seconds():
+    """A mixed run: an ok, a 429 asking for one second, a missing entry whose listing 503s once
+    and then 429s with Retry-After 1. Nothing ever asks twice within five seconds."""
+    answers = {
+        TS_A: [_serves()],
+        TS_B: [_refused(429, "1"), _not_found],
+        TS_D: [_not_found],
+    }
+    replies = [
+        urllib.error.HTTPError(FR_URL, 503, "busy", {}, None),
+        urllib.error.HTTPError(FR_URL, 429, "slow", _message({"Retry-After": "1"}), None),
+    ]
+
+    class Busy(_Wayback):
+        def json_fn(self, url, headers=None, data=None):
+            if replies:
+                self.events.append(("cdx", url))
+                raise replies.pop(0)
+            return super().json_fn(url, headers, data)
+
+    wayback = Busy(answers, listings={FR_URL: []})
+    sources = [
+        _archived(TS_A),
+        _archived(TS_B, xr_id="xr_src_0002"),
+        _archived(TS_D, xr_id="xr_src_0003"),
+    ]
+    wayback.run(*sources)
+    gaps, waited, first = [], 0.0, True
+    for kind, value in wayback.events:
+        if kind == "sleep":
+            waited += value
+            continue
+        if not first:
+            gaps.append(waited)
+        first, waited = False, 0.0
+    assert len(gaps) == sum(kind != "sleep" for kind, _ in wayback.events) - 1
+    assert min(gaps) >= 5.0
+    assert all("/save" not in value for kind, value in wayback.events if kind != "sleep")
+
+
+def test_a_record_with_two_entries_gets_both_checked():
+    wayback = _Wayback({TS_A: [_serves()], TS_B: [_serves(b"other bytes")]})
+    reports = wayback.run(_archived(TS_A, TS_B))
+    assert [(r.xr_id, r.timestamp, r.status) for r in reports] == [
+        ("xr_src_0001", TS_A, "ok"),
+        ("xr_src_0001", TS_B, "lost"),
+    ]
+
+
+def test_a_copy_that_is_not_checkable_is_reported_without_a_request():
+    source = _fr_source(archives=[{"service": "perma", "url": "https://perma.cc/ABCD-1234"}])
+    wayback = _Wayback({})
+    [report] = wayback.run(source)
+    assert report.status == "not_checkable"
+    assert report.samples == []
+    assert wayback.events == []
+
+
+def test_a_first_pass_ok_is_final_before_the_first_round_wait():
+    wayback = _Wayback({TS_A: [_serves()], TS_D: [_not_found]}, listings={FR_URL: []})
+    wayback.run(
+        _archived(TS_A),
+        _archived(TS_D, xr_id="xr_src_0002"),
+        on_final=lambda r: wayback.events.append(("final", r.xr_id)),
+    )
+    assert wayback.events.index(("final", "xr_src_0001")) < wayback.events.index(("sleep", 300.0))
+    assert wayback.events[-1] == ("final", "xr_src_0002")
 
 
 # ------------------------------------------------------------------- 429 is a rate, not a fault

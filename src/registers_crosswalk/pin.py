@@ -476,16 +476,17 @@ class ExpectedDrift:
     def of(cls, source: Source) -> ExpectedDrift:
         return cls(source.fetcher, source.artifact.drift_key, source.artifact.drift_value)
 
-    def reproduced_by(self, body: bytes) -> bool:
+    def value_of(self, body: bytes) -> str:
+        """The drift value the pin's own fetcher reads from `body`. Raises what the fetcher does."""
         from . import fetchers
 
-        try:
-            return fetchers.drift_value(self.fetcher, body) == self.drift_value
-        except Exception:  # noqa: BLE001 - a page the fetcher cannot parse reproduces nothing
-            return False
+        return fetchers.drift_value(self.fetcher, body)
 
 
-CaptureVerdict = Literal["ok", "not_served", "mismatch"]
+# `unreadable` is a capture served at its timestamp that the pin's fetcher could not read (a prelim
+# page without its source credit). Reuse and a new capture treat it as `mismatch`, as before; the
+# weekly check keeps it apart, since it says nothing about whether the pin's text is still there.
+CaptureVerdict = Literal["ok", "not_served", "mismatch", "unreadable"]
 
 
 def _memento_time(value: str) -> datetime | None:
@@ -561,12 +562,72 @@ def _check_capture(
                 )
             return "not_served", f"Wayback answered for {timestamp} with no Memento-Datetime"
         return "not_served", f"Wayback served {', '.join(sorted(served))} for {timestamp}"
-    if not expected.reproduced_by(body):
+    try:
+        value = expected.value_of(body)
+    except Exception as exc:  # noqa: BLE001 - a page the fetcher cannot parse reproduces nothing
+        return (
+            "unreadable",
+            f"the pin's {expected.fetcher} fetcher could not read the capture at {timestamp} "
+            f"({type(exc).__name__}: {exc})",
+        )
+    if value != expected.drift_value:
         return (
             "mismatch",
             f"the capture at {timestamp} does not reproduce the pin's {expected.drift_key}",
         )
     return "ok", f"the capture at {timestamp} reproduces the pin's {expected.drift_key}"
+
+
+# What one check of an attached archive copy can answer. The first four are `_check_capture`'s;
+# `unreachable` is no answer at all (a timeout, a connection error, or an HTTP error other than
+# 404), and `not_checkable` is a copy there is nothing to check at (not a Wayback capture with a
+# timestamp).
+AttachedStatus = Literal[
+    "ok", "not_served", "mismatch", "unreadable", "unreachable", "not_checkable"
+]
+
+
+@dataclass(frozen=True)
+class AttachedCheck:
+    status: AttachedStatus
+    detail: str
+    # How long a 429 asked a caller to wait before asking again, in seconds: its Retry-After, or
+    # `_RATE_LIMIT_WAIT` when it gives none (or 0), as `_retrying` reads it. None for anything else.
+    retry_after: float | None = None
+
+
+def _not_checkable(copy: ArchiveCopy) -> str | None:
+    """Why `copy` can't be checked at a timestamp, or None when it can: only a Wayback capture
+    with a timestamp can be (a Perma.cc or GovInfo copy is valid, and unchecked)."""
+    if copy.service == "wayback" and _WAYBACK_TS.search(copy.url) is not None:
+        return None
+    return f"the attached {copy.service} copy {copy.url} is not a Wayback capture with a timestamp"
+
+
+def _check_attached(
+    copy: ArchiveCopy, expected: ExpectedDrift, *, capture_fn: CaptureFn
+) -> AttachedCheck:
+    """One check of a capture attached to a pin: its own URL, at its own timestamp. Never raises.
+
+    `repair_archive` asks it once, about `archives[0]`; the weekly check asks it about every entry
+    of every record, up to four times. Both read the answer the same way because it is the same
+    answer: only an unreachable Wayback is kept apart from what Wayback said.
+    """
+    why = _not_checkable(copy)
+    if why is not None:
+        return AttachedCheck("not_checkable", why)
+    m = _WAYBACK_TS.search(copy.url)
+    assert m is not None  # _not_checkable said so
+    try:
+        verdict, detail = _check_capture(
+            copy.url[m.end() :], m.group(1), expected, capture_fn=capture_fn
+        )
+    except urllib.error.HTTPError as exc:
+        asked_to_wait = (_retry_after(exc) or _RATE_LIMIT_WAIT) if exc.code == 429 else None
+        return AttachedCheck("unreachable", f"HTTP {exc.code}", asked_to_wait)
+    except Exception as exc:  # noqa: BLE001 - unreachable is not the same as wrong
+        return AttachedCheck("unreachable", f"{type(exc).__name__}: {exc}")
+    return AttachedCheck(verdict, detail)
 
 
 @dataclass(frozen=True)
@@ -732,6 +793,8 @@ def _existing_capture(
             continue
         if verdict == "ok":
             return _capture_from_timestamp(url, timestamp)
+        if verdict == "unreadable":
+            verdict = "mismatch"  # it reproduces nothing, and its digest will not either
         counts[verdict] += 1
         if verdict == "mismatch" and digest:
             rejected_digests.add(digest)
@@ -787,7 +850,7 @@ def _verified_new_capture(
             # The capture that was checked: the pin's URL at the timestamp Save Page Now reported,
             # not whatever `original_url` or Content-Location spelled it as.
             return _capture_from_timestamp(url, timestamp)
-        if verdict == "mismatch":
+        if verdict in ("mismatch", "unreadable"):
             return ArchiveFailure(
                 f"new capture does not reproduce the pin's {expected.drift_key}: {copy.url}; "
                 "nothing attached"
@@ -1651,12 +1714,13 @@ def repair_archive(
     """Re-verify a pin's attached capture at its exact timestamp, and replace it if it fails.
 
     If the attached capture reproduces the pin's drift value, nothing changes. If Wayback serves
-    some other capture for its timestamp, answers 404 for it, or the bytes do not reproduce the
-    pin, the newest existing capture that does (`_existing_capture`, through the CDX API) replaces
-    that entry, and only the `archives` field is rewritten. If none can be verified, if the
-    attached capture cannot be reached at all, or if it is not a Wayback capture with a timestamp
-    (a Perma.cc or GovInfo copy), nothing changes and the reason is reported. Never requests a
-    new capture.
+    no capture at its timestamp (a 404, an answer without Memento-Datetime, or some other
+    capture), or serves one whose bytes do not reproduce the pin or that the pin's fetcher cannot
+    read, the newest existing capture that does reproduce it (`_existing_capture`, through the CDX
+    API) replaces that entry, and only the `archives` field is rewritten. If none can be verified,
+    if the attached capture cannot be reached at all, or if it is not a Wayback capture with a
+    timestamp (a Perma.cc or GovInfo copy), nothing changes and the reason is reported. Never
+    requests a new capture.
     """
     capture_call = capture_fn or _fetch_capture
     json_call = json_fn or _json_call
@@ -1671,42 +1735,25 @@ def repair_archive(
         )
     held = source.archives[0]
     expected = ExpectedDrift.of(source)
-    m = _WAYBACK_TS.search(held.url)
+    # The capture the record names: its own URL at its own timestamp.
+    check = _check_attached(held, expected, capture_fn=capture_call)
     # Only a Wayback capture it can check is ever replaced. Anything else (a Perma.cc or GovInfo
     # copy, or a Wayback URL with no timestamp) is left as it is: unchecked is not wrong.
-    if held.service != "wayback" or m is None:
+    if check.status == "not_checkable":
         return AddOutcome(
             status="refused",
-            message=(
-                f"{xr_id}: the attached {held.service} copy {held.url} is not a Wayback capture "
-                "with a timestamp, so repair cannot check it; nothing changed"
-            ),
+            message=f"{xr_id}: {check.detail}, so repair cannot check it; nothing changed",
         )
-    try:
-        # The capture the record names: its own URL at its own timestamp.
-        verdict, detail = _check_capture(
-            held.url[m.end() :], m.group(1), expected, capture_fn=capture_call
-        )
-    except urllib.error.HTTPError as exc:
-        if exc.code != 404:
-            return AddOutcome(
-                status="archive_failed",
-                message=(
-                    f"{xr_id}: could not reach the attached capture {held.url} "
-                    f"(HTTP {exc.code}); nothing changed"
-                ),
-            )
-        # A 404 is Wayback saying nothing is stored there, as `_verified_new_capture` reads it.
-        verdict, detail = "not_served", f"Wayback holds nothing at {m.group(1)} (HTTP 404)"
-    except Exception as exc:  # noqa: BLE001 - unreachable is not the same as wrong
+    if check.status == "unreachable":
         return AddOutcome(
             status="archive_failed",
             message=(
                 f"{xr_id}: could not reach the attached capture {held.url} "
-                f"({type(exc).__name__}: {exc}); nothing changed"
+                f"({check.detail}); nothing changed"
             ),
         )
-    if verdict == "ok":
+    detail = check.detail
+    if check.status == "ok":
         return AddOutcome(
             status="unchanged",
             message=f"{xr_id}: {detail}; nothing changed ({held.url})",

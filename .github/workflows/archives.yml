@@ -1,0 +1,50 @@
+name: archives
+# Re-verifies every Wayback capture attached to a pin, at its exact timestamp. A capture that
+# verified once can stop existing: Wayback removes captures on an owner's request and on
+# exclusion, and #36's rule is true only on the day a capture is attached. The New Gray ledgers
+# cite these archive URLs, and for the three U.S. Code prelims the capture is the only
+# preservation copy there is (`pin blobs` leaves prelims out by design). This job is what re-tests
+# them. What the verdicts and exit codes mean, and what to do about each, is in docs/operations.md
+# from "The weekly archive check" on: 0 clean, 5 ARCHIVE-LOST, 6 ARCHIVE-MISSING, 7 UNCHECKED.
+#
+# Weekly and on dispatch, never on `push`. A capture attached or repaired on `main` passed #36's
+# rule on its way in; what changes afterwards is Wayback, on its own schedule. Mondays 12:40 UTC,
+# after sources-drift (12:00) and status-page (12:20). Neither of those asks Wayback anything;
+# this is the only job that does.
+#
+# A workflow of its own, for its badge. As a second job in sources-drift.yml it would share that
+# badge, and a Wayback outage would turn the document check red. sources-drift's red keeps
+# meaning "a document changed"; this one's means "an archive copy is lost, missing, or couldn't be
+# checked", and the exit code says which.
+#
+# No secrets. The check reads Wayback anonymously and never asks Save Page Now for anything, so
+# the Wayback keys are deliberately absent, and no document is re-fetched, so no API key is
+# needed either. No continue-on-error, for the reason sources-drift gives: a green run that
+# checked nothing would be telling you nothing. A run that asked Wayback about at least one
+# capture and got no answer about any ends its output with WAYBACK UNREACHABLE and exits 7.
+on:
+  schedule:
+    - cron: "40 12 * * 1"
+  workflow_dispatch:
+jobs:
+  archives:
+    runs-on: ubuntu-latest
+    # Requests are paced five seconds apart, so a first pass over twenty captures takes about two
+    # minutes. Entries that aren't OK are sampled up to three more times, five minutes apart,
+    # which adds fifteen; slow CDX reads (14 and 24 seconds on 2026-09-26, each after a 503) add a
+    # few more. But the spec alone could outrun any fixed number: three rounds stretched to ten
+    # minutes by Retry-After fill 30. So the check keeps its own budget, 25 minutes from its start:
+    # it takes no wait that would end past it, and ends on its own verdicts, with what it couldn't
+    # finish UNCHECKED and the reason printed. This 30 is the backstop behind that, for a request
+    # that hangs; each line prints as soon as its verdict is final, so even a run cut off here has
+    # already said what it reached.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+
+      - name: Re-verify every attached capture at its exact timestamp
+        run: python -m registers_crosswalk.pin check --archives

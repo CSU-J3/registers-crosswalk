@@ -211,7 +211,7 @@ def test_check_exits_2_when_a_key_is_missing(tmp_path, monkeypatch, capsys):
     assert "KEY_MISSING" in capsys.readouterr().out
 
 
-# `python -m registers_crosswalk.pin` is how both workflows and the README run the CLI. It ran
+# `python -m registers_crosswalk.pin` is how every workflow and the README run the CLI. It ran
 # pin.py as `__main__`, a second copy of the module whose `except MissingKey` named a different
 # class from the one every fetcher raises, so all three catch sites missed: a traceback and exit 1
 # where `main()` exits 2 (search, check) or reports KEY_MISSING (blobs). In-process tests are why

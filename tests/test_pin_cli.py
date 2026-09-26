@@ -926,6 +926,346 @@ def test_pin_add_refused_as_not_served_yet_says_to_run_the_same_add_again(tmp_pa
     assert not (tmp_path / "sources").exists() or _sources(tmp_path) == []
 
 
+# ------------------------------------------------------------------ check --archives
+
+AT_1, AT_2, AT_3 = "20260920190851", "20260921101010", "20260923013800"
+
+
+def _add_archived_at(tmp_path, timestamp, n=1, extra=()):
+    """Pin number `n` (its own URL and citation), with one Wayback capture at `timestamp`."""
+    url = URL.replace("2023-01", f"2023-0{n}")
+
+    def attach(url, **_):
+        return ArchiveCopy(
+            service="wayback",
+            url=f"https://web.archive.org/web/{timestamp}/{url}",
+            captured_at=datetime.strptime(timestamp, "%Y%m%d%H%M%S").replace(tzinfo=UTC),
+        )
+
+    code = _add(
+        tmp_path,
+        url=url,
+        citation=f"FEC AO 2023-0{n}",
+        extra=["--archive", *extra],
+        archive_fn=attach,
+    )
+    assert code == 0
+
+
+def _weekly(monkeypatch, answers, *, listing=(), calls=None):
+    """Wayback for `check --archives`. `answers` maps a timestamp to each sample's answer, in
+    order, the last repeated: "ok" (the pinned bytes, served there), "other" (other bytes, served
+    there), an HTTP status, or "timeout". `listing` is the CDX rows for every URL."""
+    queues = {ts: list(seq) for ts, seq in answers.items()}
+
+    def fetch_capture(url, *, timeout=90):
+        if calls is not None:
+            calls.append(("capture", url, timeout))
+        asked = re.search(r"/web/(\d{14})id_/", url).group(1)
+        seq = queues[asked]
+        answer = seq.pop(0) if len(seq) > 1 else seq[0]
+        if answer == "timeout":
+            raise TimeoutError("timed out")
+        if isinstance(answer, int):
+            raise urllib.error.HTTPError(url, answer, "refused", {}, None)
+        when = datetime.strptime(asked, "%Y%m%d%H%M%S").replace(tzinfo=UTC)
+        body = BODY if answer == "ok" else b"other bytes"
+        return body, url, {"memento-datetime": format_datetime(when, usegmt=True)}
+
+    def json_call(url, headers=None, data=None, *, timeout=90):
+        if calls is not None:
+            calls.append(("cdx", url, timeout))
+        assert url.startswith("https://web.archive.org/cdx/search/cdx?"), url  # never /save
+        rows = [list(r) for r in listing]
+        return [["timestamp", "statuscode", "digest"], *rows] if rows else []
+
+    monkeypatch.setattr("registers_crosswalk.pin._fetch_capture", fetch_capture)
+    monkeypatch.setattr("registers_crosswalk.pin._json_call", json_call)
+
+
+def _never_fetch(url, headers=None):
+    raise AssertionError(f"a document was re-fetched: {url}")
+
+
+def _never_archive(url, **_):
+    raise AssertionError(f"something was archived: {url}")
+
+
+def _check_archives(tmp_path, *extra, sleep_fn=None):
+    argv = ["--data-dir", str(tmp_path), "check", "--archives", *extra]
+    sleep_fn = sleep_fn or (lambda _seconds: None)  # the waits are asserted in test_pin.py
+    return main(argv, fetch=_never_fetch, archive_fn=_never_archive, sleep_fn=sleep_fn)
+
+
+def test_check_archives_reads_wayback_and_nothing_else(tmp_path, monkeypatch, capsys):
+    _add_archived_at(tmp_path, AT_1, 1)
+    _add_archived_at(tmp_path, AT_2, 2)
+    calls = []
+    _weekly(monkeypatch, {AT_1: ["ok"], AT_2: ["ok"]}, calls=calls)
+    capsys.readouterr()
+    assert _check_archives(tmp_path) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[0].startswith("OK              xr_src_0001  FEC AO 2023-01")
+    assert out[2].startswith("OK              xr_src_0002  FEC AO 2023-02")
+    assert out[-1] == (
+        "2 attached capture(s): 2 OK, 0 ARCHIVE-LOST, 0 ARCHIVE-MISSING, 0 UNCHECKED, "
+        "0 NOT CHECKABLE"
+    )
+    assert [c[2] for c in calls] == [60.0, 60.0]  # the capture fetch's own timeout
+
+
+@pytest.mark.parametrize(
+    "first, second, code",
+    [
+        (["other"], [404], 5),  # LOST beside MISSING
+        ([404], [403], 6),  # MISSING beside UNCHECKED
+        (["ok"], [403], 7),
+        (["ok"], [404], 6),
+        (["ok"], ["other"], 5),
+    ],
+)
+def test_check_archives_exits_with_the_strongest_finding(
+    tmp_path, monkeypatch, capsys, first, second, code
+):
+    _add_archived_at(tmp_path, AT_1, 1)
+    _add_archived_at(tmp_path, AT_2, 2)
+    _weekly(monkeypatch, {AT_1: first, AT_2: second})
+    capsys.readouterr()
+    assert _check_archives(tmp_path) == code
+
+
+def test_check_archives_prints_wayback_unreachable_last_when_nothing_answered(
+    tmp_path, monkeypatch, capsys
+):
+    _add_archived_at(tmp_path, AT_1, 1)
+    _add_archived_at(tmp_path, AT_2, 2)
+    _weekly(monkeypatch, {AT_1: ["timeout"], AT_2: ["timeout"]})
+    capsys.readouterr()
+    assert _check_archives(tmp_path) == 7
+    out = capsys.readouterr().out.splitlines()
+    assert out[-1] == "WAYBACK UNREACHABLE"
+    assert sum(line.startswith("UNCHECKED") for line in out) == 2
+
+
+def test_check_archives_with_only_copies_it_cannot_check_is_clean_and_asks_nothing(
+    tmp_path, monkeypatch, capsys
+):
+    """Wayback wasn't asked about anything, so it can't have failed to answer."""
+    perma = ArchiveCopy(service="perma", url="https://perma.cc/ABCD-1234")
+    assert _add(tmp_path, extra=["--archive"], archive_fn=lambda url, **_: perma) == 0
+    calls = []
+    _weekly(monkeypatch, {}, calls=calls)
+    capsys.readouterr()
+    assert _check_archives(tmp_path) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("NOT CHECKABLE   xr_src_0001")
+    assert "WAYBACK UNREACHABLE" not in out
+    assert calls == []
+
+
+def test_check_archives_one_answer_is_not_wayback_unreachable(tmp_path, monkeypatch, capsys):
+    _add_archived_at(tmp_path, AT_1, 1)
+    _add_archived_at(tmp_path, AT_2, 2)
+    _weekly(monkeypatch, {AT_1: [404, "timeout"], AT_2: ["timeout"]})
+    capsys.readouterr()
+    assert _check_archives(tmp_path) == 7
+    assert "WAYBACK UNREACHABLE" not in capsys.readouterr().out
+
+
+def test_check_archives_json_is_the_reports_and_nothing_else(tmp_path, monkeypatch, capsys):
+    _add_archived_at(tmp_path, AT_1, 1)
+    _add_archived_at(tmp_path, AT_3, 2)
+    _weekly(monkeypatch, {AT_1: ["timeout"], AT_3: ["timeout"]})
+    capsys.readouterr()
+    assert _check_archives(tmp_path, "--json") == 7
+    captured = capsys.readouterr()
+    reports = json.loads(captured.out)  # stdout is the JSON alone
+    assert "WAYBACK UNREACHABLE" in captured.err
+    assert set(reports[0]) == {
+        "xr_id",
+        "citation",
+        "fetcher",
+        "drift_key",
+        "expected",
+        "archive_url",
+        "timestamp",
+        "status",
+        "detail",
+        "samples",
+    }
+    assert reports[0]["timestamp"] == AT_1
+    assert reports[0]["expected"] == sha256_hex(BODY)
+    assert [s["status"] for s in reports[0]["samples"]] == ["unreachable"] * 4
+
+
+def test_check_archives_json_carries_each_samples_answer(tmp_path, monkeypatch, capsys):
+    _add_archived_at(tmp_path, AT_3, 1)
+    _weekly(monkeypatch, {AT_3: [404, 404, "ok"]})
+    capsys.readouterr()
+    assert _check_archives(tmp_path, "--json") == 0
+    [report] = json.loads(capsys.readouterr().out)
+    assert report["status"] == "ok"
+    assert [s["status"] for s in report["samples"]] == ["not_served", "not_served", "ok"]
+
+
+def test_check_archives_refuses_all_before_asking_anything(tmp_path, monkeypatch, capsys):
+    _add_archived_at(tmp_path, AT_1, 1)
+    calls = []
+    _weekly(monkeypatch, {AT_1: ["ok"]}, calls=calls)
+    capsys.readouterr()
+    assert _check_archives(tmp_path, "--all") == 1
+    assert "--all adds nothing" in capsys.readouterr().err
+    assert calls == []
+
+
+def test_check_archives_only_narrows_to_one_record(tmp_path, monkeypatch, capsys):
+    _add_archived_at(tmp_path, AT_1, 1)
+    _add_archived_at(tmp_path, AT_2, 2)
+    calls = []
+    _weekly(monkeypatch, {AT_1: ["ok"], AT_2: ["ok"]}, calls=calls)
+    capsys.readouterr()
+    assert _check_archives(tmp_path, "--only", "xr_src_0002") == 0
+    assert "xr_src_0001" not in capsys.readouterr().out
+    assert [c[1] for c in calls] == [
+        f"https://web.archive.org/web/{AT_2}id_/{URL.replace('2023-01', '2023-02')}"
+    ]
+
+
+def test_check_archives_refuses_only_for_a_record_with_no_archive(tmp_path, capsys):
+    _add(tmp_path)
+    capsys.readouterr()
+    assert _check_archives(tmp_path, "--only", "xr_src_0001") == 1
+    assert "has no archive copy to check" in capsys.readouterr().err
+    assert _check_archives(tmp_path, "--only", "xr_src_0009") == 1
+    assert "unknown source" in capsys.readouterr().err
+
+
+def test_check_archives_checks_superseded_and_merged_pins_too(tmp_path, monkeypatch, capsys):
+    """`manual` declares no CHECK_SUPERSEDED, so the drift check's own targets would skip both."""
+    _add_archived_at(tmp_path, AT_1, 1, extra=["--point-in-time", "2023-05-11"])
+    _add_archived_at(
+        tmp_path, AT_2, 2, extra=["--point-in-time", "2024-05-11", "--supersedes", "xr_src_0001"]
+    )
+    _add_archived_at(tmp_path, AT_3, 3)
+    path = tmp_path / "sources" / "xr_src_0003.json"
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["merged_into"] = "xr_src_0002"
+    path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+    _weekly(monkeypatch, {AT_1: ["ok"], AT_2: ["ok"], AT_3: ["ok"]})
+    capsys.readouterr()
+    assert _check_archives(tmp_path) == 0
+    out = capsys.readouterr().out
+    assert all(f"OK              {x}" in out for x in ("xr_src_0001", "xr_src_0002", "xr_src_0003"))
+
+
+def test_check_archives_checks_every_entry_of_a_record(tmp_path, monkeypatch, capsys):
+    _add_archived_at(tmp_path, AT_1, 1)
+    path = tmp_path / "sources" / "xr_src_0001.json"
+    record = json.loads(path.read_text(encoding="utf-8"))
+    second = dict(record["archives"][0])
+    second["url"] = second["url"].replace(AT_1, AT_2)
+    record["archives"].append(second)
+    path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+    _weekly(monkeypatch, {AT_1: ["ok"], AT_2: ["other"]})
+    capsys.readouterr()
+    assert _check_archives(tmp_path) == 5
+    out = capsys.readouterr().out
+    assert "OK              xr_src_0001" in out and "ARCHIVE-LOST    xr_src_0001" in out
+
+
+def test_check_archives_prints_a_line_as_soon_as_it_is_final(tmp_path, monkeypatch, capsys):
+    """The first pass's OK is on stdout before the first five-minute wait begins, so a run the
+    job's timeout cuts off has already said what it reached."""
+    _add_archived_at(tmp_path, AT_1, 1)
+    _add_archived_at(tmp_path, AT_3, 2)
+    _weekly(monkeypatch, {AT_1: ["ok"], AT_3: [404]})
+    capsys.readouterr()
+    printed_by_first_wait = []
+
+    def sleep(seconds):
+        if seconds == 300.0 and not printed_by_first_wait:
+            printed_by_first_wait.append(capsys.readouterr().out)
+
+    assert _check_archives(tmp_path, sleep_fn=sleep) == 6
+    assert printed_by_first_wait[0].startswith("OK              xr_src_0001")
+    assert "xr_src_0002" not in printed_by_first_wait[0]
+    later = capsys.readouterr().out
+    assert later.startswith("ARCHIVE-MISSING xr_src_0002")
+
+
+def test_check_archives_ends_on_its_own_verdicts_when_the_budget_runs_out(
+    tmp_path, monkeypatch, capsys
+):
+    """Through the CLI, on the clock the run reads: a CDX 429 asking for an hour ends the run
+    with UNCHECKED lines, the counts line and exit 7, and no wait passes 25 minutes."""
+    _add_archived_at(tmp_path, AT_3, 1)
+    _add_archived_at(tmp_path, AT_2, 2)
+    _weekly(monkeypatch, {AT_3: [404], AT_2: [404]})
+    listing = pinmod._json_call  # the fake just installed
+    refusal = [urllib.error.HTTPError("cdx", 429, "slow", {"Retry-After": "3600"}, None)]
+
+    def json_call(url, headers=None, data=None, *, timeout=90):
+        if refusal:
+            raise refusal.pop()
+        return listing(url, headers, data)
+
+    monkeypatch.setattr("registers_crosswalk.pin._json_call", json_call)
+    clock, slept = [0.0], []
+    monkeypatch.setattr(pinmod.time, "monotonic", lambda: clock[0])
+
+    def sleep(seconds):
+        slept.append((clock[0], seconds))
+        clock[0] += seconds
+
+    capsys.readouterr()
+    assert _check_archives(tmp_path, sleep_fn=sleep) == 7
+    out = capsys.readouterr().out
+    assert out.count("the CDX listing's Retry-After 3600 s exceeds the run's budget") == 2
+    assert out.splitlines()[-1] == (
+        "2 attached capture(s): 0 OK, 0 ARCHIVE-LOST, 0 ARCHIVE-MISSING, 2 UNCHECKED, "
+        "0 NOT CHECKABLE"
+    )
+    assert slept and all(start + seconds <= 25 * 60 for start, seconds in slept)
+
+
+def test_check_archives_reads_the_budget_off_a_clock_that_moves(tmp_path, monkeypatch, capsys):
+    """Rounds 600 s apart, as a 429 asks: the third wait would end at 30 minutes. Only a clock
+    that moves with the waits refuses it, so this holds the CLI to the real one."""
+    _add_archived_at(tmp_path, AT_3, 1)
+    _weekly(monkeypatch, {AT_3: [429]})
+    real = pinmod._fetch_capture  # the fake just installed
+
+    def fetch_capture(url, *, timeout=90):
+        try:
+            return real(url, timeout=timeout)
+        except urllib.error.HTTPError as exc:
+            raise urllib.error.HTTPError(url, 429, "slow", {"Retry-After": "600"}, None) from exc
+
+    monkeypatch.setattr("registers_crosswalk.pin._fetch_capture", fetch_capture)
+    clock = [0.0]
+    monkeypatch.setattr(pinmod.time, "monotonic", lambda: clock[0])
+
+    def sleep(seconds):
+        clock[0] += seconds
+
+    capsys.readouterr()
+    assert _check_archives(tmp_path, sleep_fn=sleep) == 7
+    assert "Retry-After 600 s exceeds the run's budget before round 4" in capsys.readouterr().out
+    assert clock[0] == 1200.0
+
+
+def test_check_archives_missing_detail_gives_the_age_and_the_next_step(
+    tmp_path, monkeypatch, capsys
+):
+    _add_archived_at(tmp_path, AT_3, 1)
+    _weekly(monkeypatch, {AT_3: [404]}, listing=[(AT_1, "200", "D1")])
+    capsys.readouterr()
+    assert _check_archives(tmp_path) == 6
+    out = capsys.readouterr().out
+    assert re.search(r"the capture is \d+ day\(s\) old", out)
+    assert "run `pin archive --repair xr_src_0001`" in out
+
+
 # --------------------------------------------------- the manifest verifies; the record lists all
 
 

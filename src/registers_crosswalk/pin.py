@@ -734,6 +734,28 @@ def _retrying(
             sleep_fn(waits[server_failures - 1])
 
 
+class _NotAListing(ValueError):
+    """A CDX reply that is not a listing: not a list, or a first row that is not its header."""
+
+
+def _cdx_listing(url: str, *, json_fn: JsonFn, sleep_fn: SleepFn) -> list[dict[str, object]]:
+    """Every capture the CDX API lists for `url`, each keyed by the listing's header row.
+
+    `[]` when it lists none, an empty reply or a header row alone, and that is an answer. A reply
+    that is not a listing raises `_NotAListing`; a request that fails raises what it raised, once
+    `_retrying` has retried a 5xx or a 429.
+    """
+    query = urlencode({"url": url, "output": "json", "fl": "timestamp,statuscode,digest"})
+    rows = _retrying(lambda: json_fn(f"{_WAYBACK_CDX}?{query}", None, None), sleep_fn=sleep_fn)
+    if not isinstance(rows, list):
+        raise _NotAListing(f"the reply is a {type(rows).__name__}, not a list")
+    if not rows:
+        return []
+    if "timestamp" not in rows[0]:
+        raise _NotAListing("its first row is not a header naming `timestamp`")
+    return [dict(zip(rows[0], row, strict=False)) for row in rows[1:]]
+
+
 def _existing_capture(
     url: str,
     expected: ExpectedDrift,
@@ -770,20 +792,20 @@ def _existing_capture(
         if why is not None:
             why.append(reason)
 
-    query = urlencode({"url": url, "output": "json", "fl": "timestamp,statuscode,digest"})
     try:
-        rows = _retrying(lambda: json_fn(f"{_WAYBACK_CDX}?{query}", None, None), sleep_fn=sleep_fn)
         # Parsed inside the try: a malformed listing is a broken optimisation, not an error.
-        if not isinstance(rows, list) or len(rows) < 2 or "timestamp" not in rows[0]:
-            found_nothing(f"the CDX API lists no capture of {url}")
-            return None
-        entries = [dict(zip(rows[0], row, strict=False)) for row in rows[1:]]
+        entries = _cdx_listing(url, json_fn=json_fn, sleep_fn=sleep_fn)
+    except _NotAListing:
+        entries = []
     except Exception as exc:  # noqa: BLE001 - an optimisation may not raise; fall through to SPN2
         code = getattr(exc, "code", None)
         found_nothing(
             f"the CDX listing of {url} could not be read "
             f"({f'HTTP {code}' if code else type(exc).__name__})"
         )
+        return None
+    if not entries:
+        found_nothing(f"the CDX API lists no capture of {url}")
         return None
     rejected_digests: set[str] = set()
     tried = 0
@@ -1172,6 +1194,394 @@ def check_all(
             )
         reports[i] = retried
     return reports
+
+
+# ----------------------------------------------------------------------- the weekly archive check
+
+# `pin check --archives` re-verifies every capture attached to a pin, at its exact timestamp. A
+# capture that verified once can stop existing: Wayback removes captures on an owner's request and
+# on exclusion. And Wayback's index for recent captures is not settled: a new capture can take days
+# to be served, one Wayback has served can stop being served, and two of its servers can disagree
+# about the same URL minutes apart (docs/operations.md has the dates). So one answer settles
+# nothing unless it is good, and the verdict keeps three cases apart: a capture that is gone
+# (LOST), one Wayback can't find right now (MISSING), and a run that couldn't tell (UNCHECKED).
+
+# Every Wayback request waits at least this long after the one before, which keeps a run under 12
+# a minute. Playback is rate-limited as well as Save Page Now: `id_` fetches have been answered 429
+# (docs/operations.md has the dates).
+_ARCHIVE_GAP = 5.0
+# A first sample of every entry, then up to three more rounds for the entries not yet ok, five
+# minutes apart, or a 429's Retry-After apart if that is longer, up to ten minutes.
+_ARCHIVE_SAMPLES = 4
+_ARCHIVE_ROUND_WAIT = 300.0
+_ARCHIVE_ROUND_WAIT_MAX = 600.0
+# A capture fetch's timeout. Part A's slowest took 2.7 seconds.
+_ARCHIVE_CAPTURE_TIMEOUT = 60.0
+# This many unanswered requests in a row end a round, and the next round starts with the entries
+# it didn't reach. Twenty timeouts would say no more about an outage than three do.
+_ARCHIVE_UNREACHABLE_STOP = 3
+# The check's own budget, from its start, on the clock it is given. The spec alone could outrun
+# the job: three rounds stretched to ten minutes fill 30. So no wait is taken that would end past
+# the budget, whether it spaces the rounds or honours a Retry-After, on a capture or on a CDX
+# read; the entries still pending are UNCHECKED with the reason (LOST where a sample was already a
+# mismatch), and the run ends on its own verdicts. archives.yml's timeout-minutes: 30 is the
+# backstop behind it, not the plan.
+_ARCHIVE_BUDGET = 25 * 60.0
+
+ArchiveStatus = Literal["ok", "lost", "missing", "unchecked", "not_checkable"]
+_ARCHIVE_LABELS: dict[str, str] = {
+    "ok": "OK",
+    "lost": "ARCHIVE-LOST",
+    "missing": "ARCHIVE-MISSING",
+    "unchecked": "UNCHECKED",
+    "not_checkable": "NOT CHECKABLE",
+}
+# status -> exit code. The strongest finding wins, which is NOT numeric order: 5 > 6 > 7 > 0. It
+# inverts the drift check's precedence on purpose. A LOST rests on an answer Wayback gave about
+# that capture, so an outage elsewhere in the run doesn't weaken it; a MISSING rests on several;
+# an UNCHECKED on none.
+EXIT_ARCHIVE_LOST = 5
+EXIT_ARCHIVE_MISSING = 6
+EXIT_ARCHIVE_UNCHECKED = 7
+_ARCHIVE_EXIT_CODES: dict[str, int] = {
+    "ok": 0,
+    "not_checkable": 0,
+    "lost": EXIT_ARCHIVE_LOST,
+    "missing": EXIT_ARCHIVE_MISSING,
+    "unchecked": EXIT_ARCHIVE_UNCHECKED,
+}
+_ARCHIVE_EXIT_RANK: dict[int, int] = {0: 0, 7: 1, 6: 2, 5: 3}
+
+
+class ArchiveSample(XrModel):
+    """One answer about one capture, as `_check_attached` gave it."""
+
+    status: AttachedStatus
+    detail: str
+
+
+class ArchiveReport(XrModel):
+    """The weekly check's verdict on one archive entry, from all of its samples."""
+
+    xr_id: str
+    citation: str
+    fetcher: Fetcher
+    drift_key: DriftKey
+    expected: str
+    archive_url: str
+    timestamp: str | None
+    status: ArchiveStatus
+    detail: str
+    samples: list[ArchiveSample]
+
+
+class _OutOfBudget(Exception):
+    """A wait or a request the run's budget can't cover. Its message is the reason."""
+
+
+class _Paced:
+    """Every request at least `_ARCHIVE_GAP` after the one before, and every wait inside the run's
+    budget. A wait already taken between two requests (a round's five minutes, a retry's) counts
+    towards the gap. `ready` goes before each request and `request` makes it: kept apart because
+    `_check_attached` turns anything a fetch raises into an answer, and running out of budget is
+    not one."""
+
+    def __init__(self, sleep_fn: SleepFn, clock: Callable[[], float], budget: float) -> None:
+        self._sleep_fn = sleep_fn
+        self._clock = clock
+        self._deadline = clock() + budget
+        self._asked = False
+        self._rested = 0.0
+
+    def wait(self, seconds: float, why: str) -> None:
+        """Sleep `seconds`; or, if that would end past the deadline, don't, and raise `why`."""
+        if self._clock() + seconds > self._deadline:
+            raise _OutOfBudget(why)
+        self._sleep_fn(seconds)
+        self._rested += seconds
+
+    def ready(self, why: str) -> None:
+        if self._asked and self._rested < _ARCHIVE_GAP:
+            self.wait(_ARCHIVE_GAP - self._rested, why)
+        if self._clock() > self._deadline:
+            raise _OutOfBudget(why)
+
+    def request(self, fn: Callable[..., object], *args: object) -> object:
+        self._asked, self._rested = True, 0.0
+        return fn(*args)
+
+
+@dataclass
+class _ArchiveEntry:
+    source: Source
+    copy: ArchiveCopy
+    samples: list[AttachedCheck]
+    report: ArchiveReport | None = None
+
+    @property
+    def timestamp(self) -> str | None:
+        m = _WAYBACK_TS.search(self.copy.url)
+        return m.group(1) if m else None
+
+    @property
+    def url(self) -> str:
+        m = _WAYBACK_TS.search(self.copy.url)
+        return self.copy.url[m.end() :] if m else self.copy.url
+
+
+def _only_copy(source: Source, *, repairable: bool) -> str:
+    """What a LOST or MISSING detail adds for a U.S. Code prelim, whose capture is all there is.
+    The clause about `--repair` goes only where repair has a listing to search."""
+    if source.artifact.drift_key == "sha256":
+        return ""
+    note = " This capture is the pin's only preservation copy (`pin blobs` leaves prelims out)"
+    if not repairable:
+        return f"{note}."
+    return (
+        f"{note}; `--repair` can find another with the same last amendment until the section is "
+        "next amended."
+    )
+
+
+def _verdict_from_samples(entry: _ArchiveEntry) -> tuple[ArchiveStatus, str] | None:
+    """The verdict on an entry no sample settled as ok, where its samples decide it. None where the
+    CDX listing decides it instead: every answer `not_served`, and at least two of them, since one
+    is too few to call a capture missing whatever the listing says."""
+    xr_id, samples = entry.source.xr_id, entry.samples
+    answered = [s for s in samples if s.status != "unreachable"]
+    mismatched = [s for s in answered if s.status == "mismatch"]
+    if mismatched:
+        return "lost", (
+            f"{mismatched[-1].detail}, in {len(mismatched)} of {len(samples)} sample(s). "
+            f"Next: `pin archive --repair {xr_id}`.{_only_copy(entry.source, repairable=True)}"
+        )
+    unreadable = [s for s in answered if s.status == "unreadable"]
+    if unreadable:
+        return "unchecked", (
+            f"{unreadable[-1].detail}, so whether it still holds the pin's text can't be told"
+        )
+    if not samples:
+        return "unchecked", "not tried: Wayback unreachable"
+    if not answered:
+        return "unchecked", f"no answer in {len(samples)} sample(s); the last: {samples[-1].detail}"
+    if len(answered) == 1:
+        return "unchecked", (
+            f"one answer in {len(samples)} sample(s) ({answered[0].detail}); one is too few to "
+            "call the capture missing"
+        )
+    return None
+
+
+def _verdict_from_listing(
+    entry: _ArchiveEntry, listing: Callable[[str], list[dict[str, object]]], now: datetime
+) -> tuple[ArchiveStatus, str]:
+    """The verdict on an entry every answer about which was `not_served`: MISSING if the CDX
+    listing answers without a row holding a document at that timestamp (`[]` is an answer)."""
+    xr_id, ts = entry.source.xr_id, entry.timestamp
+    answered = [s for s in entry.samples if s.status != "unreachable"]
+    seen = f"not served at {ts} in {len(answered)} answer(s) ({answered[-1].detail})"
+    try:
+        rows = listing(entry.url)
+    except _OutOfBudget:
+        raise  # not an answer about the listing: the run stops asking
+    except Exception as exc:  # noqa: BLE001 - a listing that can't be read decides nothing
+        code = getattr(exc, "code", None)
+        return "unchecked", (
+            f"{seen}, and the CDX listing could not be read "
+            f"({f'HTTP {code}' if code else f'{type(exc).__name__}: {exc}'})"
+        )
+    held = [r for r in rows if r.get("timestamp") == ts and r.get("statuscode") in ("200", "-")]
+    if held:
+        return "unchecked", (
+            f"{seen}, but the CDX listing still holds {ts} (statuscode {held[0]['statuscode']}): "
+            "an index that is not settled, or a capture on its way out"
+        )
+    try:
+        captured = datetime.strptime(str(ts), "%Y%m%d%H%M%S").replace(tzinfo=UTC)
+        age = f"the capture is {(now - captured).days} day(s) old"
+    except ValueError:
+        age = f"{ts} names no date, so the capture's age is unknown"
+    # The rows `--repair` would try, as `_existing_capture` picks them: a document, at a timestamp.
+    usable = [
+        r
+        for r in rows
+        if r.get("statuscode") in ("200", "-") and len(str(r.get("timestamp", ""))) == 14
+    ]
+    if usable:
+        return "missing", (
+            f"{seen}, and the CDX listing has no capture at {ts}; {age}. Next: dispatch the "
+            "workflow again after a day, and if it is still missing next Monday, run "
+            f"`pin archive --repair {xr_id}`.{_only_copy(entry.source, repairable=True)}"
+        )
+    listed = "is empty" if not rows else "holds no capture that `--repair` could use"
+    return "missing", (
+        f"{seen}, and the CDX listing {listed}; {age}. Next: dispatch the workflow again after a "
+        "day. `pin archive --repair` has nothing to find: if it is still missing next Monday, it "
+        "needs a fresh capture, which this check never takes."
+        f"{_only_copy(entry.source, repairable=False)}"
+    )
+
+
+def check_archives(
+    sources: Sequence[Source],
+    *,
+    capture_fn: CaptureFn,
+    json_fn: JsonFn,
+    sleep_fn: SleepFn,
+    now: datetime,
+    on_final: Callable[[ArchiveReport], None] | None = None,
+    clock: Callable[[], float] | None = None,
+    budget: float = _ARCHIVE_BUDGET,
+) -> list[ArchiveReport]:
+    """Check every entry of every source's `archives`, and return one report each, in order.
+
+    A copy that isn't a Wayback capture with a timestamp is NOT CHECKABLE at once, and nothing is
+    asked about it. Every other entry is sampled once; each that isn't ok is sampled again, in up
+    to three more rounds, five minutes apart (a 429's Retry-After apart, if longer, up to ten
+    minutes). One good answer settles an entry: served at its timestamp and reproducing the pin,
+    in any sample, is ok, and it isn't sampled again. Three unanswered in a row end a round, and
+    the next round starts with the entries that one didn't reach, so failures at the front of the
+    list can't keep the rest from being asked. After the last round, the verdicts the samples
+    decide come first, then the CDX listing is read for each entry it decides. No wait is taken
+    that would end past `budget` seconds from the start, on `clock` (`time.monotonic`, looked up
+    at call time): what is pending then is UNCHECKED, with the reason, or LOST where a sample was
+    already a mismatch. `on_final` hears each
+    report as soon as it is final, so a run cut short by the job's timeout has already said what
+    it reached. Never writes.
+    """
+    paced = _Paced(sleep_fn, clock or time.monotonic, budget)
+    entries = [_ArchiveEntry(source, copy, []) for source in sources for copy in source.archives]
+    fetch = functools.partial(paced.request, capture_fn)
+    refusals: list[urllib.error.HTTPError] = []  # what the CDX API refused, while reading one
+
+    def ask_listing(*args: object) -> object:
+        paced.ready("budget spent while reading the CDX listing")
+        try:
+            return paced.request(json_fn, *args)
+        except urllib.error.HTTPError as exc:
+            refusals.append(exc)
+            raise
+
+    def wait_to_retry_listing(seconds: float) -> None:
+        asked = _retry_after(refusals[-1]) if refusals and refusals[-1].code == 429 else None
+        why = (
+            f"the CDX listing's Retry-After {asked:g} s exceeds the run's budget"
+            if asked
+            else f"a {seconds:g} s wait to retry the CDX listing exceeds the run's budget"
+        )
+        # a retry is a request too, so it waits at least as long as any other
+        paced.wait(max(seconds, _ARCHIVE_GAP), why)
+
+    def listing(url: str) -> list[dict[str, object]]:
+        refusals.clear()
+        return _cdx_listing(url, json_fn=ask_listing, sleep_fn=wait_to_retry_listing)
+
+    def settle(entry: _ArchiveEntry, status: ArchiveStatus, detail: str) -> None:
+        entry.report = ArchiveReport(
+            xr_id=entry.source.xr_id,
+            citation=entry.source.citation,
+            fetcher=entry.source.fetcher,
+            drift_key=entry.source.artifact.drift_key,
+            expected=entry.source.artifact.drift_value,
+            archive_url=entry.copy.url,
+            timestamp=entry.timestamp,
+            status=status,
+            detail=detail,
+            samples=[ArchiveSample(status=s.status, detail=s.detail) for s in entry.samples],
+        )
+        if on_final is not None:
+            on_final(entry.report)
+
+    # Nothing to ask Wayback about these, so nothing is asked, and no outage can hold them back.
+    for entry in entries:
+        why = _not_checkable(entry.copy)
+        if why is not None:
+            settle(entry, "not_checkable", why)
+
+    def cut_short(pending: Iterable[_ArchiveEntry], reason: str) -> None:
+        """What the budget left pending: UNCHECKED, with the reason and the answers so far. LOST
+        where a sample was already a mismatch: that is Wayback's own answer about the capture,
+        more samples wouldn't change it, and UNCHECKED would hide a finding behind a budget."""
+        for entry in pending:
+            if entry.report is None:
+                so_far = ", ".join(s.status for s in entry.samples) or "none"
+                detail = f"{reason}; its answers so far: {so_far}"
+                if any(s.status == "mismatch" for s in entry.samples):
+                    repair = f"`pin archive --repair {entry.source.xr_id}`"
+                    only = _only_copy(entry.source, repairable=True)
+                    settle(entry, "lost", f"{detail}. Next: {repair}.{only}")
+                else:
+                    settle(entry, "unchecked", detail)
+
+    order = [entry for entry in entries if entry.report is None]
+    round_wait, retry_afters = _ARCHIVE_ROUND_WAIT, []
+    try:
+        for n in range(_ARCHIVE_SAMPLES):
+            order = [entry for entry in order if entry.report is None]
+            if not order:
+                break
+            if n:
+                stretched = bool(retry_afters) and max(retry_afters) > _ARCHIVE_ROUND_WAIT
+                paced.wait(
+                    round_wait,
+                    f"Retry-After {max(retry_afters):g} s exceeds the run's budget before round "
+                    f"{n + 1}"
+                    if stretched
+                    else f"budget spent before round {n + 1}",
+                )
+            unanswered_in_a_row, retry_afters, asked = 0, [], 0
+            for entry in order:
+                if unanswered_in_a_row >= _ARCHIVE_UNREACHABLE_STOP:
+                    break  # the rest wait for the next round, which starts with them
+                paced.ready(f"budget spent in round {n + 1}")
+                asked += 1
+                expected = ExpectedDrift.of(entry.source)
+                check = _check_attached(entry.copy, expected, capture_fn=fetch)
+                entry.samples.append(check)
+                if check.status == "unreachable":
+                    unanswered_in_a_row += 1
+                    if check.retry_after is not None:
+                        retry_afters.append(check.retry_after)
+                else:
+                    unanswered_in_a_row = 0
+                if check.status == "ok":
+                    earlier = ", ".join(s.status for s in entry.samples[:-1])
+                    after = f", on sample {len(entry.samples)} after {earlier}" if earlier else ""
+                    settle(entry, "ok", check.detail + after)
+            order = order[asked:] + order[:asked]
+            round_wait = min(_ARCHIVE_ROUND_WAIT_MAX, max([_ARCHIVE_ROUND_WAIT, *retry_afters]))
+    except _OutOfBudget as spent:
+        cut_short(entries, str(spent))
+        return [entry.report for entry in entries if entry.report is not None]
+
+    # The verdicts the samples decide first, so none of them waits behind another entry's listing.
+    by_listing = []
+    for entry in entries:
+        if entry.report is None:
+            verdict = _verdict_from_samples(entry)
+            if verdict is None:
+                by_listing.append(entry)
+            else:
+                settle(entry, *verdict)
+    try:
+        if by_listing and retry_afters:
+            # The last round heard a 429, and the listing is Wayback too: wait as long as it asked.
+            paced.wait(
+                min(_ARCHIVE_ROUND_WAIT_MAX, max(retry_afters)),
+                f"Retry-After {max(retry_afters):g} s exceeds the run's budget before the CDX "
+                "listing",
+            )
+        for entry in by_listing:
+            settle(entry, *_verdict_from_listing(entry, listing, now))
+    except _OutOfBudget as spent:
+        cut_short(by_listing, str(spent))
+    return [entry.report for entry in entries if entry.report is not None]
+
+
+def _archive_line(report: ArchiveReport) -> str:
+    """`pin check`'s layout, with a label column wide enough for ARCHIVE-MISSING."""
+    label = _ARCHIVE_LABELS[report.status]
+    return f"{label:<15} {report.xr_id}  {report.citation}\n{'':16}{report.detail}"
 
 
 def check(
@@ -1954,10 +2364,72 @@ def _cmd_note(
     return 0
 
 
+def _cmd_check_archives(args: argparse.Namespace, sleep_fn: SleepFn) -> int:
+    """`check --archives`: every attached capture, never the documents. Reads Wayback, anonymously;
+    never writes, never asks Save Page Now for anything, needs no key."""
+    if args.all:
+        # Refused, not ignored: it would read as a change of scope, and there is none to add.
+        print(
+            "--archives already checks every entry of every record that has one; --all adds "
+            "nothing to it",
+            file=sys.stderr,
+        )
+        return 1
+    xw = Crosswalk(args.data_dir)
+    if args.only:
+        source = xw.sources.get(args.only)
+        if source is None:
+            print(f"unknown source {args.only!r}", file=sys.stderr)
+            return 1
+        if not source.archives:
+            print(
+                f"{args.only} has no archive copy to check; `pin archive` adds one", file=sys.stderr
+            )
+            return 1
+        targets = [source]
+    else:
+        # Live, superseded or merged away alike: a capture's bytes don't depend on its pin's
+        # liveness, and a superseded pin's capture is still what its ledger entry cites.
+        targets = sorted((s for s in xw.sources.values() if s.archives), key=lambda s: s.xr_id)
+
+    def show(report: ArchiveReport) -> None:
+        if not args.json:
+            print(_archive_line(report), flush=True)
+
+    reports = check_archives(
+        targets,
+        # Looked up here, at call time, so a test's stand-in for either is the one used.
+        capture_fn=functools.partial(_fetch_capture, timeout=_ARCHIVE_CAPTURE_TIMEOUT),
+        json_fn=_json_call,
+        sleep_fn=sleep_fn,
+        now=datetime.now(tz=UTC),
+        on_final=show,
+    )
+    checkable = [r for r in reports if r.status != "not_checkable"]
+    unreachable = bool(checkable) and all(
+        s.status == "unreachable" for r in checkable for s in r.samples
+    )
+    if args.json:
+        print(json.dumps([r.model_dump(mode="json") for r in reports], indent=2))
+    else:
+        counts = ", ".join(
+            f"{sum(r.status == status for r in reports)} {label}"
+            for status, label in _ARCHIVE_LABELS.items()
+        )
+        print(f"{len(reports)} attached capture(s): {counts}")
+    if unreachable:
+        print("WAYBACK UNREACHABLE", file=sys.stderr if args.json else sys.stdout)
+    return max(
+        (_ARCHIVE_EXIT_CODES[r.status] for r in reports), default=0, key=_ARCHIVE_EXIT_RANK.get
+    )
+
+
 def _cmd_check(
     args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
 ) -> int:
     del archive_fn  # check never archives
+    if args.archives:
+        return _cmd_check_archives(args, sleep_fn)
     xw = Crosswalk(args.data_dir)
     if args.only:
         source = xw.sources.get(args.only)
@@ -2189,6 +2661,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="check every record on disk: also the superseded pins the default skips, and "
         "merged_into losers",
+    )
+    check_parser.add_argument(
+        "--archives",
+        action="store_true",
+        help="re-verify every attached Wayback capture at its exact timestamp instead of "
+        "re-fetching documents: 0 ok, 5 lost, 6 missing, 7 unchecked; never writes, needs no key",
     )
     check_parser.add_argument("--json", action="store_true")
 

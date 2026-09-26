@@ -938,15 +938,29 @@ record; `--json` prints one report per entry, each sample's answer included, and
 - **0 — clean.** Every capture is `OK` (or not checkable). Nothing to do.
 - **5 — `ARCHIVE-LOST`.** Run `pin archive --repair <xr_id>`. If it finds no capture that
   verifies, nothing changes, and Corey decides.
-- **6 — `ARCHIVE-MISSING`.** Not a loss yet: Wayback has served captures it wasn't serving when
-  they were first checked, and stopped serving one it had served (below). Dispatch the workflow
-  again after a day, and if the entry is still missing the next Monday, run `pin archive --repair
-  <xr_id>`. Where the listing is empty, or holds no capture repair could use, repair has nothing
-  to find, and the detail says so: an entry still missing the next Monday needs a fresh capture,
-  a separate step from this check.
-- **7 — `UNCHECKED`.** Usually Wayback being slow or down: re-run by dispatch. An entry that stays
-  `UNCHECKED` on the same status week after week gets a look by hand. A run that asked Wayback
-  about at least one capture and got no answer about any ends with `WAYBACK UNREACHABLE`.
+- **6 — `ARCHIVE-MISSING`.** Not a loss yet: Wayback has served captures it wasn't serving when they
+  were first checked, and stopped serving two it had served, `xr_src_0017` and `xr_src_0024`
+  (below). Dispatch the workflow again after a day, and if the entry is still missing the next
+  Monday, run `pin archive --repair <xr_id>`. Where the listing is empty, or holds no capture repair
+  could use, repair has nothing to find, and the detail says so: an entry still missing the next
+  Monday needs a fresh capture, a separate step from this check.
+  **A U.S. Code prelim doesn't wait.** A prelim found `ARCHIVE-MISSING` gets
+  `pin archive --repair <xr_id>` at once, run from a machine Wayback answers: repair changes nothing
+  unless a capture verifies, and a prelim has no blob to fall back on (`pin blobs` writes none for a
+  prelim: its bytes never hash to the pin), so until a capture verifies the pin has no copy anyone
+  can read. The wait would spare at most a change to its archive URL. The section's next amendment
+  doesn't end what repair can find: captures made before it still show the old last amendment and
+  still reproduce the pin. What an amendment ends is fresh captures, so the pool repair can draw on
+  stops growing and only shrinks with the index. The week's wait stands for every other pin. The
+  detail's `Next:` still says to dispatch again after a day, a prelim's too; for a prelim this rule
+  stands over it. `xr_src_0024` was the first, on 2026-09-26 (below).
+- **7 — `UNCHECKED`.** Usually Wayback slow, down, or refusing the machine that asked; the detail
+  says which. An `UNCHECKED` from the runner means nothing until the check has been re-run from a
+  machine Wayback answers (`python -m registers_crosswalk.pin check --archives`, paced as
+  always): on 2026-09-26 the runner's three were two `ARCHIVE-MISSING` and one `OK` from this
+  machine (below). An entry that stays `UNCHECKED` from such a machine on the same status week
+  after week gets a look by hand. A run that asked Wayback about at least one capture and got no
+  answer about any ends with `WAYBACK UNREACHABLE`.
 
 The precedence is **5 > 6 > 7 > 0**, the strongest finding first. It inverts the drift check's on
 purpose: a `LOST` rests on answers Wayback gave about that capture, so an outage elsewhere in the
@@ -970,6 +984,25 @@ the checks behind this command found on 2026-09-26 (UTC):
 - One more request, sent at 03:20:48, 32 seconds after the last of those requests had finished,
   was answered 429 Too Many Requests. Playback had answered 429 before: three times on
   2026-09-20, while the reuse path was verified live.
+- The first run from a GitHub runner (`archives.yml` by dispatch, 19:35 to 20:00, run
+  36266577307) exited 7: 17 `OK`, and `xr_src_0017`, `xr_src_0022` and `xr_src_0024`
+  `UNCHECKED`. Wayback answered none of about half its requests, 21 of 41. The two whose error
+  the log prints, `xr_src_0022`'s last sample and the CDX read, were `[Errno 111] Connection
+  refused`, and each of the 21 took about 18 seconds (15 to 25) rather than failing at once. The
+  one CDX read, `xr_src_0017`'s, was refused once and not retried: `_retrying` retries only an
+  HTTP 5xx or 429. The check used 24m45s of its 25-minute budget, against about 17 minutes by
+  design. The run's time went to 15 minutes of round waits, about 3 of pacing, about 20 seconds
+  for the 20 answered requests, and about 6.3 minutes in the 21 refusals.
+- The same check from this machine (20:06 to 20:24, 17m40s) exited 6: 18 `OK`, and two
+  `ARCHIVE-MISSING`. `xr_src_0017`: four answers, none serving it (the last a 404), and a
+  listing of `[]`. `xr_src_0024` (52 U.S.C. § 30118, a prelim): its capture at
+  `20260923014054` was served at its own timestamp, with the pin's last amendment, at 01:24 that
+  morning. From 20:08 to about 20:24 it answered four times, five minutes apart, never serving
+  that timestamp (the last answer a redirect to `20260415170221`), and the CDX listing held no
+  capture at its timestamp. The runner had seen that redirect once.
+- `pin archive --repair xr_src_0024`, at 20:34, replaced it with the capture at
+  `20260415170221`, served at its own timestamp and giving the pin's last amendment, 2002-03-27.
+  Only the record's `archives` changed.
 
 **A 5xx from Wayback is retried; a 4xx is not.** `POST /save` answered 503 with an HTML "Internet
 Archive: Temporarily Offline" page at 19:22 UTC on 2026-09-20 and was serving normally by 19:23.
@@ -1115,3 +1148,16 @@ way, and is restarted the same way; everything below holds for it too.
   majors that target Node 24 across every workflow (`ci.yml`, `cross-repo.yml`,
   `sources-drift.yml`, `status-page.yml`, `archives.yml`). Warning only, non-urgent; do it in
   step with the sibling repos so all four move together.
+- **Archive check hardening, after Monday's run (2026-09-28).** Two notes from the first runner run,
+  to be decided with Monday's numbers beside them. A refused connection cost about 18 seconds rather
+  than failing at once, and 21 of them put the check at 24m45s of its 25-minute budget. And a CDX
+  read gets a single attempt when its connection is refused, since `_retrying` retries only an HTTP
+  5xx or 429: one refusal left `xr_src_0017` `UNCHECKED` where its two answers, neither serving it
+  (the last a 404), pointed to `ARCHIVE-MISSING`. Beside them, two fixes to the details printed for
+  a prelim. Its `ARCHIVE-MISSING` detail should say to run `--repair` now, not to wait a day. And
+  the clause a prelim's `LOST` or `MISSING` detail adds, that `--repair` can find another capture
+  with the same last amendment "until the section is next amended", claims what code 6 of the weekly
+  archive check corrects: captures made before an amendment still show the old last amendment and
+  still reproduce the pin. What an amendment ends is fresh captures, so the pool repair can draw on
+  stops growing and only shrinks with the index. The paragraph after the codes, which repeats the
+  clause, changes with it.

@@ -45,6 +45,7 @@ from .pin import (
     MissingKey,
     PinSpec,
     add_source,
+    again_later,
     archive,
     archive_source,
     clean_credential,
@@ -512,7 +513,7 @@ class Console:
         if outcome.status == "written":
             with self._lock:
                 self._specs.pop(resolve_id, None)
-        return 200, _outcome_payload(outcome)
+        return 200, _outcome_payload(outcome, again="nothing was written, so pin it")
 
     def api_archive(self, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         """Archive a pin that has none. The same `archive_source` the CLI's `pin archive` calls.
@@ -525,7 +526,7 @@ class Console:
             outcome = archive_source(xr_id, data_dir=self.data_dir, archive_fn=self.archive_fn)
         except (ValueError, OSError) as exc:
             return 200, {"status": "refused", "message": f"{type(exc).__name__}: {exc}"}
-        return 200, _outcome_payload(outcome)
+        return 200, _outcome_payload(outcome, again="press Archive now")
 
 
 def _credential_failure(exc: CredentialFailure) -> tuple[int, dict[str, Any]]:
@@ -539,11 +540,13 @@ def _credential_failure(exc: CredentialFailure) -> tuple[int, dict[str, Any]]:
     return 502, {"error": str(exc)}
 
 
-def _outcome_payload(outcome: AddOutcome) -> dict[str, Any]:
+def _outcome_payload(outcome: AddOutcome, *, again: str) -> dict[str, Any]:
+    """The outcome for the page. `again` is how the page asks again, in its own terms rather than
+    a CLI command, for a capture Wayback hasn't served yet."""
     source = outcome.source
     return {
         "status": outcome.status,
-        "message": outcome.message,
+        "message": outcome.message + (again_later(again) if outcome.not_served_yet else ""),
         "xr_id": source.xr_id if source else None,
         "path": str(outcome.path) if outcome.path else None,
         "ledger": outcome.ledger,

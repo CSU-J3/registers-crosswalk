@@ -651,6 +651,44 @@ def test_api_archive_reports_the_reason_when_the_capture_fails(tmp_path):
         thread.join(timeout=5)
 
 
+def test_a_capture_not_served_yet_says_to_ask_again_in_the_pages_own_terms(tmp_path):
+    """Pin and Archive now both refuse a capture Wayback hasn't served yet, and each says how to
+    ask again on the page: no CLI command, and only while the capture still matches."""
+    (tmp_path / "sources").mkdir()
+    not_yet = "capture not served at returned timestamp: x; nothing attached. Wayback can take days"
+
+    def not_served_yet(url, **_):
+        return ArchiveFailure(not_yet, not_served_yet=True)
+
+    console = Console(data_dir=tmp_path, env=ENV, fetch=cl_fetch(), archive_fn=not_served_yet)
+    server = serve(console, port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        c = Client(console, server)
+        args = {"fetcher": "courtlistener", "args": {"cluster_id": "1481640"}}
+        _, resolved = c.post("/api/resolve", args)
+        _, pinned = c.post("/api/pin", {"resolve_id": resolved["resolve_id"], "archive": True})
+        assert pinned["status"] == "archive_failed"
+        assert pinned["message"] == (
+            f"archive step failed: {not_yet}: nothing was written, so pin it again later, and it "
+            "reuses this capture once it is served, if it still matches"
+        )
+        _, resolved = c.post("/api/resolve", args)
+        _, written = c.post("/api/pin", {"resolve_id": resolved["resolve_id"], "archive": False})
+        _, archived = c.post("/api/archive", {"xr_id": written["xr_id"]})
+        assert archived["status"] == "archive_failed"
+        assert archived["message"] == (
+            f"archive step failed: {not_yet}: press Archive now again later, and it reuses this "
+            "capture once it is served, if it still matches"
+        )
+        assert "pin archive" not in archived["message"] + pinned["message"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_api_archive_needs_the_token(client):
     status, _ = client.raw("/api/archive", method="POST", body={"xr_id": "xr_src_0001"})
     assert status == 401

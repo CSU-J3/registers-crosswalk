@@ -406,7 +406,7 @@ _REUSE_TRIES = 8
 # A new capture is checked by fetching it back at its exact timestamp. Wayback can take a while to
 # serve one it has just taken, answering 404 or redirecting to a different timestamp meanwhile, so
 # the check is tried three times over ten minutes before the capture is reported as "capture not
-# stored at returned timestamp" (or "could not be checked", when the last try failed in transport).
+# served at returned timestamp" (or "could not be checked", when the last try failed in transport).
 _NEW_CAPTURE_WAITS: tuple[float, ...] = (0.0, 300.0, 300.0)
 _SERVED_TS = re.compile(r"/web/(\d{14})id_/")
 
@@ -641,6 +641,19 @@ class ArchiveFailure:
     """
 
     reason: str
+    # A new capture Save Page Now took and Wayback hasn't served yet. Nothing is kept for it:
+    # Wayback's index holds the capture, and the reuse path finds it once it is served, so asking
+    # again later is the whole remedy. Each caller says how, in its own terms (`again_later`).
+    not_served_yet: bool = False
+
+
+def again_later(how: str) -> str:
+    """What a caller appends to a refusal whose capture isn't served yet: how to ask again.
+
+    Only while the capture still matches: a `pin add` run later re-fetches the document, and a
+    document that has changed gets a fresh capture instead of this one.
+    """
+    return f": {how} again later, and it reuses this capture once it is served, if it still matches"
 
 
 def _spn2_reason(payload: Mapping[str, object]) -> str:
@@ -819,13 +832,15 @@ def _verified_new_capture(
     """`copy`, if its `id_` copy at the timestamp Save Page Now reported reproduces the pin.
 
     Save Page Now's word that it took a capture is not a check of what it took: on 2026-09-22 it
-    reported two captures (xr_src_0012, xr_src_0013) that the CDX API still does not hold, so both
-    records named captures Wayback serves only by redirecting to an older one. So the capture is
-    fetched back at its exact timestamp. Nothing stored there (a 404, or a redirect to a different
-    timestamp) is retried, three tries over ten minutes, since a capture can take a while to become
-    servable, and is then reported as "capture not stored at returned timestamp". A capture that is
-    served and does not reproduce the pin is refused at once. A transport error on the last try
-    says so instead, since it is no evidence of what is stored.
+    reported two captures (xr_src_0012, xr_src_0013) that Wayback, when they were checked, served
+    only by redirecting to an older one, so both records named captures nobody could read at their
+    own timestamps. A capture can take days to be served, and `pin archive` can attach it once it
+    is (docs/operations.md has the dates). So the capture is fetched back at its exact timestamp.
+    One not served there (a 404, an answer without Memento-Datetime, or a redirect to a different
+    timestamp) is retried, three tries over ten minutes, and is then reported as "capture not
+    served at returned timestamp". A capture that is served and does not reproduce the pin, or
+    that the pin's fetcher cannot read, is refused at once. A transport error on the last try says
+    so instead, since it is no evidence of what Wayback serves.
     """
     m = _WAYBACK_TS.search(copy.url)
     if m is None:
@@ -833,18 +848,28 @@ def _verified_new_capture(
             f"new capture {copy.url} has no timestamp to verify; nothing attached"
         )
     timestamp = m.group(1)
-    last, not_stored = "not tried", True
+    refused: list[int] = []  # the status of an HTTP error the last try's fetch answered with
+
+    def fetch(capture_url: str) -> tuple[bytes, str, Mapping[str, str]]:
+        refused.clear()
+        try:
+            return capture_fn(capture_url)
+        except urllib.error.HTTPError as exc:
+            refused.append(exc.code)
+            raise
+
+    last, not_served = "not tried", True
     for wait in _NEW_CAPTURE_WAITS:
         if wait:
             sleep_fn(wait)
         try:
-            verdict, detail = _check_capture(url, timestamp, expected, capture_fn=capture_fn)
+            # A 404 comes back as `not_served`; what raises is an answer that says nothing.
+            verdict, detail = _check_capture(url, timestamp, expected, capture_fn=fetch)
         except urllib.error.HTTPError as exc:
-            # A 404 is Wayback saying nothing is stored at that timestamp; anything else is not.
-            last, not_stored = f"HTTP {exc.code}", exc.code == 404
+            last, not_served = f"HTTP {exc.code}", False
             continue
-        except Exception as exc:  # noqa: BLE001 - retried; it says nothing about what is stored
-            last, not_stored = f"{type(exc).__name__}: {exc}", False
+        except Exception as exc:  # noqa: BLE001 - retried; it says nothing about what is served
+            last, not_served = f"{type(exc).__name__}: {exc}", False
             continue
         if verdict == "ok":
             # The capture that was checked: the pin's URL at the timestamp Save Page Now reported,
@@ -855,16 +880,20 @@ def _verified_new_capture(
                 f"new capture does not reproduce the pin's {expected.drift_key}: {copy.url}; "
                 "nothing attached"
             )
-        last, not_stored = detail, True
-    tries = (
-        f"{len(_NEW_CAPTURE_WAITS)} tries over {sum(_NEW_CAPTURE_WAITS) / 60:.0f} minutes ({last})"
-    )
-    if not_stored:
+        # The URL already names the timestamp, so a 404 is said as its status alone.
+        last, not_served = (f"HTTP {refused[0]}" if refused else detail), True
+    tries = f"{len(_NEW_CAPTURE_WAITS)} tries over {sum(_NEW_CAPTURE_WAITS) / 60:.0f} minutes"
+    if not_served:
         return ArchiveFailure(
-            f"capture not stored at returned timestamp: {copy.url}, after {tries}; nothing attached"
+            f"capture not served at returned timestamp: {copy.url}, after {tries} "
+            f"(last answer: {last}); nothing attached. Wayback can take days to serve a new "
+            "capture",
+            not_served_yet=True,
         )
+    # No parentheses round the last try: an exception's own text carries them often enough.
     return ArchiveFailure(
-        f"new capture could not be checked: {copy.url}, after {tries}; nothing attached"
+        f"new capture could not be checked: {copy.url}, after {tries}, the last ending in {last}; "
+        "nothing attached"
     )
 
 
@@ -1483,7 +1512,8 @@ class AddOutcome:
     A frozen dataclass rather than an exception per refusal: a refusal here is an ordinary answer
     ("that document is already pinned"), not a failure of the program, and the console has to put
     it on a page as readily as the CLI puts it on stderr. `message` is the CLI's own wording,
-    unchanged, so the two cannot describe the same refusal differently.
+    unchanged, so the two cannot describe the same refusal differently. The one thing each says
+    in its own terms is how to ask again, where `not_served_yet` says asking again will help.
     """
 
     status: Literal["written", "unchanged", "refused", "archive_failed"]
@@ -1491,6 +1521,9 @@ class AddOutcome:
     source: Source | None = None
     path: Path | None = None
     ledger: str | None = None
+    # An `archive_failed` whose new capture Wayback hasn't served yet (`ArchiveFailure`'s flag).
+    # The message stops at the reason; each caller adds how to ask again, in its own terms.
+    not_served_yet: bool = False
 
 
 def add_source(
@@ -1590,7 +1623,11 @@ def add_source(
                 if isinstance(result, ArchiveFailure)
                 else f"no capture returned for {source.canonical_url}; nothing written"
             )
-            return AddOutcome(status="archive_failed", message=f"archive step failed: {reason}")
+            return AddOutcome(
+                status="archive_failed",
+                message=f"archive step failed: {reason}",
+                not_served_yet=isinstance(result, ArchiveFailure) and result.not_served_yet,
+            )
         archives = [result]
     # pin() builds the document facts; the crosswalk facts (who cites it, what it replaces) are the
     # caller's. Re-validate the assembled node rather than trusting model_copy, which skips it.
@@ -1667,7 +1704,11 @@ def archive_source(
             if isinstance(result, ArchiveFailure)
             else f"no capture returned for {source.canonical_url}; nothing written"
         )
-        return AddOutcome(status="archive_failed", message=f"archive step failed: {reason}")
+        return AddOutcome(
+            status="archive_failed",
+            message=f"archive step failed: {reason}",
+            not_served_yet=isinstance(result, ArchiveFailure) and result.not_served_yet,
+        )
     return _write_archives(
         xw, source, [result], data_dir=data_dir, message=f"archived {xr_id}: {result.url}"
     )
@@ -1865,7 +1906,11 @@ def _cmd_add(
         archive_fn=archive_fn,
     )
     if outcome.status != "written":
-        print(outcome.message, file=sys.stderr)
+        again = "nothing was written, so run the same `pin add`"
+        print(
+            outcome.message + (again_later(again) if outcome.not_served_yet else ""),
+            file=sys.stderr,
+        )
         return 1
     print(outcome.message)
     print(outcome.ledger)
@@ -1888,7 +1933,8 @@ def _cmd_archive(
         print(outcome.message)
         return 0
     if outcome.status != "written":
-        print(outcome.message, file=sys.stderr)
+        again = again_later(f"run `pin archive {args.xr_id}`") if outcome.not_served_yet else ""
+        print(outcome.message + again, file=sys.stderr)
         return 1
     print(outcome.message)
     print(outcome.ledger)

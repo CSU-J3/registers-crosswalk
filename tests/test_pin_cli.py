@@ -762,9 +762,7 @@ def test_repair_replaces_a_served_prelim_the_parser_cannot_read(tmp_path, monkey
     assert [a["url"].split("/")[4] for a in after["archives"]] == [TS_OLDER]
 
 
-def test_repair_treats_a_404_at_the_attached_timestamp_as_nothing_stored(
-    tmp_path, monkeypatch, capsys
-):
+def test_repair_treats_a_404_at_the_attached_timestamp_as_not_served(tmp_path, monkeypatch, capsys):
     _add_archived(tmp_path)
     _wayback(monkeypatch, {TS_OLDER: BODY}, cdx=(TS_OLDER,))
     real = pinmod._fetch_capture  # the fake just installed
@@ -894,6 +892,38 @@ def test_repair_refuses_a_pin_with_no_archive(tmp_path, capsys):
     capsys.readouterr()
     assert _repair(tmp_path) == 1
     assert "no archive copy to repair" in capsys.readouterr().err
+
+
+# ------------------------------------------- a capture not served yet: say how to ask again
+
+NOT_YET = "capture not served at returned timestamp: x; nothing attached. Wayback can take days"
+
+
+def _not_served_yet(url, **_):
+    return ArchiveFailure(NOT_YET, not_served_yet=True)
+
+
+def test_pin_archive_refused_as_not_served_yet_says_to_run_it_again(tmp_path, capsys):
+    _add(tmp_path)
+    capsys.readouterr()
+    argv = ["--data-dir", str(tmp_path), "archive", "xr_src_0001"]
+    assert main(argv, archive_fn=_not_served_yet) == 1
+    assert capsys.readouterr().err.rstrip() == (
+        f"archive step failed: {NOT_YET}: run `pin archive xr_src_0001` again later, and it "
+        "reuses this capture once it is served, if it still matches"
+    )
+    # Any other failure says nothing about asking again: nothing says it would help.
+    assert main(argv, archive_fn=lambda url, **_: ArchiveFailure("HTTP 503 from Wayback")) == 1
+    assert "again later" not in capsys.readouterr().err
+
+
+def test_pin_add_refused_as_not_served_yet_says_to_run_the_same_add_again(tmp_path, capsys):
+    assert _add(tmp_path, extra=["--archive"], archive_fn=_not_served_yet) == 1
+    assert capsys.readouterr().err.rstrip() == (
+        f"archive step failed: {NOT_YET}: nothing was written, so run the same `pin add` again "
+        "later, and it reuses this capture once it is served, if it still matches"
+    )
+    assert not (tmp_path / "sources").exists() or _sources(tmp_path) == []
 
 
 # --------------------------------------------------- the manifest verifies; the record lists all

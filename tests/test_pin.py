@@ -1,5 +1,6 @@
 import email.message
 import gzip
+import http.client
 import json
 import re
 import socket
@@ -957,13 +958,13 @@ def test_a_new_capture_not_yet_served_is_retried_then_reported():
         env=KEYS,
     )
     assert isinstance(result, ArchiveFailure)
-    assert result.reason.startswith("capture not stored at returned timestamp")
+    assert result.reason.startswith("capture not served at returned timestamp")
     assert "3 tries over 10 minutes" in result.reason
     assert slept.count(300.0) == 2
 
 
-def test_nothing_is_attached_when_nothing_is_stored_at_the_returned_timestamp():
-    """Save Page Now returned a timestamp, and on every try Wayback has nothing stored there:
+def test_nothing_is_attached_when_nothing_is_served_at_the_returned_timestamp():
+    """Save Page Now returned a timestamp, and on every try Wayback serves nothing there:
     it answers 404, or redirects to a different capture, which here even holds the pinned bytes.
     Only the served-timestamp comparison stops that other capture being attached under the
     returned timestamp."""
@@ -987,13 +988,14 @@ def test_nothing_is_attached_when_nothing_is_stored_at_the_returned_timestamp():
         env=KEYS,
     )
     assert isinstance(result, ArchiveFailure)
-    assert result.reason.startswith("capture not stored at returned timestamp: ")
-    assert "(HTTP 404)" in result.reason
-    assert result.reason.endswith("nothing attached")
+    assert result.reason.startswith("capture not served at returned timestamp: ")
+    assert "(last answer: HTTP 404)" in result.reason
+    assert result.reason.endswith("nothing attached. Wayback can take days to serve a new capture")
+    assert result.not_served_yet
     assert len(tries) == 3
 
 
-def test_a_404_on_every_try_is_reported_as_nothing_stored():
+def test_a_404_on_every_try_is_reported_as_not_served():
     def capture_fn(url):
         raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
 
@@ -1006,7 +1008,65 @@ def test_a_404_on_every_try_is_reported_as_nothing_stored():
         env=KEYS,
     )
     assert isinstance(result, ArchiveFailure)
-    assert result.reason.startswith("capture not stored at returned timestamp: ")
+    assert result.reason.startswith("capture not served at returned timestamp: ")
+
+
+def _always_404(url):
+    raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+
+
+@pytest.mark.parametrize(
+    "capture_fn, last",
+    [
+        (_always_404, "HTTP 404"),
+        (
+            _served(
+                {"20260711041727": ARCHIVED_BODY}, redirect={"20260919120000": "20260711041727"}
+            ),
+            "Wayback served 20260711041727 for 20260919120000",
+        ),
+    ],
+)
+def test_a_new_capture_not_served_names_its_last_answer_in_one_pair_of_parentheses(
+    capture_fn, last
+):
+    result = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=_cdx_then_spn2(_cdx()),
+        capture_fn=capture_fn,
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert result.reason == (
+        f"capture not served at returned timestamp: https://web.archive.org/web/20260919120000/"
+        f"{ECFR_URL}, after 3 tries over 10 minutes (last answer: {last}); nothing attached. "
+        "Wayback can take days to serve a new capture"
+    )
+    assert result.reason.count("(") == 1
+    assert result.not_served_yet
+
+
+def test_a_new_capture_that_could_not_be_checked_nests_no_parentheses():
+    """An exception's own text often carries parentheses, so the last try isn't put in any."""
+
+    def capture_fn(url):
+        raise http.client.IncompleteRead(b"abc", 5)
+
+    result = archive(
+        ECFR_URL,
+        expected=EXPECTED,
+        json_fn=_cdx_then_spn2(_cdx()),
+        capture_fn=capture_fn,
+        sleep_fn=lambda _s: None,
+        env=KEYS,
+    )
+    assert result.reason == (
+        f"new capture could not be checked: https://web.archive.org/web/20260919120000/"
+        f"{ECFR_URL}, after 3 tries over 10 minutes, the last ending in IncompleteRead: "
+        "IncompleteRead(3 bytes read, 5 more expected); nothing attached"
+    )
+    assert not result.not_served_yet  # a transport failure: nothing says asking again will help
 
 
 def test_the_new_capture_attached_is_the_pin_url_at_the_checked_timestamp():
@@ -1057,7 +1117,7 @@ def test_a_malformed_cdx_listing_cannot_raise_out_of_archive(rows):
     assert isinstance(copy, ArchiveCopy)
 
 
-def test_a_transport_error_is_not_reported_as_nothing_stored():
+def test_a_transport_error_is_not_reported_as_not_served():
     def capture_fn(url):
         raise TimeoutError("read timed out")
 

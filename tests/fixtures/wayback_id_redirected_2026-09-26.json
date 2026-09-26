@@ -1,0 +1,83 @@
+{
+  "requested_url": "https://web.archive.org/web/20260801000000id_/https://www.fec.gov/files/legal/murs/8111/8111_25.pdf",
+  "captured_at": "2026-09-26T03:09:52.186746+00:00",
+  "status": 200,
+  "final_url": "https://web.archive.org/web/20260711041727id_/https://www.fec.gov/files/legal/murs/8111/8111_25.pdf",
+  "redirects": [
+    {
+      "status": 302,
+      "url": "https://web.archive.org/web/20260801000000id_/https://www.fec.gov/files/legal/murs/8111/8111_25.pdf",
+      "location": "https://web.archive.org/web/20260711041727id_/https://www.fec.gov/files/legal/murs/8111/8111_25.pdf",
+      "headers": {
+        "content-type": "text/plain; charset=utf-8",
+        "content-length": "0",
+        "location": "https://web.archive.org/web/20260711041727id_/https://www.fec.gov/files/legal/murs/8111/8111_25.pdf",
+        "x-ts": "302"
+      },
+      "withheld": [
+        "connection",
+        "date",
+        "permissions-policy",
+        "referrer-policy",
+        "server",
+        "server-timing",
+        "set-cookie",
+        "x-app-server",
+        "x-archive-redirect-reason",
+        "x-location",
+        "x-na",
+        "x-nid",
+        "x-page-cache",
+        "x-rl",
+        "x-sd",
+        "x-tr"
+      ]
+    }
+  ],
+  "headers": {
+    "content-type": "application/pdf",
+    "content-length": "1028444",
+    "memento-datetime": "Sat, 11 Jul 2026 04:17:27 GMT",
+    "link": "<https://www.fec.gov/files/legal/murs/8111/8111_25.pdf>; rel=\"original\", <https://web.archive.org/web/timemap/link/https://www.fec.gov/files/legal/murs/8111/8111_25.pdf>; rel=\"timemap\"; type=\"application/link-format\", <https://web.archive.org/web/https://www.fec.gov/files/legal/murs/8111/8111_25.pdf>; rel=\"timegate\", <https://web.archive.org/web/20240927013636/https://www.fec.gov/files/legal/murs/8111/8111_25.pdf>; rel=\"first memento\"; datetime=\"Fri, 27 Sep 2024 01:36:36 GMT\", <https://web.archive.org/web/20260328095952/https://www.fec.gov/files/legal/murs/8111/8111_25.pdf>; rel=\"prev memento\"; datetime=\"Sat, 28 Mar 2026 09:59:52 GMT\", <https://web.archive.org/web/20260711041727/https://www.fec.gov/files/legal/murs/8111/8111_25.pdf>; rel=\"memento\"; datetime=\"Sat, 11 Jul 2026 04:17:27 GMT\", <https://web.archive.org/web/20260711041727/https://www.fec.gov/files/legal/murs/8111/8111_25.pdf>; rel=\"last memento\"; datetime=\"Sat, 11 Jul 2026 04:17:27 GMT\"",
+    "x-archive-src": "archiveteam_archivebot_go_20260711043227_bd2ad1db/www.fec.gov-inf-20260710-205935-5se8j-00010.warc.gz",
+    "x-ts": "200"
+  },
+  "withheld": [
+    "accept-ranges",
+    "cache-control",
+    "connection",
+    "content-security-policy",
+    "date",
+    "permissions-policy",
+    "referrer-policy",
+    "server",
+    "server-timing",
+    "set-cookie",
+    "x-app-server",
+    "x-archive-orig-accept-ranges",
+    "x-archive-orig-connection",
+    "x-archive-orig-content-length",
+    "x-archive-orig-date",
+    "x-archive-orig-etag",
+    "x-archive-orig-last-modified",
+    "x-archive-orig-strict-transport-security",
+    "x-archive-orig-via",
+    "x-archive-orig-x-amz-cf-id",
+    "x-archive-orig-x-amz-cf-pop",
+    "x-archive-orig-x-amz-server-side-encryption",
+    "x-archive-orig-x-amz-version-id",
+    "x-archive-orig-x-cache",
+    "x-archive-orig-x-content-type-options",
+    "x-archive-orig-x-frame-options",
+    "x-archive-orig-x-vcap-request-id",
+    "x-location",
+    "x-na",
+    "x-nid",
+    "x-page-cache",
+    "x-rl",
+    "x-sd",
+    "x-tr"
+  ],
+  "body_sha256": "be75cba280742c4162a4e93f929c094571c03a7a8c20808ca28c75b04c398503",
+  "body_length": 1028444
+}

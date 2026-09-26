@@ -1,0 +1,93 @@
+{
+  "requested_url": "https://web.archive.org/cdx/search/cdx?url=https%3A%2F%2Fwww.fec.gov%2Ffiles%2Flegal%2Fmurs%2F8111%2F8111_25.pdf&output=json&fl=timestamp%2Cstatuscode%2Cdigest",
+  "captured_at": "2026-09-26T01:25:30.729825+00:00",
+  "status": 200,
+  "final_url": "https://web.archive.org/cdx/search/cdx?url=https%3A%2F%2Fwww.fec.gov%2Ffiles%2Flegal%2Fmurs%2F8111%2F8111_25.pdf&output=json&fl=timestamp%2Cstatuscode%2Cdigest",
+  "redirects": [],
+  "headers": null,
+  "withheld": null,
+  "body_sha256": "696969a102591d67fceff5611677c8bc6915f5e43e88c2547dd9028f0f0c752e",
+  "body_length": 941,
+  "rows": [
+    [
+      "timestamp",
+      "statuscode",
+      "digest"
+    ],
+    [
+      "20240927013636",
+      "200",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20250121023218",
+      "200",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20250207080647",
+      "200",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20250215034435",
+      "200",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20250301160327",
+      "200",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20250412003304",
+      "-",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20250423213828",
+      "200",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20250715023405",
+      "-",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20250921191046",
+      "-",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20251215080545",
+      "-",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20260225040304",
+      "200",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20260315132840",
+      "200",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20260328095952",
+      "-",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20260711041727",
+      "200",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ],
+    [
+      "20260922175016",
+      "-",
+      "YUSRT6IS3H2A56TPEUKPKZ62ZAHYDEEU"
+    ]
+  ]
+}

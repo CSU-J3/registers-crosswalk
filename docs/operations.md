@@ -271,6 +271,20 @@ The rules that follow from it:
 - Capture live, store under `tests/fixtures/` with the capture date in the filename, and load it;
   don't paste an abbreviated version into the test module.
 - Trim nothing. A capture is evidence; an edited capture is an assumption again.
+  **One exception: a Wayback fixture's headers are an allowlist.** It keeps `memento-datetime`,
+  `x-ts`, `link`, `location`, `content-type`, `content-length` and `x-archive-src`, and lists
+  every other header's name, names only, under `withheld`; nothing kept is edited. A trim by
+  name, listed in the fixture, is visible, which an edit is not. A header that identifies the
+  machine that made the request is evidence about that machine, not about Wayback, so it stays
+  out of a public repo: `x-nid` is that header, and named this machine's ISP on 2026-09-26.
+  `set-cookie` is withheld too, since a cookie header can carry anything, and so is the name of
+  the Wayback app server that answered (`x-app-server`, which `set-cookie` repeated): no test
+  reads it, and the servers that disagreed on 2026-09-26 are in the dated record under **The
+  weekly archive check**, below. A body is kept as its sha256 and length, not its bytes: a
+  served body here is a pinned document, whose copies live outside this repo (`pin blobs`), and
+  a test serves a stand-in whose hash it computes. The Part A listing's headers were never
+  recorded, so they are null, which means "not recorded", never "nothing withheld".
+  `test_wayback_fixtures_keep_only_allowlisted_headers` holds every `wayback_*` file to this.
 - Assert the key set, so an invented field and a dropped field both fail (see
   `test_captured_fixture_matches_the_observed_live_key_set`).
 - Need an error case the live response doesn't contain? **Mutate a copy of the capture** — blank a
@@ -707,7 +721,9 @@ new text and re-pin" — and a checker that conflates them teaches you to ignore
 this is the split between `except OSError` (every urllib transport error subclasses it) and
 everything else. When a run mixes statuses, the precedence is **2 > 3 > 1 > 0**: fix the
 environment, then the network, and only then read the drift answers, which are not trustworthy
-until every source was actually reachable.
+until every source was actually reachable. `check --archives` asks a different question, of
+Wayback rather than the publishers, and has codes of its own, 5 to 7, under **The weekly
+archive check**, below.
 
 Each line is one of six statuses, and they mean genuinely different things:
 
@@ -807,9 +823,10 @@ callables, so the tests for success, pending-then-success, error and timeout sta
 The keys live in a gitignored `.env` read into the process environment for a run. A `uscode` pin
 needs them there: `REQUIRES_ARCHIVE` refuses the pin without a capture, and the synchronous save
 path 500s for these URLs with or without an Authorization header, so an unkeyed run cannot produce
-one. Neither key belongs in CI: nothing in the workflows archives, so an unkeyed CI checkout takes
-the anonymous path and never needs it. Perma.cc stays a TODO in `archive()` rather than the next
-step — a keyed capture now works, so there is nothing for it to rescue.
+one. Neither key belongs in CI: nothing in the workflows asks Save Page Now for a capture (the
+`archives` workflow only reads Wayback), so an unkeyed CI checkout never needs one. Perma.cc
+stays a TODO in `archive()` rather than the next step — a keyed capture now works, so there is
+nothing for it to rescue.
 
 **Save Page Now reuses a capture under an hour old, so an archive may predate its fetch by up to an
 hour.** Ask SPN2 to capture a URL it captured within the last hour and it does not capture it
@@ -830,8 +847,11 @@ For a U.S. Code prelim it is the section's last amendment, because the page carr
 session data and its bytes never match twice; the prelims are the one case where the match is by
 date, not by bytes. The `id_` form serves the archived response as it was, not wrapped in
 Wayback's toolbar. The exact timestamp matters because Wayback redirects a timestamp it doesn't
-hold to the nearest capture it does, so drift values are compared only when the capture it served,
-read from the final URL and `Memento-Datetime`, is the one asked for.
+hold to the nearest capture it does, so drift values are compared only when the capture it served
+is the one asked for. The status is read first: a 404 serves nothing, although it comes back at
+the very URL that was asked for, which names the timestamp. Then a capture counts as served only
+when `Memento-Datetime` names the timestamp asked for and the final URL names no other; a 200
+without the header serves no capture, whatever its URL says.
 
 So `archive()` asks first. It lists the URL's captures from the CDX API, newest first, and reuses
 the first that reproduces the pin. It skips any capture whose CDX digest already failed, since a
@@ -839,31 +859,117 @@ digest names a payload. A capture of that URL is not enough on its own: a URL th
 different document last year has a capture too. If none reproduces the pin, Save Page Now is asked
 for a new capture, and that capture is fetched back at the timestamp it reported:
 - If it's served and reproduces the pin, it is attached.
-- If it's served and doesn't, it is refused ("new capture does not reproduce the pin's
-  `<drift key>`").
-- If nothing is stored at that timestamp yet (a 404, or a redirect to a different capture, even
-  one whose bytes would match), it is tried three times over ten minutes, then reported as
-  "capture not stored at returned timestamp" with nothing attached.
+- If it's served and doesn't, or the pin's fetcher can't read it, it is refused ("new capture
+  does not reproduce the pin's `<drift key>`").
+- If Wayback serves nothing at that timestamp yet (a 404, an answer without `Memento-Datetime`,
+  or a redirect to a different capture, even one whose bytes would match), it is tried three times
+  over ten minutes, then reported as "capture not served at returned timestamp" with nothing
+  attached. "Served", not "stored": a capture can take days to be served (below). The refusal
+  says so, and says how to ask again, each caller in its own terms: `pin archive <xr_id>` again
+  later, or the same `pin add` when nothing was written; on the console, Archive now again, or pin
+  it again. Asked again once it is served, the reuse path finds the capture and attaches it, if
+  it still matches: a `pin add` re-fetches, and a document that has changed gets a fresh capture
+  instead. Nothing is kept for the pending capture; Wayback's index holds it.
 - If the last try fails for another reason (a timeout, or an HTTP error other than 404), it is
-  reported as "new capture could not be checked", since that says nothing about what is stored.
+  reported as "new capture could not be checked", since that says nothing about what is served.
 
 The listing is an optimisation, so a broken CDX API can't refuse a pin; it just means the long way
 round. A 5xx or 429 from it is retried the way Save Page Now's are: on 2026-09-24 it answered 503
 twice in a row and then served the listing.
 
 Why the new capture is checked too: on 2026-09-22 Save Page Now reported captures for
-`xr_src_0012` and `xr_src_0013` at timestamps the CDX API still didn't hold two days later, and
-Wayback served both only by redirecting to a 2026-07-11 capture. Nothing checked them before the
-records were written. A read-only check of all twenty attached captures on 2026-09-24 found those
-two and no others: the other eighteen reproduce their pins at their exact timestamps.
+`xr_src_0012` and `xr_src_0013`, and nothing checked them before the records were written. When
+they were checked, on 2026-09-24, the CDX API held neither timestamp, and Wayback served both only
+by redirecting to a 2026-07-11 capture. That read-only check of all twenty attached captures
+found those two and no others: the other eighteen reproduced their pins at their exact
+timestamps, and #36 re-pointed the two to their 2026-07-11 captures. When they were checked
+again, on 2026-09-26, Wayback served both at their own timestamps, with the pins' bytes,
+`xr_src_0012`'s from a 2026-09-22 Save Page Now WARC that the CDX listing now held as a revisit
+(`-`). They were unindexed, not missing.
 
 **`pin archive --repair xr_src_NNNN`** re-verifies a pin's attached capture at its exact
-timestamp. If it verifies, nothing changes. If Wayback serves another capture for that timestamp,
-answers 404 for it, or the bytes don't reproduce the pin, the newest existing capture that does
-replaces the entry, and only the record's `archives` field is rewritten. Nothing changes, and the
-reason is reported, if no existing capture can be verified, if the attached capture can't be
-reached at all, or if it isn't a Wayback capture with a timestamp (a Perma.cc or GovInfo copy is
-left alone). It never asks for a new capture.
+timestamp. If it verifies, nothing changes. If Wayback serves no capture at that timestamp (a
+404, an answer without `Memento-Datetime`, another capture), or serves one whose bytes don't
+reproduce the pin or that the pin's fetcher can't read, the newest existing capture that does
+reproduce it replaces the entry, and only the record's `archives` field is rewritten. Nothing
+changes, and the reason is reported, if no existing capture can be verified, if the attached
+capture can't be reached at all, or if it isn't a Wayback capture with a timestamp (a Perma.cc or
+GovInfo copy is left alone). It never asks for a new capture. It reads the attached capture
+through the same check the weekly run uses, `_check_attached`, so the two can't disagree about
+what an answer means.
+
+**The weekly archive check.** `.github/workflows/archives.yml` runs `python -m
+registers_crosswalk.pin check --archives` Mondays 12:40 UTC and on `workflow_dispatch`, a
+workflow of its own so a Wayback outage can't turn `sources-drift`'s badge red. It checks every
+entry of every record that has one, live, superseded or merged away alike, since a capture's
+bytes don't depend on its pin's liveness. A copy that isn't a Wayback capture with a timestamp is
+`NOT CHECKABLE` at once, and nothing is asked about it. Every other entry is sampled once, at its
+own URL and timestamp; each that isn't OK is sampled again in up to three more rounds, five
+minutes apart (a 429's `Retry-After` apart, if longer, up to ten minutes), and one good answer
+settles an entry. Requests go at least five seconds apart. Three unanswered in a row end a round,
+and the next round starts with the entries that one didn't reach, so captures that keep failing
+at the front of the list can't keep the rest from being asked. After the last round, the
+verdicts the samples decide come first; then the CDX listing is read for each entry whose every
+answer was "not served", if there were at least two (one is too few to call a capture missing,
+whatever the listing says). The check has a budget of its own, 25 minutes from its start: no wait
+is taken that would end past it, whether it spaces the rounds or honours a Retry-After on a
+capture or a CDX read, and what is still pending then is `UNCHECKED`, with the reason ("the CDX
+listing's Retry-After 3600 s exceeds the run's budget", "budget spent before round 3") and its
+answers so far; an entry with a mismatch among them is `LOST`, since that is Wayback's own answer
+about the capture. The run ends on its own verdicts; the job's `timeout-minutes: 30` is only the
+backstop. Each line prints as soon as its verdict is final. It never writes,
+never asks Save Page Now for anything, and needs no key. `--only xr_src_NNNN` narrows it to one
+record; `--json` prints one report per entry, each sample's answer included, and nothing else.
+
+- **`OK`**: some sample was served at the exact timestamp and reproduced the pin's drift value.
+- **`ARCHIVE-LOST`**: none reproduced, and some sample was served at the exact timestamp with
+  bytes that don't give the pin's drift value. The copy the ledgers cite is not the pinned text.
+- **`ARCHIVE-MISSING`**: every sample that answered was "not served", at least two answered, and
+  the CDX listing answered without a row at that timestamp holding a document (statuscode `200`
+  or `-`); `[]` is an answer. The detail gives the capture's age in days.
+- **`UNCHECKED`**: no evidence either way. Too few answers, a capture the pin's fetcher couldn't
+  read, a listing that couldn't be read, a listing that still holds the timestamp while no sample
+  was served it, or the run's budget spent before the entry was settled; the detail says which,
+  and for the budget it lists the entry's answers so far.
+- **`NOT CHECKABLE`**: a Perma.cc or GovInfo copy, or a Wayback URL without a timestamp. None
+  today.
+
+**What its codes mean.**
+- **0 — clean.** Every capture is `OK` (or not checkable). Nothing to do.
+- **5 — `ARCHIVE-LOST`.** Run `pin archive --repair <xr_id>`. If it finds no capture that
+  verifies, nothing changes, and Corey decides.
+- **6 — `ARCHIVE-MISSING`.** Not a loss yet: Wayback has served captures it wasn't serving when
+  they were first checked, and stopped serving one it had served (below). Dispatch the workflow
+  again after a day, and if the entry is still missing the next Monday, run `pin archive --repair
+  <xr_id>`. Where the listing is empty, or holds no capture repair could use, repair has nothing
+  to find, and the detail says so: an entry still missing the next Monday needs a fresh capture,
+  a separate step from this check.
+- **7 — `UNCHECKED`.** Usually Wayback being slow or down: re-run by dispatch. An entry that stays
+  `UNCHECKED` on the same status week after week gets a look by hand. A run that asked Wayback
+  about at least one capture and got no answer about any ends with `WAYBACK UNREACHABLE`.
+
+The precedence is **5 > 6 > 7 > 0**, the strongest finding first. It inverts the drift check's on
+purpose: a `LOST` rests on answers Wayback gave about that capture, so an outage elsewhere in the
+run doesn't weaken it, and the job is red either way. On a U.S. Code prelim, a `LOST` or
+`MISSING` detail adds that the capture is the pin's only preservation copy, and that `--repair`
+can find another with the same last amendment until the section is next amended; a `MISSING`
+detail leaves that last clause out where the listing holds no capture repair could use.
+
+**Why MISSING is kept apart from LOST: Wayback's index isn't settled for recent captures.** What
+the checks behind this command found on 2026-09-26 (UTC):
+- The two captures Save Page Now reported on 2026-09-22, not served at their own timestamps when
+  checked on 2026-09-24, were served at them, with the pins' bytes, when checked on 2026-09-26
+  (above).
+- Two of Wayback's servers disagreed about `xr_src_0012`'s URL two minutes apart: at 01:23:19 one
+  named `20260711041727` as the last memento, and at 01:25:04 another named `20260922175016`.
+- `xr_src_0017` (301 U.S. 242), captured at `20260923013800` and served at that timestamp with the
+  pin's bytes on 2026-09-24, answered 404 at 01:23, and again in four samples five minutes apart
+  from 03:04 to 03:19, each from a different server, while `xr_src_0018`, on the same host and
+  captured two minutes later, was served normally. Its CDX listing answered `[]` twice. It is the
+  first `ARCHIVE-MISSING`.
+- One more request, sent at 03:20:48, 32 seconds after the last of those requests had finished,
+  was answered 429 Too Many Requests. Playback had answered 429 before: three times on
+  2026-09-20, while the reuse path was verified live.
 
 **A 5xx from Wayback is retried; a 4xx is not.** `POST /save` answered 503 with an HTML "Internet
 Archive: Temporarily Offline" page at 19:22 UTC on 2026-09-20 and was serving normally by 19:23.
@@ -988,23 +1094,24 @@ build/status/index.html` (add `--drift-json` if you have a check's JSON to hand)
 fail; it simply stops running, and `sources-drift` reports nothing rather than reporting green.
 This repo is exactly the kind that goes quiet — the crosswalk is small and stable, and a two-month
 lull between commits is normal — so the drift check is genuinely at risk of switching itself off
-in the period you most need it.
+in the period you most need it. `archives` runs on the same kind of schedule, goes dark the same
+way, and is restarted the same way; everything below holds for it too.
 
-- **Symptom.** No `sources-drift` runs in the Actions tab for weeks, with no red. Absence of red is
-  the tell; there is no notification.
+- **Symptom.** No `sources-drift` (or `archives`) runs in the Actions tab for weeks, with no red.
+  Absence of red is the tell; there is no notification.
 - **Restart.** The workflow carries `workflow_dispatch`, so run it by hand — Actions →
   *sources-drift* → *Run workflow*, or `gh workflow run sources-drift.yml --repo
-  CSU-J3/registers-crosswalk`. GitHub also emails the repo admin before disabling, and a manual run
-  or any commit resets the 60-day clock.
-- **Check it is still armed.** `gh workflow list --repo CSU-J3/registers-crosswalk` shows the
+  CSU-J3/registers-crosswalk` (`archives.yml` for the other). GitHub also emails the repo admin
+  before disabling, and a manual run or any commit resets the 60-day clock.
+- **Check it is still armed.** `gh workflow list --repo CSU-J3/registers-crosswalk` shows each
   workflow's state; anything other than `active` means the schedule is off.
-- Treat a long quiet spell as a reason to dispatch the job manually, not as evidence that nothing
-  drifted.
+- Treat a long quiet spell as a reason to dispatch the jobs manually, not as evidence that nothing
+  drifted or went missing.
 
 ## Tracked chores
 
 - **Node 20 → newer action majors.** `actions/checkout@v4` and `actions/setup-python@v5` currently
   run on Node 24 with a deprecation warning (Node 20 sunset, GitHub 2025-09-19). Bump to action
   majors that target Node 24 across every workflow (`ci.yml`, `cross-repo.yml`,
-  `sources-drift.yml`, `status-page.yml`). Warning only, non-urgent; do it in
+  `sources-drift.yml`, `status-page.yml`, `archives.yml`). Warning only, non-urgent; do it in
   step with the sibling repos so all four move together.

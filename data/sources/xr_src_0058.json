@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0058",
+  "kind": "source",
+  "citation": "11 CFR Part 100",
+  "title": "11 CFR Part 100, as of 2026-09-14",
+  "publisher": "Office of the Federal Register",
+  "canonical_url": "https://www.ecfr.gov/api/versioner/v1/full/2026-09-14/title-11.xml?part=100",
+  "fetcher": "ecfr",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-18",
+  "point_in_time": "2026-09-14",
+  "published_at": null,
+  "artifact": {
+    "sha256": "b471831b14443bf189ba7af987a87f1b1641a2a66891dba31ff0541d7e913b75",
+    "byte_length": 183349,
+    "media_type": "application/xml",
+    "fetched_at": "2026-09-27T19:47:33.086913Z",
+    "drift_key": "sha256",
+    "drift_value": "b471831b14443bf189ba7af987a87f1b1641a2a66891dba31ff0541d7e913b75"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

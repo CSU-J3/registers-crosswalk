@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0068",
+  "kind": "source",
+  "citation": "H. Comm. on Ethics, Report, In the Matter of Allegations Relating to Representative Chuck Edwards, 2026-08-03",
+  "title": "Report in the Matter of Allegations Relating to Representative Chuck Edwards",
+  "publisher": "U.S. House of Representatives, Committee on Ethics",
+  "canonical_url": "https://ethics.house.gov/wp-content/uploads/2026/08/Committee-Report-8.3.26.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2026-08-03",
+  "artifact": {
+    "sha256": "25af6ba813221418802c534294107448fbf2adfe8e7602ebef17b20a093f6796",
+    "byte_length": 1099034,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-27T20:01:51.882217Z",
+    "drift_key": "sha256",
+    "drift_value": "25af6ba813221418802c534294107448fbf2adfe8e7602ebef17b20a093f6796"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260913024949/https://ethics.house.gov/wp-content/uploads/2026/08/Committee-Report-8.3.26.pdf",
+      "captured_at": "2026-09-13T02:49:49Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Committee report recommending censure"
+}

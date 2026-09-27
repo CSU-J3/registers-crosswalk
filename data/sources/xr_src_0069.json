@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0069",
+  "kind": "source",
+  "citation": "H. Comm. on Ethics, Statement of the Chairman and Ranking Member Regarding Representative Max Miller, 2026-08-04",
+  "title": "Statement of the Chairman and Ranking Member Regarding Representative Max Miller",
+  "publisher": "U.S. House of Representatives, Committee on Ethics",
+  "canonical_url": "https://ethics.house.gov/wp-content/uploads/2026/08/Press-Release-Rep.-Miller-8.4.26.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2026-08-04",
+  "artifact": {
+    "sha256": "f87782afb4519d060beb2478449288bc32d797faf58135f1049cd6a46f7527e1",
+    "byte_length": 585954,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-27T20:02:13.998871Z",
+    "drift_key": "sha256",
+    "drift_value": "f87782afb4519d060beb2478449288bc32d797faf58135f1049cd6a46f7527e1"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260901231818/https://ethics.house.gov/wp-content/uploads/2026/08/Press-Release-Rep.-Miller-8.4.26.pdf",
+      "captured_at": "2026-09-01T23:18:18Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Committee Rule 18(a) review opened"
+}

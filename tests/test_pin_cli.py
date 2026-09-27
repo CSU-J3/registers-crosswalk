@@ -1327,7 +1327,9 @@ def test_the_ledger_record_lists_every_pin_and_marks_the_prelims(capsys):
     xw = Crosswalk(DATA)
     main(["--data-dir", str(DATA), "ledger", "--format", "record"], fetch=_fetch())
     lines = capsys.readouterr().out.splitlines()
-    assert len(lines) == len(xw.sources) == 57
+    # From the register, not a count: a constant here failed on the first run that added a pin.
+    assert len(lines) == len(xw.sources)
+    assert sorted(line.split("  ")[1] for line in lines) == sorted(xw.sources)
     for line in lines:
         sha, xr_id, fetched, drift_key, kind, citation = line.split("  ", 5)
         source = xw.sources[xr_id]
@@ -1335,7 +1337,9 @@ def test_the_ledger_record_lists_every_pin_and_marks_the_prelims(capsys):
         assert citation == source.citation and fetched.endswith("Z")
         assert kind == ("manifest" if drift_key == "sha256" else "record-only")
     record_only = sorted(line.split("  ")[1] for line in lines if "  record-only  " in line)
-    assert record_only == ["xr_src_0005", "xr_src_0024", "xr_src_0056"]
+    # The emitter's own predicate: the manifest leaves out every pin whose drift key isn't sha256.
+    left_out = sorted(s.xr_id for s in xw.sources.values() if s.artifact.drift_key != "sha256")
+    assert record_only == left_out
 
 
 def test_ledger_since_filters_on_the_fetch_date(tmp_path, capsys):

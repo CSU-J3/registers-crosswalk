@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0067",
+  "kind": "source",
+  "citation": "FEC, Statement of Chair Shana M. Broussard, 2026-04-30",
+  "title": "Statement of Chair Shana M. Broussard on the One-Year Anniversary of the Loss of a Quorum",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://www.fec.gov/resources/cms-content/documents/Statement_on_One_Year_Without_Quorum.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2026-04-30",
+  "artifact": {
+    "sha256": "6a9856f5e77edd55acf19ae50ce2ce683db7182d8eed04d2b86a5493e8a3ab70",
+    "byte_length": 139585,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-27T20:00:03.196070Z",
+    "drift_key": "sha256",
+    "drift_value": "6a9856f5e77edd55acf19ae50ce2ce683db7182d8eed04d2b86a5493e8a3ab70"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260710213516/https://www.fec.gov/resources/cms-content/documents/Statement_on_One_Year_Without_Quorum.pdf",
+      "captured_at": "2026-07-10T21:35:16Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The Chair's statement at one year without a quorum"
+}

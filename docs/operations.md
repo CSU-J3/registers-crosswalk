@@ -611,6 +611,26 @@ essay chat. Nothing is pinned for it.
 filings metadata call only. `fecfiling` has no `content_request`, as `openfec` has none, and `spec()`
 refuses to store any URL that is not a bare `https://docquery.fec.gov/...` URL.
 
+## `manual` carried its first real pins on 2026-09-27, the FEC's notice of lack of quorum first
+
+`manual` has shipped `VERIFIED = True` since 2026-09-17, by the route above: nothing in it maps a
+response, so there is no parse to get wrong. It carried no real pin until 2026-09-27, when four
+PDFs with no API behind them went in through it: the FEC's Notice of Lack of Quorum in *Senate
+Majority PAC v. FEC*, ECF No. 9 (`xr_src_0066`), the Chair's statement of 2026-04-30 (`0067`), and
+the House Committee on Ethics' Edwards report of 2026-08-03 and Miller statement of 2026-08-04
+(`0068`, `0069`). Each is on its publisher's own site, graded A1 by the caller and archived; all
+four reused an existing Wayback capture.
+
+**The first one ran scratch-first anyway.** With no parse to check, the scratch run tested the URL,
+not the fetcher. `pin --data-dir <scratch> add manual …` outside the repo minted the notice, then
+the real `add manual … --archive` did, and the two sha256s matched (`7b11c316…`). A mismatch would
+have meant a URL that serves different bytes per request, which `manual` cannot pin: its drift key
+is the raw hash. The other three followed directly.
+
+**The caller types every field, the grade included.** `--url`, `--citation` and `--title` are
+required; `--publisher`, `--published-at` and `--point-in-time` are optional. `--reliability` and
+`--credibility` default to B and 2, so an A1 pin has to say so.
+
 ## `add` cannot write a record that fails to load
 
 Before writing, `pin add` runs the would-be record through

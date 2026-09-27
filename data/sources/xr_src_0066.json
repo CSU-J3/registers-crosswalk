@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0066",
+  "kind": "source",
+  "citation": "Senate Majority PAC v. FEC, No. 1:26-cv-00336 (D.D.C.), ECF No. 9",
+  "title": "Defendant Federal Election Commission's Notice of Lack of Quorum, filed 2026-04-06",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://www.fec.gov/resources/cms-content/documents/fec-notice-of-lack-of-quorum-26-336-04-06-2026.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2026-04-06",
+  "artifact": {
+    "sha256": "7b11c3162d9eb60f23d4c30446c7612ce5c9894cdd6de9a8373ce48351b84c0a",
+    "byte_length": 251483,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-27T19:57:07.288296Z",
+    "drift_key": "sha256",
+    "drift_value": "7b11c3162d9eb60f23d4c30446c7612ce5c9894cdd6de9a8373ce48351b84c0a"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260711014235/https://www.fec.gov/resources/cms-content/documents/fec-notice-of-lack-of-quorum-26-336-04-06-2026.pdf",
+      "captured_at": "2026-07-11T01:42:35Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The Commission's notice to the court that it has had no quorum since 2025-05-01"
+}

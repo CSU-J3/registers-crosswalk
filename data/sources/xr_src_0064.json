@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0064",
+  "kind": "source",
+  "citation": "52 U.S.C. § 30106",
+  "title": "52 U.S.C. § 30106 (prelim, laws in effect on 2026-09-26)",
+  "publisher": "Office of the Law Revision Counsel",
+  "canonical_url": "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title52-section30106&num=0&edition=prelim",
+  "fetcher": "uscode",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-19",
+  "point_in_time": "2026-09-26",
+  "published_at": null,
+  "artifact": {
+    "sha256": "616c60af96576efb5961a9f23d6f3b0b0d05b8bb88a3d9b7e74f3945b85d05c4",
+    "byte_length": 172507,
+    "media_type": "text/html",
+    "fetched_at": "2026-09-27T19:55:44.883133Z",
+    "drift_key": "last_amended",
+    "drift_value": "1997-10-10"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20250530162737/https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title52-section30106&num=0&edition=prelim",
+      "captured_at": "2025-05-30T16:27:37Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Archive is the 2025-05-30 capture, which shows laws in effect on May 29, 2025 and the pinned last amendment, 1997-10-10."
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0070",
+  "kind": "source",
+  "citation": "Phang v. Blanche, No. 1:26-cv-01417 (D.D.C.), ECF No. 16",
+  "title": "Phang v. Blanche",
+  "publisher": "District Court, District of Columbia",
+  "canonical_url": "https://ecf.dcd.uscourts.gov/cgi-bin/show_public_doc?2026cv1417-16",
+  "fetcher": "courtlistener",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-20",
+  "point_in_time": null,
+  "published_at": "2026-06-25",
+  "artifact": {
+    "sha256": "7ebfe27d8e5e898fe19f5a216cb9aabd280b66d3a1e59f648a860bf11811fdec",
+    "byte_length": 259522,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-27T20:05:02.064970Z",
+    "drift_key": "sha256",
+    "drift_value": "7ebfe27d8e5e898fe19f5a216cb9aabd280b66d3a1e59f648a860bf11811fdec"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260627183904/https://ecf.dcd.uscourts.gov/cgi-bin/show_public_doc?2026cv1417-16",
+      "captured_at": "2026-06-27T18:39:04Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Memorandum Opinion granting the preliminary injunction, ECF No. 16; RECAP mirror: https://storage.courtlistener.com/recap/gov.uscourts.dcd.291779/gov.uscourts.dcd.291779.16.0_2.pdf"
+}

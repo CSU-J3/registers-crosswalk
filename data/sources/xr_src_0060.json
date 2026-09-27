@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0060",
+  "kind": "source",
+  "citation": "FEC MUR 8098",
+  "title": "Substitution of Treasurer Name",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://www.fec.gov/files/legal/murs/8098/8098_10.pdf",
+  "fetcher": "openfec",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-21",
+  "point_in_time": null,
+  "published_at": "2024-08-02",
+  "artifact": {
+    "sha256": "63d78f77ca99c84a9f70b446d0c99182a319aa63d83d6c9934267b45b98a4b38",
+    "byte_length": 804722,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-27T19:47:51.227392Z",
+    "drift_key": "sha256",
+    "drift_value": "63d78f77ca99c84a9f70b446d0c99182a319aa63d83d6c9934267b45b98a4b38"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260711041735/https://www.fec.gov/files/legal/murs/8098/8098_10.pdf",
+      "captured_at": "2026-07-11T04:17:35Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "OGC memorandum of 2024-08-02 recommending the Loomer committee's treasurer-name substitution; refers to the errata memorandum of 2024-07-10"
+}

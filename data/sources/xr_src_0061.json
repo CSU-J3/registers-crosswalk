@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0061",
+  "kind": "source",
+  "citation": "FEC MUR 8098",
+  "title": "Cory Mills - Substitution of Treasurer Name",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://www.fec.gov/files/legal/murs/8098/8098_11.pdf",
+  "fetcher": "openfec",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-21",
+  "point_in_time": null,
+  "published_at": "2024-08-06",
+  "artifact": {
+    "sha256": "07d16a99a307165ff5526c6814ea32a50ad136621b757a16ae0b26fd73fa6441",
+    "byte_length": 703135,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-09-27T19:48:28.833944Z",
+    "drift_key": "sha256",
+    "drift_value": "07d16a99a307165ff5526c6814ea32a50ad136621b757a16ae0b26fd73fa6441"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260711041736/https://www.fec.gov/files/legal/murs/8098/8098_11.pdf",
+      "captured_at": "2026-07-11T04:17:36Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "5-0 vote of 2024-08-06 amending the 2024-07-23 certification's treasurer name for the Loomer committee"
+}

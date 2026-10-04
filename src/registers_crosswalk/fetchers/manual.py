@@ -7,7 +7,8 @@ the person pinning it knows which they have.
 HTML pinned this way is NOISY. Its drift key is the raw hash, so a nav change, a cookie banner or a
 rotating build id reads as drift. That is the honest answer for a page with no version axis — but
 if the document also exists as a PDF, or in eCFR/GovInfo/the Federal Register, pin it there instead
-and get a stable hash.
+and get a stable hash. A page whose bytes change on every request cannot hold this pin at all;
+`wayback` pins one capture of it instead.
 """
 
 from __future__ import annotations

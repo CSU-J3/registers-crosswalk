@@ -259,6 +259,10 @@ class PinSpec:
     point_in_time: date | None = None
     published_at: date | None = None
     headers: Mapping[str, str] | None = None
+    # The Wayback capture the document is read from, by its 14-digit timestamp: `wayback` only.
+    # When set, `pin()` reads that capture's `id_` bytes instead of the canonical URL, refuses a
+    # capture Wayback does not serve at exactly this timestamp, and attaches it as the archive copy.
+    capture_timestamp: str | None = None
 
 
 @dataclass(frozen=True)
@@ -322,17 +326,34 @@ def pin(
     fetch: FetchFn = default_fetch,
     blob_dir: Path | None = None,
     now: datetime | None = None,
+    capture_fn: CaptureFn | None = None,
 ) -> Source:
     """Fetch the document `spec` describes and return the `Source` node for it.
 
     With `blob_dir` (a path outside this repo), the bytes are also written to
     `<blob_dir>/<sha256><ext>` if that file is not already there — content-addressed, so pinning
     the same bytes twice writes once.
+
+    A spec with a `capture_timestamp` is read from that Wayback capture through `capture_fn`, never
+    from its canonical URL, and the capture comes back as the record's archive copy. A capture
+    Wayback does not serve at exactly that timestamp raises `CaptureNotServed`: pinning the nearest
+    one it redirects to would name one capture and hash another.
     """
     check_public_url(spec.canonical_url)
     target = _check_blob_dir(blob_dir) if blob_dir is not None else None
 
-    body, media_type = fetch(spec.fetch_url or spec.canonical_url, spec.headers)
+    archives: list[ArchiveCopy] = []
+    if spec.capture_timestamp is not None:
+        served = _capture_at(
+            spec.canonical_url, spec.capture_timestamp, capture_fn=capture_fn or _fetch_capture
+        )
+        if isinstance(served, str):
+            raise CaptureNotServed(f"{spec.citation}: {served}; nothing pinned")
+        body, headers = served
+        media_type = _media_type(_header(headers, "Content-Type"))
+        archives = [_capture_from_timestamp(spec.canonical_url, spec.capture_timestamp)]
+    else:
+        body, media_type = fetch(spec.fetch_url or spec.canonical_url, spec.headers)
     if not body:
         # An empty body hashes to a perfectly valid-looking sha256; pinning it would record a
         # failed fetch as a document. Refuse rather than mint a hash of nothing.
@@ -359,6 +380,7 @@ def pin(
             drift_value=spec.drift_value(body),
         ),
         grade=spec.grade,
+        archives=archives,
     )
     if target is not None:
         target.mkdir(parents=True, exist_ok=True)
@@ -529,6 +551,10 @@ def _served_timestamps(status: int, final_url: str, headers: Mapping[str, str]) 
     return served
 
 
+class CaptureNotServed(ValueError):
+    """A capture pin names a timestamp Wayback does not serve. Nothing was pinned."""
+
+
 def _capture_at(
     url: str, timestamp: str, *, capture_fn: CaptureFn
 ) -> tuple[bytes, Mapping[str, str]] | str:
@@ -538,8 +564,8 @@ def _capture_at(
     Wayback serves no capture at a timestamp when it answers 404, when it answers 200 without
     `Memento-Datetime`, or when it serves some other capture (it redirects a timestamp it does not
     hold to the nearest one it does). Any other HTTP error, and any other transport error,
-    propagates; the caller decides what it means. One rule for the weekly check and `--repair`, so
-    the two cannot disagree about what was served.
+    propagates; the caller decides what it means. One rule for the weekly check, `--repair`, and a
+    capture pin's own fetch, so the three cannot disagree about what was served.
     """
     try:
         body, final, headers = capture_fn(f"https://web.archive.org/web/{timestamp}id_/{url}")
@@ -1142,7 +1168,13 @@ def _failure(exc: Exception, secret: str | None) -> str:
     return f"{type(exc).__name__}: {exc}"
 
 
-DriftStatus = Literal["ok", "drift", "amended", "key_missing", "fetch_failed", "error"]
+DriftStatus = Literal["ok", "fixed", "drift", "amended", "key_missing", "fetch_failed", "error"]
+
+# What `check` says about a pin read from one Wayback capture (`wayback`), instead of fetching it.
+FIXED_DETAIL = (
+    "read from a Wayback capture, whose bytes cannot change; `pin check --archives` re-verifies "
+    "the capture"
+)
 
 # status -> process exit code. A check that could not RUN (2, 3) is reported separately from a
 # check that ran and found a problem (1); conflating them is how a dead endpoint gets mistaken for
@@ -1151,6 +1183,8 @@ DriftStatus = Literal["ok", "drift", "amended", "key_missing", "fetch_failed", "
 # every source was actually reachable.
 _EXIT_CODES: dict[str, int] = {
     "ok": 0,
+    # Not fetched, by design, and not a problem: see `check`.
+    "fixed": 0,
     "drift": 1,
     "amended": 1,
     # A parse failure means the document no longer states what we read from it (uscode dropped its
@@ -1611,6 +1645,12 @@ def check(
     markup, so for those sources the parsed "laws in effect on" date is the signal. For eCFR
     sources a matching hash is not the end of it — the point-in-time URL keeps returning the same
     bytes after the part is amended, so the amendment history is checked too.
+
+    A pin read from one Wayback capture (a fetcher with FIXED_BYTES) is never fetched: its bytes
+    are the capture's, which cannot change, and its canonical URL is a live page that was pinned
+    this way because it would not hold still. Whether the capture is still served is the weekly
+    archive check's question, asked there on Wayback's pacing; asking it here too would double the
+    requests for the same answer. It reports `fixed`, so every run still accounts for it.
     """
     # Imported here, not at module scope: the fetchers import PinSpec and default_fetch from this
     # module, so a top-level import either way round would be circular.
@@ -1623,6 +1663,8 @@ def check(
         "expected": source.artifact.drift_value,
         "archived": bool(source.archives),
     }
+    if fetchers.fixed_bytes(source.fetcher):
+        return DriftReport(**base, status="fixed", detail=FIXED_DETAIL)
     env = os.environ if env is None else env
     try:
         url, headers = fetchers.content_request(source.fetcher, source.canonical_url, env=env)
@@ -1684,7 +1726,13 @@ def _slug(citation: str) -> str:
 
 def to_ledger_markdown(source: Source) -> str:
     """One entry in the New Gray source-links house style (three lines)."""
-    when = source.published_at or source.point_in_time
+    from . import fetchers
+
+    capture_pin = fetchers.fixed_bytes(source.fetcher)
+    # A capture pin's point in time is its capture's day, which the line already names as the
+    # capture's; in the head it would read as the document's date. With no publication date given,
+    # its head carries no date.
+    when = source.published_at if capture_pin else source.published_at or source.point_in_time
     head_bits = [b for b in (source.publisher, when.isoformat() if when else None) if b]
     head = ", ".join(head_bits) if head_bits else "undated"
     # `fetched_at` is UTC, and the day it names can be tomorrow for a reader west of Greenwich, so
@@ -1694,6 +1742,15 @@ def to_ledger_markdown(source: Source) -> str:
     # so appending it unconditionally printed the same date twice on one line.
     if source.point_in_time is not None and source.point_in_time.isoformat() not in source.title:
         retrieved += f", as of {source.point_in_time.isoformat()}"
+    captured = source.archives[0].captured_at if source.archives else None
+    if capture_pin and captured is not None:
+        # A capture pin's bytes came from the capture, not from the URL on the next line, and New
+        # Gray copies this entry verbatim: so it says so, and names the capture's instant, which is
+        # the version of the page the pin holds.
+        retrieved = (
+            f"Wayback capture of {captured:%Y-%m-%d %H:%M:%S} UTC, "
+            f"retrieved {source.artifact.fetched_at:%Y-%m-%d} UTC"
+        )
     archive_url = source.archives[0].url if source.archives else "pending"
     # A title that already opens with its citation carries it ("11 CFR Part 114, as of
     # 2026-09-14"), and appending it again would print it twice. A title that does not — a Federal
@@ -1765,12 +1822,69 @@ class BlobReport:
     expected: bool = False
 
 
+class _CaptureReads:
+    """`blobs`' reads of capture pins from Wayback: each at least `_ARCHIVE_GAP` after the one
+    before, as the weekly archive check paces them, and none at all once Wayback has answered 429
+    in this run. The pins after a 429 are reported, not asked about."""
+
+    def __init__(self, capture_fn: CaptureFn, sleep_fn: SleepFn) -> None:
+        self._capture_fn = capture_fn
+        self._sleep_fn = sleep_fn
+        self._asked = False
+        self._refused_at: str | None = None
+
+    def read(self, source: Source, base: Mapping[str, str]) -> bytes | BlobReport:
+        """The bytes of the capture `source` was read from, or the report of why there are none."""
+        if self._refused_at is not None:
+            detail = (
+                f"not asked: Wayback answered 429 at {self._refused_at} in this run; "
+                "run blobs again later"
+            )
+            return BlobReport(**base, status="fetch_failed", detail=detail)
+        held = source.archives[0] if source.archives else None
+        m = _WAYBACK_TS.search(held.url) if held is not None else None
+        if held is None or m is None:
+            return BlobReport(**base, status="error", detail="no Wayback capture to read it from")
+        if self._asked:
+            self._sleep_fn(_ARCHIVE_GAP)
+        self._asked = True
+        try:
+            served = _capture_at(held.url[m.end() :], m.group(1), capture_fn=self._capture_fn)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429:
+                self._refused_at = source.xr_id
+            detail = f"Wayback answered HTTP {exc.code}"
+            return BlobReport(**base, status="fetch_failed", detail=detail)
+        except _TRANSPORT as exc:
+            return BlobReport(**base, status="fetch_failed", detail=f"{type(exc).__name__}: {exc}")
+        if isinstance(served, str):
+            return BlobReport(**base, status="fetch_failed", detail=served)
+        return served[0]
+
+
+def _keep_blob(source: Source, target: Path, base: Mapping[str, str], body: bytes) -> BlobReport:
+    """Write `body` to `target` if it hashes to the pin; if not, write nothing and say so."""
+    actual = sha256_hex(body)
+    if actual != source.artifact.sha256:
+        expected = source.artifact.drift_key != "sha256"
+        detail = f"expected {source.artifact.sha256}, got {actual}"
+        if expected:
+            detail += "; its bytes vary per request, so its Wayback copy is its preservation copy"
+        return BlobReport(**base, status="mismatch", detail=detail, expected=expected)
+    part = target.with_name(target.name + ".part")
+    part.write_bytes(body)
+    os.replace(part, target)
+    return BlobReport(**base, status="written")
+
+
 def save_blobs(
     targets: Sequence[Source],
     out_dir: Path,
     *,
     fetch: FetchFn = default_fetch,
     env: Mapping[str, str] | None = None,
+    capture_fn: CaptureFn | None = None,
+    sleep_fn: SleepFn = time.sleep,
 ) -> list[BlobReport]:
     """Put each target's bytes in `out_dir` under its manifest name, but only bytes that hash to
     the pin. They are re-fetched through the fetcher's own request path, exactly as `check` does.
@@ -1779,12 +1893,17 @@ def save_blobs(
     not re-fetched); different bytes are reported (`conflict`) and left alone. A download that does
     not hash to the pin writes nothing (`mismatch`). Each write goes through a `.part` file and a
     rename, so a crash never leaves a truncated file under a pin's name.
+
+    A capture pin (a fetcher with FIXED_BYTES) is read from the capture it was pinned from, at its
+    exact timestamp, because its canonical URL is the live page whose bytes never held still. Those
+    reads are paced and stop at a 429 (`_CaptureReads`).
     """
     from . import fetchers
 
     out = _check_blob_dir(out_dir, flag="--out")
     out.mkdir(parents=True, exist_ok=True)
     env = os.environ if env is None else env
+    captures = _CaptureReads(capture_fn or _fetch_capture, sleep_fn)
     reports = []
     for source in targets:
         name = manifest_name(source)
@@ -1797,6 +1916,12 @@ def save_blobs(
             else:
                 detail = f"a file with other bytes is already there ({held}); left as it is"
                 reports.append(BlobReport(**base, status="conflict", detail=detail))
+            continue
+        if fetchers.fixed_bytes(source.fetcher):
+            read = captures.read(source, base)
+            reports.append(
+                read if isinstance(read, BlobReport) else _keep_blob(source, target, base, read)
+            )
             continue
         try:
             url, headers = fetchers.content_request(source.fetcher, source.canonical_url, env=env)
@@ -1816,20 +1941,7 @@ def save_blobs(
         except Exception as exc:
             reports.append(BlobReport(**base, status="error", detail=_failure(exc, secret)))
             continue
-        actual = sha256_hex(body)
-        if actual != source.artifact.sha256:
-            expected = source.artifact.drift_key != "sha256"
-            detail = f"expected {source.artifact.sha256}, got {actual}"
-            if expected:
-                detail += (
-                    "; its bytes vary per request, so its Wayback copy is its preservation copy"
-                )
-            reports.append(BlobReport(**base, status="mismatch", detail=detail, expected=expected))
-            continue
-        part = target.with_name(target.name + ".part")
-        part.write_bytes(body)
-        os.replace(part, target)
-        reports.append(BlobReport(**base, status="written"))
+        reports.append(_keep_blob(source, target, base, body))
     return reports
 
 
@@ -1966,6 +2078,7 @@ def add_source(
     # Bound at definition time, where `archive` is still the module-level function; the `archive`
     # parameter above only shadows it inside the body.
     archive_fn: ArchiveFn = archive,
+    capture_fn: CaptureFn | None = None,
 ) -> AddOutcome:
     """Guard, fetch, archive and write one pin. The whole write side of `add`, minus argparse.
 
@@ -1980,6 +2093,18 @@ def add_source(
     operator can fix by retrying, which is worth saying on a page with a button on it.
     """
     xw = Crosswalk(data_dir)
+
+    # A capture pin is its own archive copy: the capture it is read from. A second request to
+    # Wayback could only attach the same bytes again, so it is refused before any work, here
+    # rather than in `_cmd_add` because the console reaches this function with a checkbox.
+    if archive and spec.capture_timestamp is not None:
+        return AddOutcome(
+            status="refused",
+            message=(
+                f"a {spec.fetcher} pin is its own archive copy (the capture it is read from); "
+                "pin it without --archive"
+            ),
+        )
 
     # Cheap early exit on the one refusal we can reach without doing any work: re-pinning a
     # document version we already hold. Placed before pin() and before the archive step so a
@@ -2001,7 +2126,10 @@ def add_source(
     if path.exists():
         return AddOutcome(status="refused", message=f"refusing to overwrite {path}")
 
-    source = pin(spec, next_id=xr_id, fetch=fetch, blob_dir=blob_dir)
+    try:
+        source = pin(spec, next_id=xr_id, fetch=fetch, blob_dir=blob_dir, capture_fn=capture_fn)
+    except CaptureNotServed as exc:
+        return AddOutcome(status="refused", message=str(exc))
 
     # The other duplicate rule: the same citation at the same drift value is the same document,
     # however its URL and point_in_time happen to read. It cannot join the early exit above,
@@ -2032,7 +2160,8 @@ def add_source(
             ),
         )
 
-    archives: list[ArchiveCopy] = []
+    # A capture pin arrives with its capture attached; every other pin arrives with none.
+    archives: list[ArchiveCopy] = list(source.archives)
     if archive:
         # The drift value goes with the request: `archive()` attaches no capture, reused or new,
         # that does not reproduce it.
@@ -2299,8 +2428,9 @@ def _cmd_add(
     #
     # This and the next refusal stay here rather than in add_source because both are decided from
     # the flags alone, before there is a spec to hand over — and because both name a flag, which
-    # is a fact about the command line and not about pinning.
-    if args.cited_in and not args.archive:
+    # is a fact about the command line and not about pinning. A capture pin is exempt: it carries
+    # the capture it is read from, which is the archive copy the load path asks a cited pin for.
+    if args.cited_in and not args.archive and not fetchers.fixed_bytes(args.fetcher):
         print("cited sources must carry an archive copy; pass --archive", file=sys.stderr)
         return 1
 
@@ -2533,7 +2663,7 @@ def _cmd_blobs(
     args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
 ) -> int:
     """Write verified copies of the pinned documents to a consuming project's directory."""
-    del archive_fn, sleep_fn  # blobs never archives, and a mismatch is not retried
+    del archive_fn  # blobs never archives, and a mismatch is not retried
     xw = Crosswalk(args.data_dir)
     everything = sorted(xw.sources.values(), key=lambda s: s.xr_id)
     if args.only:
@@ -2545,7 +2675,8 @@ def _cmd_blobs(
     else:
         targets = everything
     try:
-        reports = save_blobs(targets, args.out, fetch=fetch)
+        # sleep_fn paces the reads of capture pins from Wayback, and nothing else.
+        reports = save_blobs(targets, args.out, fetch=fetch, sleep_fn=sleep_fn)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1

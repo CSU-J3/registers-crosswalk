@@ -21,6 +21,7 @@ from registers_crosswalk.fetchers import (
     manual,
     openfec,
     uscode,
+    wayback,
 )
 
 REPO = Path(__file__).resolve().parents[1]
@@ -1223,6 +1224,97 @@ def test_manual_takes_the_callers_grade():
     assert spec.drift_key == "sha256"
 
 
+# --------------------------------------------------------------------------- wayback
+
+WB_URL = "https://www.dscc.org/article/dscc-statement-on-maine-senate-race-2/"
+WB_TS = "20260707001827"
+
+
+def _wb_spec(**over):
+    kwargs = {
+        "url": WB_URL,
+        "timestamp": WB_TS,
+        "citation": "DSCC, Statement on Maine Senate Race, 2026-07-06",
+        "title": "DSCC Statement on Maine Senate Race",
+        "publisher": "Democratic Senatorial Campaign Committee",
+        "published_at": date(2026, 7, 6),
+    }
+    return wayback.spec(**(kwargs | over))
+
+
+def test_wayback_cites_the_publisher_and_names_the_capture_it_reads():
+    spec = _wb_spec()
+    assert spec.fetcher == "wayback"
+    assert spec.canonical_url == WB_URL
+    assert spec.capture_timestamp == WB_TS
+    # pin() reads the capture through its own seam; nothing would read the live page.
+    assert spec.fetch_url is None
+    # The capture's UTC day: 00:18:27 UTC on the 7th was still the 6th in Maine.
+    assert spec.point_in_time == date(2026, 7, 7)
+    assert spec.drift_key == "sha256"
+    assert spec.grade.code() == "B2"
+
+
+def test_wayback_takes_the_callers_credibility():
+    assert _wb_spec(credibility=1).grade.code() == "B1"
+
+
+def test_wayback_refuses_reliability_a_by_the_mirror_rule():
+    with pytest.raises(ValueError, match="mirror: reliability B at best, not A"):
+        _wb_spec(reliability="A")
+    parser = argparse.ArgumentParser()
+    wayback.add_arguments(parser)
+    base = ["--url", WB_URL, "--timestamp", WB_TS, "--citation", "C", "--title", "T"]
+    with pytest.raises(SystemExit):
+        parser.parse_args([*base, "--reliability", "A"])
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "2026070700182",  # 13 digits
+        "202607070018270",  # 15
+        "2026-07-07",
+        "20261307001827",  # a 13th month
+        "20260707006127",  # a 61st minute
+    ],
+)
+def test_wayback_refuses_a_timestamp_that_names_no_capture(bad):
+    with pytest.raises(ValueError):
+        _wb_spec(timestamp=bad)
+    parser = argparse.ArgumentParser()
+    wayback.add_arguments(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--url", WB_URL, "--timestamp", bad, "--citation", "C", "--title", "T"])
+
+
+def test_wayback_refuses_the_captures_own_url_in_place_of_the_publishers():
+    with pytest.raises(ValueError, match="the publisher's URL"):
+        _wb_spec(url=f"https://web.archive.org/web/{WB_TS}/{WB_URL}")
+
+
+def test_wayback_cli_adapter():
+    parser = argparse.ArgumentParser()
+    wayback.add_arguments(parser)
+    args = parser.parse_args(
+        ["--url", WB_URL, "--timestamp", WB_TS, "--citation", "C", "--title", "T"]
+        + ["--published-at", "2026-07-06", "--credibility", "1"]
+    )
+
+    def no_fetch(url, headers=None):
+        raise AssertionError(f"spec_from_args fetched {url}")
+
+    spec = wayback.spec_from_args(args, fetch=no_fetch)
+    assert (spec.canonical_url, spec.capture_timestamp, spec.grade.code()) == (WB_URL, WB_TS, "B1")
+    assert spec.published_at == date(2026, 7, 6)
+
+
+def test_only_wayback_reads_its_pins_from_a_capture():
+    from registers_crosswalk import fetchers as reg
+
+    assert [n for n in reg.NAMES if reg.fixed_bytes(n)] == ["wayback"]
+
+
 # --------------------------------------------------------------------------- key discipline
 
 
@@ -1353,12 +1445,12 @@ def test_exercised_fetchers_ship_verified(module, verified_on):
 
 def test_unexercised_fetchers_ship_unverified(unverified_fetcher):
     # A claim recorded in a handoff or a docstring is not a verification. Real fetchers flip one at
-    # a time, each on its own live `add` in this tree, dated the day it ran; every one has now, so
-    # the unverified shape is held by a fixture rather than by whichever fetcher is left.
+    # a time, each on its own live `add` in this tree, dated the day it ran. `wayback` has not had
+    # its run yet; the unverified shape is also held by a fixture, so it outlives that run.
     from registers_crosswalk.fetchers import NAMES, get
 
     unverified = [n for n in NAMES if not get(n).VERIFIED]
-    assert unverified == [unverified_fetcher.NAME]
+    assert unverified == ["wayback", unverified_fetcher.NAME]
     assert unverified_fetcher.VERIFIED is False
     assert unverified_fetcher.VERIFIED_AT is None
 

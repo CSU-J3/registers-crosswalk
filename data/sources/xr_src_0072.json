@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0072",
+  "kind": "source",
+  "citation": "Troy Jackson Senate Exploratory Committee (C00955609), FEC file 1988465",
+  "title": "Form 1 image (PDF)",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://docquery.fec.gov/pdf/215/202607079874772215/202607079874772215.pdf",
+  "fetcher": "fecfiling",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-23",
+  "point_in_time": null,
+  "published_at": "2026-07-07",
+  "artifact": {
+    "sha256": "026170f71bf381bbd38bdd05f649f1cfc3b5a89c7b0724e042e0fcfa11a87691",
+    "byte_length": 66659,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-04T20:40:45.169890Z",
+    "drift_key": "sha256",
+    "drift_value": "026170f71bf381bbd38bdd05f649f1cfc3b5a89c7b0724e042e0fcfa11a87691"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Troy Jackson Senate Exploratory Committee, C00955609, Form 1 received 2026-07-07."
+}

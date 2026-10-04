@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0073",
+  "kind": "source",
+  "citation": "Brandon Rottinghaus, Scandal: Why Politicians Survive Controversy in a Partisan Era",
+  "title": "Brandon Rottinghaus, Scandal: Why Politicians Survive Controversy in a Partisan Era, catalog page",
+  "publisher": "Columbia University Press",
+  "canonical_url": "https://cup.columbia.edu/book/scandal/9780231218825/",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "09ee37a4bfab4a8e5d125c39cf7329e7150adca5bbfeb892a4ee590bad4593a3",
+    "byte_length": 111298,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-04T20:40:45.990308Z",
+    "drift_key": "sha256",
+    "drift_value": "09ee37a4bfab4a8e5d125c39cf7329e7150adca5bbfeb892a4ee590bad4593a3"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 2
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The publisher's catalog page: Pub Date November 2025. The book's copyright page reads 2026."
+}

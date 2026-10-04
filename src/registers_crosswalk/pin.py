@@ -529,17 +529,17 @@ def _served_timestamps(status: int, final_url: str, headers: Mapping[str, str]) 
     return served
 
 
-def _check_capture(
-    url: str, timestamp: str, expected: ExpectedDrift, *, capture_fn: CaptureFn
-) -> tuple[CaptureVerdict, str]:
-    """Fetch the capture of `url` at exactly `timestamp` and say whether it reproduces `expected`.
+def _capture_at(
+    url: str, timestamp: str, *, capture_fn: CaptureFn
+) -> tuple[bytes, Mapping[str, str]] | str:
+    """The capture of `url` at exactly `timestamp`, as its body and headers; or, as a string, why
+    Wayback served none there.
 
-    `not_served` when Wayback served no capture at that timestamp: a 404, a 200 without
-    `Memento-Datetime`, or some other capture (it redirects a timestamp it does not hold to the
-    nearest one it does). `mismatch` when it served that capture and the bytes do not give the
-    pin's drift value. Drift values are compared only once the served timestamp is the one asked
-    for. Any other HTTP error, and any other transport error, propagates; the caller decides what
-    it means.
+    Wayback serves no capture at a timestamp when it answers 404, when it answers 200 without
+    `Memento-Datetime`, or when it serves some other capture (it redirects a timestamp it does not
+    hold to the nearest one it does). Any other HTTP error, and any other transport error,
+    propagates; the caller decides what it means. One rule for the weekly check and `--repair`, so
+    the two cannot disagree about what was served.
     """
     try:
         body, final, headers = capture_fn(f"https://web.archive.org/web/{timestamp}id_/{url}")
@@ -552,16 +552,33 @@ def _check_capture(
     served = _served_timestamps(status, final, headers)
     if served != {timestamp}:
         if status != 200:
-            return "not_served", f"Wayback serves nothing at {timestamp} (HTTP {status})"
+            return f"Wayback serves nothing at {timestamp} (HTTP {status})"
         if not served:
             memento = _header(headers, "Memento-Datetime")
             if memento:
-                return "not_served", (
+                return (
                     f"Wayback answered for {timestamp} with a Memento-Datetime that names no "
                     f"time: {memento!r}"
                 )
-            return "not_served", f"Wayback answered for {timestamp} with no Memento-Datetime"
-        return "not_served", f"Wayback served {', '.join(sorted(served))} for {timestamp}"
+            return f"Wayback answered for {timestamp} with no Memento-Datetime"
+        return f"Wayback served {', '.join(sorted(served))} for {timestamp}"
+    return body, headers
+
+
+def _check_capture(
+    url: str, timestamp: str, expected: ExpectedDrift, *, capture_fn: CaptureFn
+) -> tuple[CaptureVerdict, str]:
+    """Fetch the capture of `url` at exactly `timestamp` and say whether it reproduces `expected`.
+
+    `not_served` when Wayback served no capture at that timestamp (see `_capture_at`). `mismatch`
+    when it served that capture and the bytes do not give the pin's drift value. Drift values are
+    compared only once the served timestamp is the one asked for. Any other HTTP error, and any
+    other transport error, propagates; the caller decides what it means.
+    """
+    served = _capture_at(url, timestamp, capture_fn=capture_fn)
+    if isinstance(served, str):
+        return "not_served", served
+    body, _ = served
     try:
         value = expected.value_of(body)
     except Exception as exc:  # noqa: BLE001 - a page the fetcher cannot parse reproduces nothing

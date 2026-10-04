@@ -631,7 +631,7 @@ is the raw hash. The other three followed directly.
 required; `--publisher`, `--published-at` and `--point-in-time` are optional. `--reliability` and
 `--credibility` default to B and 2, so an A1 pin has to say so.
 
-## `wayback`: a page as one capture served it (unverified until its first live run)
+## `wayback` was verified live on 2026-10-04: a page as one capture served it
 
 A read-only probe of New Gray's pin requests, 2026-10-03, found news pages and party statements
 that `manual` cannot pin. The DSCC's statement page carried a Cloudflare script holding the second
@@ -702,9 +702,17 @@ page.
 after the one before. Once Wayback answers 429 in a run, the capture pins after it are reported as
 not asked, and the run exits 1.
 
-**Unverified until its first live run.** `wayback` ships `VERIFIED = False`. Its tests read the
-`id_` captures of 2026-09-26 (served, redirected, 404). Its first live `add` runs scratch-first by
-the convention above and captures its own dated fixtures before the flag flips.
+**Verified live on 2026-10-04 (UTC), scratch-first by the convention above.** `pin --data-dir
+<scratch> add wayback` of the DSCC's statement at 20260707001827 minted it outside the repo with
+every mapped field as the captured answer gives it: `canonical_url` the publisher's URL,
+`point_in_time` 2026-07-07, the archive copy at 20260707001827 with `captured_at` 00:18:27Z from
+`Memento-Datetime`, `media_type` `text/html` from the capture's `Content-Type`, and sha256
+`17c595fe…` over 72,756 bytes, the hash the probe's fetch of the same capture gave the day before.
+A second scratch add, of the PBS NewsHour page at 20260707154827, was refused: Wayback answered 302
+to 20260707155507. Each answer was recorded by a wrapper around the capture fetch that sends the
+same request, and the two are the fixtures `wayback_id_dscc_served_2026-10-04.json` and
+`wayback_id_pbs_redirected_2026-10-04.json`, which the capture-pin tests read; the 404 is still
+2026-09-26's. Three requests to Wayback, no 429. Nothing went into `data/`.
 
 ## `add` cannot write a record that fails to load
 
@@ -1250,7 +1258,9 @@ way, and is restarted the same way; everything below holds for it too.
   `archives.yml` run (exit 5 or 6). The unit: `archives.yml` saves `pin check --archives --json` as
   an artifact, `status-page.yml` runs after it and hands that file to `status.py`, and a capture
   pin's archive verdict becomes its row's verdict, `OK` counting as 1:1 and `ARCHIVE-LOST` or
-  `ARCHIVE-MISSING` counting against it.
+  `ARCHIVE-MISSING` counting against it. Until then, a run in which every report is FIXED shows a
+  green dot and "All fetched documents = 1:1" over zero documents; the unit gives that case its own
+  wording.
 - **Node 20 → newer action majors.** `actions/checkout@v4` and `actions/setup-python@v5` currently
   run on Node 24 with a deprecation warning (Node 20 sunset, GitHub 2025-09-19). Bump to action
   majors that target Node 24 across every workflow (`ci.yml`, `cross-repo.yml`,

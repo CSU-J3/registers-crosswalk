@@ -41,11 +41,15 @@ DRIFT_KEY = "sha256"
 # A pin's bytes are the capture's: `check` reports it FIXED without fetching, `blobs` reads it from
 # the capture, and the ledger says so. See `fetchers.fixed_bytes`.
 FIXED_BYTES = True
-# Ships False, like every fetcher: its code path (the capture URL, the served-timestamp refusal,
-# the archive copy it attaches) has not yet been run against Wayback from this tree. It flips on
-# the first live `add`, run scratch-first per docs/operations.md, dated the day it ran.
-VERIFIED = False
-VERIFIED_AT: date | None = None
+# Exercised against Wayback on 2026-10-04 (UTC) through the current code path, scratch-first: an
+# `add wayback` of the DSCC's statement at 20260707001827 into a data dir outside the repo, every
+# mapped field compared against the captured response (wayback_id_dscc_served_2026-10-04.json)
+# and its hash against the probe's fetch of the same capture the day before; and an add of the PBS
+# NewsHour page at 20260707154827, which Wayback served from 20260707155507 and the add refused
+# (wayback_id_pbs_redirected_2026-10-04.json). Any further edit to spec(), or to how pin() reads a
+# capture, resets this to False, by the convention in docs/operations.md.
+VERIFIED = True
+VERIFIED_AT = date(2026, 10, 4)
 # The mirror rule: an institutional archive is not the publisher, so a capture is never A.
 RELIABILITIES: tuple[Reliability, ...] = ("B", "C", "D", "E", "F")
 _TIMESTAMP = re.compile(r"\d{14}")

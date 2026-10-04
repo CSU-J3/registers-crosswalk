@@ -1436,6 +1436,9 @@ def test_courtlistener_stamps_its_live_run_onto_every_record():
         # fecfiling: a scratch `add --file-number 1903438 --document fec` on 2026-09-23 (UTC),
         # checked with no key in the environment.
         (fecfiling, date(2026, 9, 23)),
+        # wayback: a scratch `add` of the DSCC's statement at 20260707001827 on 2026-10-04 (UTC),
+        # and one at a timestamp Wayback served as another, which the add refused.
+        (wayback, date(2026, 10, 4)),
     ],
 )
 def test_exercised_fetchers_ship_verified(module, verified_on):
@@ -1445,12 +1448,12 @@ def test_exercised_fetchers_ship_verified(module, verified_on):
 
 def test_unexercised_fetchers_ship_unverified(unverified_fetcher):
     # A claim recorded in a handoff or a docstring is not a verification. Real fetchers flip one at
-    # a time, each on its own live `add` in this tree, dated the day it ran. `wayback` has not had
-    # its run yet; the unverified shape is also held by a fixture, so it outlives that run.
+    # a time, each on its own live `add` in this tree, dated the day it ran; every one has now, so
+    # the unverified shape is held by a fixture rather than by whichever fetcher is left.
     from registers_crosswalk.fetchers import NAMES, get
 
     unverified = [n for n in NAMES if not get(n).VERIFIED]
-    assert unverified == ["wayback", unverified_fetcher.NAME]
+    assert unverified == [unverified_fetcher.NAME]
     assert unverified_fetcher.VERIFIED is False
     assert unverified_fetcher.VERIFIED_AT is None
 

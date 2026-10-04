@@ -36,6 +36,18 @@ EYEBROW = "registers-crosswalk"
 TITLE = "Pinned sources"
 BAND_ALL_OK = "All pinned documents = 1:1"
 BAND_SOME_OK = "{ok_count} of {n} pinned documents = 1:1"
+# The band once a run holds any FIXED report: those pins were not fetched, so its 1:1 is said of
+# the fetched documents only, and the next line says how many it left out.
+BAND_ALL_FETCHED_OK = "All fetched documents = 1:1"
+BAND_SOME_FETCHED_OK = "{ok_count} of {n} fetched documents = 1:1"
+BAND_CAPTURE_ONE = (
+    "1 pin is read from a Wayback capture and was not fetched in this run; the weekly archive "
+    "check verifies it."
+)
+BAND_CAPTURES = (
+    "{fixed} pins are read from Wayback captures and were not fetched in this run; the weekly "
+    "archive check verifies them."
+)
 BAND_UNCHECKED = "Not checked in this build"
 BAND_CHECKED_AT = "Checked {when} UTC, from a GitHub runner."
 BAND_BUILT_LOCALLY = "Built locally, not checked."
@@ -79,6 +91,9 @@ COPY_FAILED = "Could not copy. Select the entry and copy it by hand."
 # `key_missing` rather than the rust that would read as "this document changed".
 _PILLS: dict[str, tuple[str, str]] = {
     "ok": ("OK", "ok"),
+    # A pin read from one Wayback capture, which `check` does not fetch. Grey, because this run
+    # did not check it; the weekly archive check is what re-verifies the capture.
+    "fixed": ("FIXED", "grey"),
     "drift": ("DRIFT", "drift"),
     "amended": ("AMENDED", "drift"),
     "key_missing": ("KEY MISSING", "grey"),
@@ -239,21 +254,33 @@ def _row(source: Source, report: DriftReport | None, superseded_by: str | None) 
 
 
 def _band(reports: list[DriftReport] | None, n: int, generated_at: datetime) -> str:
+    captures = ""
     if reports is None:
         state, tone = BAND_UNCHECKED, "grey"
         checked = BAND_BUILT_LOCALLY
     else:
         ok_count = sum(1 for r in reports if r.status == "ok")
-        if ok_count == len(reports):
-            state, tone = BAND_ALL_OK, "ok"
+        # A FIXED pin was not fetched: its bytes are a capture's, and whether the capture is still
+        # served is the archive check's answer, which this page does not have. So it counts neither
+        # as 1:1 nor against it, and the band says how many it left out. With none, the band reads
+        # exactly as it did before capture pins existed.
+        fixed = sum(1 for r in reports if r.status == "fixed")
+        fetched = len(reports) - fixed
+        all_ok, some_ok, of = BAND_ALL_OK, BAND_SOME_OK, n
+        if fixed:
+            all_ok, some_ok, of = BAND_ALL_FETCHED_OK, BAND_SOME_FETCHED_OK, fetched
+            captures = BAND_CAPTURE_ONE if fixed == 1 else BAND_CAPTURES.format(fixed=fixed)
+        if ok_count == fetched:
+            state, tone = all_ok, "ok"
         else:
-            state, tone = BAND_SOME_OK.format(ok_count=ok_count, n=n), "drift"
+            state, tone = some_ok.format(ok_count=ok_count, n=of), "drift"
         checked = BAND_CHECKED_AT.format(when=f"{generated_at:%a %d %b %Y, %H:%M}")
     nxt = BAND_NEXT_CHECK.format(when=f"{next_check_after(generated_at):%d %b}")
+    left_out = f"<p>{_e(captures)}</p>" if captures else ""
     return (
         '<section class="band">'
         f'<p class="state"><span class="dot dot-{tone}"></span>{_e(state)}</p>'
-        f'<div class="band-right"><p>{_e(checked)}</p><p>{_e(nxt)}</p></div>'
+        f'<div class="band-right"><p>{_e(checked)}</p>{left_out}<p>{_e(nxt)}</p></div>'
         "</section>"
     )
 

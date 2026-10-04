@@ -2030,3 +2030,185 @@ def test_note_refuses_an_empty_label(tmp_path, capsys):
     assert _note(tmp_path, "   ") == 1
     assert "a note must not be empty" in capsys.readouterr().err
     assert _record(tmp_path) == before  # nothing written
+
+
+# --------------------------------------------------------------- capture pins (`add wayback`)
+
+WB_URL = "https://www.dscc.org/article/dscc-statement-on-maine-senate-race-2/"
+WB_TS = "20260707001827"
+WB_BODY = b"<html>the statement as captured</html>"
+WB_CITATION = "DSCC, Statement on Maine Senate Race, 2026-07-06"
+
+
+def _no_live(url, headers=None):
+    raise AssertionError(f"a capture pin fetched its live URL {url}")
+
+
+def _no_archive(url, **_):
+    raise AssertionError(f"asked Wayback to archive {url}")
+
+
+def _add_capture(data, *extra, url=WB_URL, timestamp=WB_TS, citation=WB_CITATION):
+    argv = [
+        "--data-dir",
+        str(data),
+        "add",
+        "wayback",
+        "--url",
+        url,
+        "--timestamp",
+        timestamp,
+        "--citation",
+        citation,
+        "--title",
+        "DSCC Statement on Maine Senate Race",
+        "--publisher",
+        "Democratic Senatorial Campaign Committee",
+        "--published-at",
+        "2026-07-06",
+        "--credibility",
+        "1",
+        *extra,
+    ]
+    return main(argv, fetch=_no_live, archive_fn=_no_archive)
+
+
+def test_add_wayback_pins_the_capture_and_attaches_it_as_the_archive(tmp_path, monkeypatch, capsys):
+    calls = []
+    _wayback(monkeypatch, {WB_TS: WB_BODY}, calls=calls)
+    assert _add_capture(tmp_path) == 0
+    record = json.loads((tmp_path / "sources" / "xr_src_0001.json").read_text(encoding="utf-8"))
+    assert record["fetcher"] == "wayback"
+    assert record["canonical_url"] == WB_URL
+    assert record["artifact"]["sha256"] == sha256_hex(WB_BODY)
+    assert record["point_in_time"] == "2026-07-07"
+    assert record["grade"] == {"reliability": "B", "credibility": 1}
+    assert record["archives"] == [
+        {
+            "service": "wayback",
+            "url": f"https://web.archive.org/web/{WB_TS}/{WB_URL}",
+            "captured_at": "2026-07-07T00:18:27Z",
+        }
+    ]
+    assert calls == [f"https://web.archive.org/web/{WB_TS}id_/{WB_URL}"]  # one request
+    out = capsys.readouterr().out
+    assert "Wayback capture of 2026-07-07 00:18:27 UTC, retrieved " in out
+    assert f"  Archive: https://web.archive.org/web/{WB_TS}/{WB_URL}" in out
+
+
+def test_add_wayback_refuses_archive_before_asking_wayback_anything(tmp_path, monkeypatch, capsys):
+    calls = []
+    _wayback(monkeypatch, {WB_TS: WB_BODY}, calls=calls)
+    assert _add_capture(tmp_path, "--archive") == 1
+    assert "a wayback pin is its own archive copy" in capsys.readouterr().err
+    assert calls == []
+    assert not (tmp_path / "sources").exists() or _sources(tmp_path) == []
+
+
+def test_add_wayback_refuses_a_timestamp_wayback_serves_as_another(tmp_path, monkeypatch, capsys):
+    _wayback(monkeypatch, {"20260708162125": WB_BODY}, redirect={WB_TS: "20260708162125"})
+    assert _add_capture(tmp_path) == 1
+    err = capsys.readouterr().err
+    assert f"{WB_CITATION}: Wayback served 20260708162125 for {WB_TS}; nothing pinned" in err
+    assert not (tmp_path / "sources").exists() or _sources(tmp_path) == []
+
+
+def test_add_wayback_can_be_cited_without_archive(tmp_path, monkeypatch):
+    # The capture is the archive copy the load path asks a cited pin for.
+    _wayback(monkeypatch, {WB_TS: WB_BODY})
+    assert _add_capture(tmp_path, "--cited-in", "vi:vi_conflict_0001") == 0
+    record = Crosswalk(tmp_path).sources["xr_src_0001"]
+    assert [ref.local_id for ref in record.cited_in] == ["vi_conflict_0001"]
+    assert len(record.archives) == 1
+
+
+def test_check_reports_a_capture_pin_fixed_and_fetches_nothing(tmp_path, monkeypatch, capsys):
+    _wayback(monkeypatch, {WB_TS: WB_BODY})
+    _add_capture(tmp_path)
+    capsys.readouterr()
+    calls = []
+    _wayback(monkeypatch, {}, calls=calls)  # any read of the capture would now fail
+    assert main(["--data-dir", str(tmp_path), "check"], fetch=_no_live) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].split()[:2] == ["FIXED", "xr_src_0001"]
+    assert lines[1].strip() == pinmod.FIXED_DETAIL
+    assert calls == []
+    assert main(["--data-dir", str(tmp_path), "check", "--json"], fetch=_no_live) == 0
+    assert [r["status"] for r in json.loads(capsys.readouterr().out)] == ["fixed"]
+
+
+def test_blobs_reads_a_capture_pin_from_its_capture(tmp_path, monkeypatch, capsys):
+    data, out = tmp_path / "data", tmp_path / "pins"
+    _wayback(monkeypatch, {WB_TS: WB_BODY})
+    _add_capture(data)
+    capsys.readouterr()
+    calls = []
+    _wayback(monkeypatch, {WB_TS: WB_BODY}, calls=calls)
+    argv = ["--data-dir", str(data), "blobs", "--out", str(out)]
+    assert main(argv, fetch=_no_live, sleep_fn=lambda _s: None) == 0
+    assert calls == [f"https://web.archive.org/web/{WB_TS}id_/{WB_URL}"]
+    assert (out / _name(data, "xr_src_0001")).read_bytes() == WB_BODY
+
+
+def test_blobs_paces_capture_reads_and_asks_nothing_after_a_429(tmp_path, monkeypatch, capsys):
+    data, out = tmp_path / "data", tmp_path / "pins"
+    pages = [f"https://example.org/statement-{n}/" for n in (1, 2, 3)]
+    _wayback(monkeypatch, {WB_TS: WB_BODY})
+    for n, page in enumerate(pages, 1):
+        assert _add_capture(data, url=page, citation=f"Statement {n}") == 0
+    capsys.readouterr()
+    calls, sleeps = [], []
+
+    def fetch_capture(url, *, timeout=90):
+        calls.append(url)
+        if len(calls) == 2:
+            raise urllib.error.HTTPError(url, 429, "Too Many Requests", {}, None)
+        when = datetime.strptime(WB_TS, "%Y%m%d%H%M%S").replace(tzinfo=UTC)
+        return WB_BODY, url, {"memento-datetime": format_datetime(when, usegmt=True)}
+
+    monkeypatch.setattr("registers_crosswalk.pin._fetch_capture", fetch_capture)
+    argv = ["--data-dir", str(data), "blobs", "--out", str(out)]
+    assert main(argv, fetch=_no_live, sleep_fn=sleeps.append) == 1
+    assert len(calls) == 2  # the third pin is never asked about
+    assert sleeps == [pinmod._ARCHIVE_GAP]  # noqa: SLF001 - one gap, between the two reads
+    printed = capsys.readouterr().out
+    assert "WRITTEN      xr_src_0001" in printed
+    assert "Wayback answered HTTP 429" in printed
+    assert "not asked: Wayback answered 429 at xr_src_0002 in this run" in printed
+
+
+# A real child process, as the CLI runs, with the capture fetch stubbed in the child so nothing
+# touches the network. `main()` has no handler for an HTTP error raised during `add`, for any
+# fetcher, so the operator sees Python's own report of it: today a traceback whose last line
+# names the 429, and exit status 1.
+_WAYBACK_ANSWERS_429 = """\
+import sys
+import urllib.error
+
+import registers_crosswalk.pin as pin
+
+
+def refuse(url, *, timeout=90):
+    print("ASKED", url, file=sys.stderr)
+    raise urllib.error.HTTPError(url, 429, "Too Many Requests", {}, None)
+
+
+pin._fetch_capture = refuse
+sys.exit(pin.main(sys.argv[1:]))
+"""
+
+
+def test_add_wayback_on_a_429_writes_nothing_names_the_429_and_asks_once(tmp_path):
+    argv = ["--data-dir", str(tmp_path), "add", "wayback", "--url", WB_URL]
+    argv += ["--timestamp", WB_TS, "--citation", WB_CITATION, "--title", "T"]
+    done = subprocess.run(
+        [sys.executable, "-c", _WAYBACK_ANSWERS_429, *argv],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert done.returncode != 0
+    assert "429" in done.stderr.strip().splitlines()[-1]
+    assert done.stderr.count("ASKED ") == 1  # one request, no retry
+    assert done.stdout == ""
+    assert not (tmp_path / "sources").exists()  # no record, not even its directory

@@ -227,9 +227,66 @@ def test_next_check_is_the_monday_after(xw):
     )
 
 
+def _band_html(page: str) -> str:
+    return re.search(r'<section class="band">.*?</section>', page, flags=re.S).group(0)
+
+
+@pytest.mark.parametrize(
+    "statuses",
+    [
+        {"xr_src_0001": "fixed"},
+        {"xr_src_0001": "fixed", "xr_src_0002": "fixed"},
+        {"xr_src_0001": "fixed", "xr_src_0002": "drift"},
+        {s: "fixed" for s in ("xr_src_0001", "xr_src_0002", "xr_src_0003", "xr_src_0004")},
+    ],
+)
+def test_a_page_with_any_fixed_report_never_reads_all_pinned_documents_1_1(xw, statuses):
+    # A FIXED pin was not fetched, and whether its capture is still served is the archive run's
+    # answer, which the page does not have: the band must not vouch for it.
+    assert "All pinned documents = 1:1" not in _page(xw, _reports(xw, **statuses))
+
+
+def test_a_fixed_pin_is_left_out_of_the_bands_count_and_the_band_says_so(xw):
+    page = _page(xw, _reports(xw, xr_src_0001="fixed"))
+    assert _cell(_row(page, "xr_src_0001"), "check") == '<span class="pill pill-grey">FIXED</span>'
+    band = _band_html(page)
+    assert '<span class="dot dot-ok"></span>All fetched documents = 1:1' in band
+    assert (
+        "<p>1 pin is read from a Wayback capture and was not fetched in this run; the weekly "
+        "archive check verifies it.</p>"
+    ) in band
+    band = _band_html(
+        _page(xw, _reports(xw, xr_src_0001="fixed", xr_src_0002="fixed", xr_src_0003="drift"))
+    )
+    # n counts the fetched reports only: five pins, two of them read from captures.
+    assert '<span class="dot dot-drift"></span>2 of 3 fetched documents = 1:1' in band
+    assert (
+        "<p>2 pins are read from Wayback captures and were not fetched in this run; the weekly "
+        "archive check verifies them.</p>"
+    ) in band
+
+
+@pytest.mark.parametrize(
+    "statuses, state",
+    [
+        ({}, '<span class="dot dot-ok"></span>All pinned documents = 1:1'),
+        (
+            {"xr_src_0001": "drift"},
+            '<span class="dot dot-drift"></span>4 of 5 pinned documents = 1:1',
+        ),
+    ],
+)
+def test_with_no_capture_pins_the_band_reads_exactly_as_before(xw, statuses, state):
+    assert _band_html(_page(xw, _reports(xw, **statuses))) == (
+        f'<section class="band"><p class="state">{state}</p><div class="band-right">'
+        "<p>Checked Sat 19 Sep 2026, 20:11 UTC, from a GitHub runner.</p>"
+        "<p>Next check Mon 21 Sep, 12:00 UTC.</p></div></section>"
+    )
+
+
 def test_every_drift_status_has_a_pill(xw):
-    # A seventh status added to DriftStatus without a pill would KeyError the whole page, which is
-    # the one way this module can take the site down over a change made elsewhere.
+    # A status added to DriftStatus without a pill would KeyError the whole page, which is the one
+    # way this module can take the site down over a change made elsewhere.
     assert set(DriftStatus.__args__) == set(_PILLS)
     for status in DriftStatus.__args__:
         source = xw.sources["xr_src_0001"]

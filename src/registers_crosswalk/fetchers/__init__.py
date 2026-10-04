@@ -10,6 +10,9 @@ A fetcher module exposes:
     ENV_KEY         optional; the environment variable holding this fetcher's API key
     REQUIRES_ARCHIVE  optional; True refuses an `add` through this fetcher without --archive
     CHECK_SUPERSEDED  optional; True has `pin check` re-test this fetcher's superseded pins too
+    FIXED_BYTES     optional; True for a pin read from one Wayback capture: `check` never fetches
+                    it, `blobs` reads it from its capture, and the ledger says where its bytes
+                    came from
     spec(...)       -> PinSpec, keyword-only, the API the tests drive
     add_arguments(parser) / spec_from_args(args, *, fetch, env)   the CLI adapter for spec()
     drift_value(body) -> str
@@ -41,12 +44,32 @@ from types import ModuleType
 
 from ..models import DriftKey
 from ..pin import MissingKey, SearchHit
-from . import courtlistener, ecfr, fecfiling, federalregister, govinfo, manual, openfec, uscode
+from . import (
+    courtlistener,
+    ecfr,
+    fecfiling,
+    federalregister,
+    govinfo,
+    manual,
+    openfec,
+    uscode,
+    wayback,
+)
 
 # CLI subcommand order: most-used first, `manual` last as the escape hatch.
 _MODULES: dict[str, ModuleType] = {
     m.NAME: m
-    for m in (ecfr, federalregister, govinfo, uscode, openfec, fecfiling, courtlistener, manual)
+    for m in (
+        ecfr,
+        federalregister,
+        govinfo,
+        uscode,
+        openfec,
+        fecfiling,
+        courtlistener,
+        wayback,
+        manual,
+    )
 }
 NAMES: tuple[str, ...] = tuple(_MODULES)
 # The subset `pin search` offers. Derived, never hand-listed, so adding SEARCH_TYPES to a module
@@ -153,6 +176,17 @@ def check_superseded(name: str) -> bool:
     only the current text, so the retired pin would read as DRIFT.
     """
     return bool(getattr(get(name), "CHECK_SUPERSEDED", False))
+
+
+def fixed_bytes(name: str) -> bool:
+    """Whether this fetcher's pins are read from one Wayback capture rather than from their URL.
+
+    True for `wayback` alone. Such a pin's canonical URL is the live page, whose bytes would not
+    hold still, and its bytes are the capture's, which cannot change. So `check` reports it FIXED
+    without fetching anything (the weekly archive check is what re-verifies the capture), `blobs`
+    reads it from the capture, and the ledger entry names the capture as where its bytes came from.
+    """
+    return bool(getattr(get(name), "FIXED_BYTES", False))
 
 
 def amended_since(name: str) -> Callable[..., date | None] | None:

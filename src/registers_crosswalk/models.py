@@ -105,6 +105,7 @@ Fetcher = Literal[
     "openfec",
     "fecfiling",
     "courtlistener",
+    "wayback",
     "manual",
 ]
 # Admiralty grading: source reliability A-F, information credibility 1-6. "A1" is an official

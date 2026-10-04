@@ -13,10 +13,12 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 import pytest
 
 from registers_crosswalk import pin as pinmod
-from registers_crosswalk.fetchers import ecfr, uscode
+from registers_crosswalk.fetchers import ecfr, uscode, wayback
 from registers_crosswalk.models import ArchiveCopy, Grade, Source
 from registers_crosswalk.pin import (
+    FIXED_DETAIL,
     ArchiveFailure,
+    CaptureNotServed,
     ExpectedDrift,
     PinSpec,
     add_source,
@@ -1445,6 +1447,141 @@ def test_a_final_url_naming_another_capture_is_not_served():
     )
     assert verdict == "not_served"
     assert "20260711041727" in detail
+
+
+# ------------------------------------------- a capture pin (wayback): the capture its spec names
+
+
+def _capture_spec(fixture, **over):
+    url, timestamp = _asked(fixture)
+    kwargs = {"url": url, "timestamp": timestamp, "citation": "C", "title": "T"}
+    return wayback.spec(**(kwargs | over))
+
+
+def _no_live_fetch(url, headers=None):
+    raise AssertionError(f"a capture pin fetched {url} instead of its capture")
+
+
+def test_a_capture_pin_holds_the_capture_wayback_served_at_its_timestamp():
+    fixture = _wayback_fixture("served")
+    url, timestamp = _asked(fixture)
+    source = pin(
+        _capture_spec(fixture),
+        next_id="xr_src_0001",
+        fetch=_no_live_fetch,
+        capture_fn=_answering_as(fixture),
+    )
+    assert source.canonical_url == url
+    assert source.artifact.sha256 == sha256_hex(STAND_IN)
+    assert source.artifact.media_type == "application/pdf"  # the capture's own Content-Type
+    assert source.point_in_time == date(2026, 9, 20)
+    assert source.archives == [
+        ArchiveCopy(
+            service="wayback",
+            url=f"https://web.archive.org/web/{timestamp}/{url}",
+            captured_at=datetime(2026, 9, 20, 19, 8, 51, tzinfo=UTC),
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "key, why",
+    [
+        # Wayback redirected the asked timestamp to the nearest capture it holds.
+        ("redirected", "Wayback served 20260711041727 for 20260801000000"),
+        ("missing", "Wayback serves nothing at 20260711041727 (HTTP 404)"),
+    ],
+)
+def test_a_capture_pin_refuses_a_capture_not_served_at_its_timestamp(key, why):
+    fixture = _wayback_fixture(key)
+    with pytest.raises(CaptureNotServed, match=re.escape(f"C: {why}; nothing pinned")):
+        pin(
+            _capture_spec(fixture),
+            next_id="xr_src_0001",
+            fetch=_no_live_fetch,
+            capture_fn=_answering_as(fixture),
+        )
+
+
+def test_add_source_writes_nothing_for_a_capture_not_served(tmp_path):
+    fixture = _wayback_fixture("redirected")
+    outcome = add_source(
+        _capture_spec(fixture),
+        data_dir=tmp_path,
+        fetch=_no_live_fetch,
+        capture_fn=_answering_as(fixture),
+    )
+    assert outcome.status == "refused"
+    assert "Wayback served 20260711041727 for 20260801000000" in outcome.message
+    assert not (tmp_path / "sources").exists() or not any((tmp_path / "sources").iterdir())
+
+
+def test_add_source_refuses_an_archive_request_for_a_capture_pin_before_any_fetch(tmp_path):
+    def no_capture(url):
+        raise AssertionError(f"read {url} for a pin that was refused")
+
+    outcome = add_source(
+        _capture_spec(_wayback_fixture("served")),
+        data_dir=tmp_path,
+        archive=True,
+        fetch=_no_live_fetch,
+        capture_fn=no_capture,
+    )
+    assert outcome.status == "refused"
+    assert outcome.message == (
+        "a wayback pin is its own archive copy (the capture it is read from); "
+        "pin it without --archive"
+    )
+
+
+def test_check_never_fetches_a_capture_pin_and_says_why():
+    fixture = _wayback_fixture("served")
+    source = pin(
+        _capture_spec(fixture),
+        next_id="xr_src_0001",
+        fetch=_no_live_fetch,
+        capture_fn=_answering_as(fixture),
+    )
+    report = check(source, fetch=_no_live_fetch)
+    assert (report.status, report.detail, report.archived) == ("fixed", FIXED_DETAIL, True)
+    assert pinmod._EXIT_CODES[report.status] == 0  # noqa: SLF001
+
+
+def test_a_capture_pins_ledger_entry_says_its_bytes_are_the_captures():
+    """New Gray copies this entry verbatim, so it must not read as a fetch of the live URL."""
+    fixture = _wayback_fixture("served")
+    url, timestamp = _asked(fixture)
+    spec = _capture_spec(fixture, publisher="P", published_at=date(2026, 9, 19), credibility=1)
+    source = pin(
+        spec,
+        next_id="xr_src_0001",
+        fetch=_no_live_fetch,
+        capture_fn=_answering_as(fixture),
+        now=datetime(2026, 10, 5, 12, 0, tzinfo=UTC),
+    )
+    assert to_ledger_markdown(source) == (
+        "- **P, 2026-09-19 (B1)** — T, C. Wayback capture of 2026-09-20 19:08:51 UTC, "
+        f"retrieved 2026-10-05 UTC; sha256 {sha256_hex(STAND_IN)[:16]}…; xr_src_0001.\n"
+        f"  {url}\n"
+        f"  Archive: https://web.archive.org/web/{timestamp}/{url}"
+    )
+
+
+def test_a_capture_pin_without_a_publication_date_has_no_date_in_its_ledger_head():
+    """The capture's day is already in the line, as the capture's; in the head it would read as
+    the document's date, so a page that states none is given none."""
+    fixture = _wayback_fixture("served")
+    source = pin(
+        _capture_spec(fixture, publisher="P", credibility=1),
+        next_id="xr_src_0001",
+        fetch=_no_live_fetch,
+        capture_fn=_answering_as(fixture),
+        now=datetime(2026, 10, 5, 12, 0, tzinfo=UTC),
+    )
+    assert source.published_at is None and source.point_in_time == date(2026, 9, 20)
+    assert to_ledger_markdown(source).startswith(
+        "- **P (B1)** — T, C. Wayback capture of 2026-09-20 19:08:51 UTC, retrieved 2026-10-05 UTC;"
+    )
 
 
 def test_reuse_passes_over_a_capture_served_without_memento_datetime():

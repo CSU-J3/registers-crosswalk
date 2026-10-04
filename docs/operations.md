@@ -631,6 +631,81 @@ is the raw hash. The other three followed directly.
 required; `--publisher`, `--published-at` and `--point-in-time` are optional. `--reliability` and
 `--credibility` default to B and 2, so an A1 pin has to say so.
 
+## `wayback`: a page as one capture served it (unverified until its first live run)
+
+A read-only probe of New Gray's pin requests, 2026-10-03, found news pages and party statements
+that `manual` cannot pin. The DSCC's statement page carried a Cloudflare script holding the second
+of the request, the Bangor Daily News stamped the request time into its asset URLs, and the three
+pages compared with their July captures had changed their menus and "latest posts" lists while
+their text stood still. Those bytes never hash the same twice, and no fresh capture reproduces a
+fetch it did not see. Their July captures can be pinned: a capture's bytes are fixed once taken,
+and they show what the page said that week, which is what a citation of a news page is for.
+
+    pin add wayback --url <publisher URL> --timestamp <YYYYMMDDhhmmss> --citation … --title …
+        [--publisher …] [--published-at …] [--reliability B-F] [--credibility 1-6]
+
+**What the record holds.** `canonical_url` is the publisher's URL, the one a reader cites. The
+bytes are the capture's raw `id_` response at exactly `--timestamp`; nothing is read from the live
+URL. `point_in_time` is the capture's UTC day, and `archives[0]` is the capture itself. Wayback
+redirects a timestamp it does not hold to the nearest one it does (on 2026-10-04 the PBS NewsHour
+capture listed at 20260707154827 was served from 20260707155507), so `add` refuses a capture not
+served at exactly its timestamp, by the rule the weekly archive check and `--repair` apply
+(`_capture_at`). `--archive` is refused: the pin is its own archive copy. `--cited-in` works
+without it, since the capture is the copy the load path asks a cited pin for.
+
+Two captures of one URL coexist when they fall on different UTC days, a second capture on the same
+UTC day is refused (the duplicate rules, below), and `--supersedes` is not for the before and after
+captures of an edited page: those are two versions, both live and both citable.
+
+Pass `--published-at` when the page states its date. A capture pin's ledger entry takes its date
+from that alone: without it the entry carries no date, rather than the capture's day, which the
+entry already names as the capture's.
+
+**Reproducing a capture pin's hash by hand.** Fetch the `id_` form, not the ledger's Archive line:
+
+    https://web.archive.org/web/<timestamp>id_/<canonical_url>
+
+`<timestamp>` is the 14 digits in the Archive line. The `id_` form serves the bytes as captured,
+and the sha256 is of that body with any Content-Encoding undone (`curl --compressed` does it). The
+Archive line (`/web/<timestamp>/<url>`, no `id_`) is the browsable form of the same capture:
+Wayback's replay, which rewrites every link and inserts its toolbar, so it never hashes to the pin.
+Two checks before trusting the hash: the response's `Memento-Datetime` names the instant in
+`<timestamp>`, and the final URL after any redirect still carries it. A redirect to another
+timestamp is another capture, and its bytes are another version of the page.
+
+**Graded as a mirror**, by courtlistener's rule above: an institutional archive is not the
+publisher, so reliability is B at best, and `--reliability A` is refused. Credibility is the
+caller's: 1 where the text is confirmed against the live page or other outlets, 2 by default. A
+party's own statement pinned this way is B1, not A1. The grade is about custody of the copy, not
+about whose words it holds.
+
+**`check` does not fetch these pins. It prints FIXED** and exits 0 for them. The status page shows a
+grey pill, counts them neither as 1:1 nor against it, and says in its band how many it left out:
+
+- A capture's bytes cannot change. Two things can still go wrong with one: Wayback stops serving it
+  (removal on an owner's request, an exclusion), or serves another capture at its timestamp.
+- Both are what the weekly archive check (`pin check --archives`) already asks of every attached
+  capture, on the path built for Wayback: five seconds between requests, four samples before a
+  verdict, Retry-After honoured, a 25-minute budget. A capture pin's archive copy is its pinned
+  bytes, so that check is its drift check.
+- Fetching them on Mondays as well would double the Wayback requests for the same answer, on a path
+  with no Wayback pacing. Wayback's CDX API answered this machine 429 on 2026-10-04 after eight
+  requests in 2m36s, ten seconds apart. Checking them less often would add a schedule without
+  adding an answer.
+
+Every run still prints a line for each one, so the pins a run reports add up to the pins it holds.
+Until the status page takes its verdicts from the archive run (a tracked chore, below), a capture
+pin whose capture is lost or missing shows as a red archives run (exit 5 or 6), not on the status
+page.
+
+**`blobs` reads them from the capture**, at its exact timestamp, each read at least five seconds
+after the one before. Once Wayback answers 429 in a run, the capture pins after it are reported as
+not asked, and the run exits 1.
+
+**Unverified until its first live run.** `wayback` ships `VERIFIED = False`. Its tests read the
+`id_` captures of 2026-09-26 (served, redirected, 404). Its first live `add` runs scratch-first by
+the convention above and captures its own dated fixtures before the flag flips.
+
 ## `add` cannot write a record that fails to load
 
 Before writing, `pin add` runs the would-be record through
@@ -699,7 +774,8 @@ which are not versions of each other, so "latest" silently dropped all but one o
 drift run. On the six MUR pins currently in `data/`, four were going unchecked.
 
 **Exit code → cause.**
-- **0 — clean.** Every checked pin still matches. Nothing to do.
+- **0 — clean.** Every checked pin still matches. Nothing to do. A `wayback` pin prints `FIXED`
+  and is not fetched (see `wayback`, above): the weekly archive check is what re-verifies it.
 - **1 — the check ran and found a problem with the document.** Either the drift key changed
   (`DRIFT`), the eCFR part was amended since the pin (`AMENDED`), or the document no longer states
   what we parse out of it (`ERROR` — uscode dropped its source credit, an API changed shape). All
@@ -1168,6 +1244,13 @@ way, and is restarted the same way; everything below holds for it too.
 
 ## Tracked chores
 
+- **The status page takes capture pins' verdicts from the archive run.** Open, not started (logged
+  2026-10-03). `pin check` never fetches a capture pin (`wayback`), so the page shows it as a grey
+  FIXED and leaves it out of the band's count, and a lost or missing capture shows only as a red
+  `archives.yml` run (exit 5 or 6). The unit: `archives.yml` saves `pin check --archives --json` as
+  an artifact, `status-page.yml` runs after it and hands that file to `status.py`, and a capture
+  pin's archive verdict becomes its row's verdict, `OK` counting as 1:1 and `ARCHIVE-LOST` or
+  `ARCHIVE-MISSING` counting against it.
 - **Node 20 → newer action majors.** `actions/checkout@v4` and `actions/setup-python@v5` currently
   run on Node 24 with a deprecation warning (Node 20 sunset, GitHub 2025-09-19). Bump to action
   majors that target Node 24 across every workflow (`ci.yml`, `cross-repo.yml`,

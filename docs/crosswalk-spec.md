@@ -123,10 +123,11 @@ Source
   publisher       str | null
   canonical_url   str                              (http(s), and NEVER carrying an API key)
   fetcher         "ecfr" | "federalregister" | "govinfo" | "uscode" | "openfec"
-                  | "courtlistener" | "manual"
+                  | "fecfiling" | "courtlistener" | "wayback" | "manual"
   fetcher_verified bool                            (default FALSE — see below)
   verified_at     date | null                      (set iff fetcher_verified)
-  point_in_time   date | null                      (eCFR "as of"; OLRC "laws in effect on")
+  point_in_time   date | null                      (eCFR "as of"; OLRC "laws in effect on";
+                                                    wayback: the capture's UTC day)
   published_at    date | null                      (FR publication; opinion decision; statement)
   artifact        Artifact
   grade           Grade

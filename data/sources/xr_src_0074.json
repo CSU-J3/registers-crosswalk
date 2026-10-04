@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0074",
+  "kind": "source",
+  "citation": "Scott J. Basinger, Scandals and Congressional Elections in the Post-Watergate Era, Political Research Quarterly 66(2): 385–398 (2013)",
+  "title": "Scott J. Basinger, Scandals and Congressional Elections in the Post-Watergate Era, Political Research Quarterly 66(2): 385–398 (2013), metadata record",
+  "publisher": "Crossref",
+  "canonical_url": "https://api.crossref.org/works/10.1177/1065912912451144/transform/application/x-bibtex",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "7daaf7e7a3a9eb6c07269ee2696c38dd451991d4d4f6e8763b46e7e2982b863e",
+    "byte_length": 366,
+    "media_type": "application/octet-stream",
+    "fetched_at": "2026-10-04T20:40:46.495541Z",
+    "drift_key": "sha256",
+    "drift_value": "7daaf7e7a3a9eb6c07269ee2696c38dd451991d4d4f6e8763b46e7e2982b863e"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Crossref's metadata for DOI 10.1177/1065912912451144, not the article page; online first 2012-08-22."
+}

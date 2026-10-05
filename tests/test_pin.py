@@ -1304,8 +1304,9 @@ def test_default_fetch_decodes_a_lowercase_content_encoding(monkeypatch):
 
 # ---------------------------------- what Wayback served: the status first, then Memento-Datetime
 
-# Wayback's answers as captured live on 2026-09-26, loaded by exact name: a `wayback_id_served_*`
-# glob would also match `wayback_id_served_late_*`.
+# Wayback's answers as captured live on 2026-09-26, and on 2026-10-04 by `wayback`'s verifying
+# run, loaded by exact name: a `wayback_id_served_*` glob would also match
+# `wayback_id_served_late_*`.
 WAYBACK_FIXTURES = {
     "served": "wayback_id_served_2026-09-26.json",
     "served_late": "wayback_id_served_late_2026-09-26.json",
@@ -1313,6 +1314,8 @@ WAYBACK_FIXTURES = {
     "missing": "wayback_id_missing_2026-09-26.json",
     "listing": "wayback_cdx_listing_2026-09-26.json",
     "listing_0017": "wayback_cdx_0017_2026-09-26.json",
+    "dscc_served": "wayback_id_dscc_served_2026-10-04.json",
+    "pbs_redirected": "wayback_id_pbs_redirected_2026-10-04.json",
 }
 # The one exception to "trim nothing": a fixture keeps these headers and lists every other one's
 # name under `withheld`, so nothing that identifies the machine that asked enters the repo.
@@ -1384,6 +1387,10 @@ def _answering_as(fixture, body=STAND_IN):
         ("redirected", {"20260711041727"}, "not_served"),
         # a 404 comes back at the URL that was asked for, which names the timestamp; nothing served
         ("missing", set(), "not_served"),
+        # `wayback`'s verifying run, 2026-10-04: an HTML capture served at its timestamp, and a
+        # timestamp Wayback redirected to the next capture it holds
+        ("dscc_served", {"20260707001827"}, "ok"),
+        ("pbs_redirected", {"20260707155507"}, "not_served"),
     ],
 )
 def test_every_captured_id_answer_is_classified_as_wayback_meant_it(key, served, verdict):
@@ -1450,6 +1457,9 @@ def test_a_final_url_naming_another_capture_is_not_served():
 
 
 # ------------------------------------------- a capture pin (wayback): the capture its spec names
+#
+# Read from the answers `wayback`'s verifying run captured on 2026-10-04; the 404 is the
+# 2026-09-26 one, since that run met none.
 
 
 def _capture_spec(fixture, **over):
@@ -1463,7 +1473,7 @@ def _no_live_fetch(url, headers=None):
 
 
 def test_a_capture_pin_holds_the_capture_wayback_served_at_its_timestamp():
-    fixture = _wayback_fixture("served")
+    fixture = _wayback_fixture("dscc_served")
     url, timestamp = _asked(fixture)
     source = pin(
         _capture_spec(fixture),
@@ -1473,13 +1483,13 @@ def test_a_capture_pin_holds_the_capture_wayback_served_at_its_timestamp():
     )
     assert source.canonical_url == url
     assert source.artifact.sha256 == sha256_hex(STAND_IN)
-    assert source.artifact.media_type == "application/pdf"  # the capture's own Content-Type
-    assert source.point_in_time == date(2026, 9, 20)
+    assert source.artifact.media_type == "text/html"  # the capture's own Content-Type
+    assert source.point_in_time == date(2026, 7, 7)
     assert source.archives == [
         ArchiveCopy(
             service="wayback",
             url=f"https://web.archive.org/web/{timestamp}/{url}",
-            captured_at=datetime(2026, 9, 20, 19, 8, 51, tzinfo=UTC),
+            captured_at=datetime(2026, 7, 7, 0, 18, 27, tzinfo=UTC),
         )
     ]
 
@@ -1488,7 +1498,7 @@ def test_a_capture_pin_holds_the_capture_wayback_served_at_its_timestamp():
     "key, why",
     [
         # Wayback redirected the asked timestamp to the nearest capture it holds.
-        ("redirected", "Wayback served 20260711041727 for 20260801000000"),
+        ("pbs_redirected", "Wayback served 20260707155507 for 20260707154827"),
         ("missing", "Wayback serves nothing at 20260711041727 (HTTP 404)"),
     ],
 )
@@ -1504,7 +1514,7 @@ def test_a_capture_pin_refuses_a_capture_not_served_at_its_timestamp(key, why):
 
 
 def test_add_source_writes_nothing_for_a_capture_not_served(tmp_path):
-    fixture = _wayback_fixture("redirected")
+    fixture = _wayback_fixture("pbs_redirected")
     outcome = add_source(
         _capture_spec(fixture),
         data_dir=tmp_path,
@@ -1512,7 +1522,7 @@ def test_add_source_writes_nothing_for_a_capture_not_served(tmp_path):
         capture_fn=_answering_as(fixture),
     )
     assert outcome.status == "refused"
-    assert "Wayback served 20260711041727 for 20260801000000" in outcome.message
+    assert "Wayback served 20260707155507 for 20260707154827" in outcome.message
     assert not (tmp_path / "sources").exists() or not any((tmp_path / "sources").iterdir())
 
 
@@ -1521,7 +1531,7 @@ def test_add_source_refuses_an_archive_request_for_a_capture_pin_before_any_fetc
         raise AssertionError(f"read {url} for a pin that was refused")
 
     outcome = add_source(
-        _capture_spec(_wayback_fixture("served")),
+        _capture_spec(_wayback_fixture("dscc_served")),
         data_dir=tmp_path,
         archive=True,
         fetch=_no_live_fetch,
@@ -1535,7 +1545,7 @@ def test_add_source_refuses_an_archive_request_for_a_capture_pin_before_any_fetc
 
 
 def test_check_never_fetches_a_capture_pin_and_says_why():
-    fixture = _wayback_fixture("served")
+    fixture = _wayback_fixture("dscc_served")
     source = pin(
         _capture_spec(fixture),
         next_id="xr_src_0001",
@@ -1549,9 +1559,9 @@ def test_check_never_fetches_a_capture_pin_and_says_why():
 
 def test_a_capture_pins_ledger_entry_says_its_bytes_are_the_captures():
     """New Gray copies this entry verbatim, so it must not read as a fetch of the live URL."""
-    fixture = _wayback_fixture("served")
+    fixture = _wayback_fixture("dscc_served")
     url, timestamp = _asked(fixture)
-    spec = _capture_spec(fixture, publisher="P", published_at=date(2026, 9, 19), credibility=1)
+    spec = _capture_spec(fixture, publisher="P", published_at=date(2026, 7, 6), credibility=1)
     source = pin(
         spec,
         next_id="xr_src_0001",
@@ -1560,7 +1570,7 @@ def test_a_capture_pins_ledger_entry_says_its_bytes_are_the_captures():
         now=datetime(2026, 10, 5, 12, 0, tzinfo=UTC),
     )
     assert to_ledger_markdown(source) == (
-        "- **P, 2026-09-19 (B1)** — T, C. Wayback capture of 2026-09-20 19:08:51 UTC, "
+        "- **P, 2026-07-06 (B1)** — T, C. Wayback capture of 2026-07-07 00:18:27 UTC, "
         f"retrieved 2026-10-05 UTC; sha256 {sha256_hex(STAND_IN)[:16]}…; xr_src_0001.\n"
         f"  {url}\n"
         f"  Archive: https://web.archive.org/web/{timestamp}/{url}"
@@ -1570,7 +1580,7 @@ def test_a_capture_pins_ledger_entry_says_its_bytes_are_the_captures():
 def test_a_capture_pin_without_a_publication_date_has_no_date_in_its_ledger_head():
     """The capture's day is already in the line, as the capture's; in the head it would read as
     the document's date, so a page that states none is given none."""
-    fixture = _wayback_fixture("served")
+    fixture = _wayback_fixture("dscc_served")
     source = pin(
         _capture_spec(fixture, publisher="P", credibility=1),
         next_id="xr_src_0001",
@@ -1578,9 +1588,9 @@ def test_a_capture_pin_without_a_publication_date_has_no_date_in_its_ledger_head
         capture_fn=_answering_as(fixture),
         now=datetime(2026, 10, 5, 12, 0, tzinfo=UTC),
     )
-    assert source.published_at is None and source.point_in_time == date(2026, 9, 20)
+    assert source.published_at is None and source.point_in_time == date(2026, 7, 7)
     assert to_ledger_markdown(source).startswith(
-        "- **P (B1)** — T, C. Wayback capture of 2026-09-20 19:08:51 UTC, retrieved 2026-10-05 UTC;"
+        "- **P (B1)** — T, C. Wayback capture of 2026-07-07 00:18:27 UTC, retrieved 2026-10-05 UTC;"
     )
 
 

@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0075",
+  "kind": "source",
+  "citation": "Contribution limits for 2025–2026",
+  "title": "Contribution limits for 2025–2026, chart issued January 2025",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://www.fec.gov/documents/5661/contribution-limits-chart-2025-2026.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "cbbaa6cf4b23766c8932116d617670495a847f371b0ff9d4ebf142bba7cb8646",
+    "byte_length": 147762,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-05T19:40:39.880065Z",
+    "drift_key": "sha256",
+    "drift_value": "cbbaa6cf4b23766c8932116d617670495a847f371b0ff9d4ebf142bba7cb8646"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "State/district/local party committee to a candidate committee: $5,000 per election. The ** note: a national party committee and its Senatorial campaign committee may contribute up to $62,000 combined per campaign to each Senate candidate (110.2(e)). The URL redirects to https://www.fec.gov/resources/cms-content/documents/contribution-limits-chart-2025-2026.pdf (seen 2026-10-05)."
+}

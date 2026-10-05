@@ -1261,6 +1261,14 @@ way, and is restarted the same way; everything below holds for it too.
   `ARCHIVE-MISSING` counting against it. Until then, a run in which every report is FIXED shows a
   green dot and "All fetched documents = 1:1" over zero documents; the unit gives that case its own
   wording.
+- **A refused page says which page it was.** Open, not started (logged 2026-10-05). That day's
+  status-page runs reported `xr_src_0005`, `0024`, `0056` and `0064` as ERROR "no source-credit
+  element found in the page". A fetch by hand of § 30116 showed why: uscode.house.gov was serving
+  its House "Under Maintenance" page with HTTP 200, and nothing in the report said so. The unit:
+  when a fetcher's parse refuses a page, the error detail also names what was served, at least its
+  `<title>`, so a page that did not load reads apart from one whose layout or text changed. The
+  ERROR is already the safe answer, since nothing reads the wrong page as the document, so this
+  changes the wording only.
 - **Node 20 → newer action majors.** `actions/checkout@v4` and `actions/setup-python@v5` currently
   run on Node 24 with a deprecation warning (Node 20 sunset, GitHub 2025-09-19). Bump to action
   majors that target Node 24 across every workflow (`ci.yml`, `cross-repo.yml`,

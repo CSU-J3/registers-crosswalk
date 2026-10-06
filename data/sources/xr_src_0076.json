@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0076",
+  "kind": "source",
+  "citation": "SNCC debates Freedom Summer",
+  "title": "SNCC debates Freedom Summer, timeline entry for January 1964",
+  "publisher": "SNCC Digital Gateway",
+  "canonical_url": "https://snccdigital.org/events/sncc-debates-freedom-summer/",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "68dfe7b6f18c8e7dc6c0899db6f177c109b82109de1805adf790fbf0ca19841f",
+    "byte_length": 44126,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-06T01:36:56.781905Z",
+    "drift_key": "sha256",
+    "drift_value": "68dfe7b6f18c8e7dc6c0899db6f177c109b82109de1805adf790fbf0ca19841f"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Timeline entry for January 1964; its page metadata reads published 2016-10-13, modified 2021-09-24."
+}

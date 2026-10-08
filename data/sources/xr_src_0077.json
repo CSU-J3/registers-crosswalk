@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0077",
+  "kind": "source",
+  "citation": "DSCC Statement on Maine Senate Race",
+  "title": "DSCC Statement on Maine Senate Race",
+  "publisher": "Democratic Senatorial Campaign Committee",
+  "canonical_url": "https://www.dscc.org/article/dscc-statement-on-maine-senate-race-2/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-07",
+  "published_at": "2026-07-06",
+  "artifact": {
+    "sha256": "17c595fe58553a789b2e800df5f19ec524419934303725a7046ac4c54ace257d",
+    "byte_length": 72756,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-08T16:14:53.159682Z",
+    "drift_key": "sha256",
+    "drift_value": "17c595fe58553a789b2e800df5f19ec524419934303725a7046ac4c54ace257d"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260707001827/https://www.dscc.org/article/dscc-statement-on-maine-senate-race-2/",
+      "captured_at": "2026-07-07T00:18:27Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

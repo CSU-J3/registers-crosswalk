@@ -714,6 +714,16 @@ same request, and the two are the fixtures `wayback_id_dscc_served_2026-10-04.js
 `wayback_id_pbs_redirected_2026-10-04.json`, which the capture-pin tests read; the 404 is still
 2026-09-26's. Three requests to Wayback, no 429. Nothing went into `data/`.
 
+**The first capture pin went in on 2026-10-08 (UTC): the DSCC's statement at 20260707001827, as
+`xr_src_0077`.** `pin add wayback` minted it into `data/` from a single capture read, served at
+exactly that timestamp. Its drift value, sha256 `17c595fe…` over 72,756 bytes, is the scratch
+record's of 2026-10-04 (step 4 of the convention above), and so is every other mapped field. It is
+graded B1, by the mirror rule above. The test suite, run next, sent the same capture read twice
+more, between 16:15 and 16:20 UTC, because one test had no stand-in for capture pins. What Wayback
+answered those two is not known; the test did not record it. That makes three requests to Wayback
+on 2026-10-08, with no 429 on the first. #48 gave that test a stand-in and put every test behind
+the offline guard.
+
 ## `add` cannot write a record that fails to load
 
 Before writing, `pin add` runs the would-be record through

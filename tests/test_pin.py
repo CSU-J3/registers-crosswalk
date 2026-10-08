@@ -1278,7 +1278,9 @@ def test_decoding_reads_a_lowercase_content_encoding():
     assert pinmod._decoded(raw, {"Content-Encoding": "gzip"}) == ARCHIVED_BODY  # noqa: SLF001
 
 
-def test_a_capture_fetch_decodes_lowercase_headers_and_says_what_was_served(monkeypatch):
+def test_a_capture_fetch_decodes_lowercase_headers_and_says_what_was_served(
+    monkeypatch, real_capture_read
+):
     final = f"https://web.archive.org/web/{ARCHIVED_TS}id_/{ECFR_URL}"
     response = _FakeResponse(
         gzip.compress(ARCHIVED_BODY),

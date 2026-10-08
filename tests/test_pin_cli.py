@@ -1269,14 +1269,16 @@ def test_check_archives_missing_detail_gives_the_age_and_the_next_step(
 # --------------------------------------------------- the manifest verifies; the record lists all
 
 
-def test_the_ledger_manifest_is_what_pin_blobs_would_write(tmp_path, monkeypatch, capsys):
-    """Over the real data dir: the manifest lists exactly the pins `pin blobs` can write.
+def _manifest_and_blobs(data, tmp_path, monkeypatch, capsys):
+    """What `ledger --format manifest` prints for `data`, and the MANIFEST.sha256 `blobs` writes.
 
     The bytes are not here (this repo never holds them), so the simulation stands each document in
     with its own sha256 and hashes by reading it back: every pin whose bytes can be re-obtained
-    verifies, and a U.S. Code prelim, whose page varies per request, does not.
+    verifies, and a U.S. Code prelim, whose page varies per request, does not. A capture pin is
+    read from its capture, at its own timestamp, never from its live URL, so the stand-in answers
+    there too.
     """
-    xw = Crosswalk(DATA)
+    xw = Crosswalk(data)
     by_url = {}
     for s in xw.sources.values():
         by_url.setdefault(s.canonical_url, set()).add(s.artifact.sha256)
@@ -1287,18 +1289,57 @@ def test_the_ledger_manifest_is_what_pin_blobs_would_write(tmp_path, monkeypatch
         varies = any(s.canonical_url == url and s.fetcher == "uscode" for s in xw.sources.values())
         return (b"this request's session tokens" if varies else sha.encode()), "application/pdf"
 
+    def capture(url, *, timeout=90):
+        ts, original = re.fullmatch(r"https://web\.archive\.org/web/(\d{14})id_/(.+)", url).groups()
+        (sha,) = by_url[original]
+        when = datetime.strptime(ts, "%Y%m%d%H%M%S").replace(tzinfo=UTC)
+        return sha.encode(), url, {"memento-datetime": format_datetime(when, usegmt=True)}
+
     monkeypatch.setattr(pinmod, "sha256_hex", lambda body: body.decode("utf-8", "replace"))
     out = tmp_path / "pins"
-    save_blobs(sorted(xw.sources.values(), key=lambda s: s.xr_id), out, fetch=fetch, env={})
+    targets = sorted(xw.sources.values(), key=lambda s: s.xr_id)
+    save_blobs(targets, out, fetch=fetch, env={}, capture_fn=capture)
     write_blob_manifest(xw.sources.values(), out)
     monkeypatch.undo()
 
-    main(["--data-dir", str(DATA), "ledger", "--format", "manifest"], fetch=_fetch())
-    printed = capsys.readouterr()
-    assert printed.out.encode() == (out / "MANIFEST.sha256").read_bytes()
+    main(["--data-dir", str(data), "ledger", "--format", "manifest"], fetch=_fetch())
+    return capsys.readouterr(), (out / "MANIFEST.sha256").read_bytes()
+
+
+def test_the_ledger_manifest_is_what_pin_blobs_would_write(tmp_path, monkeypatch, capsys):
+    """Over the real data dir: the manifest lists exactly the pins `pin blobs` can write."""
+    printed, written = _manifest_and_blobs(DATA, tmp_path, monkeypatch, capsys)
+    assert printed.out.encode() == written
+    xw = Crosswalk(DATA)
     prelims = sorted(s.xr_id for s in xw.sources.values() if s.artifact.drift_key != "sha256")
     assert prelims and all(x in printed.err for x in prelims)
     assert not any(x in printed.out for x in prelims)
+
+
+def test_the_ledger_manifest_is_what_pin_blobs_would_write_with_a_capture_pin(
+    tmp_path, monkeypatch, capsys
+):
+    """The same, over a register holding a capture pin, which data/ need not: `blobs` reads that
+    pin from its capture. It is minted by `add`, answered as Wayback answered on 2026-10-04."""
+    data = tmp_path / "data"
+    assert _add(data) == 0
+    observed = json.loads(
+        (FIXTURES / "wayback_id_dscc_served_2026-10-04.json").read_text(encoding="utf-8")
+    )
+
+    def as_observed(url, *, timeout=90):
+        assert url == observed["requested_url"]
+        return WB_BODY, observed["final_url"], dict(observed["headers"])
+
+    monkeypatch.setattr("registers_crosswalk.pin._fetch_capture", as_observed)
+    assert _add_capture(data) == 0
+    monkeypatch.undo()
+    capsys.readouterr()
+
+    printed, written = _manifest_and_blobs(data, tmp_path, monkeypatch, capsys)
+    assert printed.out.encode() == written
+    names = [line.split("  ", 1)[1] for line in printed.out.splitlines()]
+    assert [name.split("-", 1)[0] for name in names] == ["xr_src_0001", "xr_src_0002"]
 
 
 @pytest.mark.parametrize("fmt", ["manifest", "record"])

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from registers_crosswalk import fetchers
 from registers_crosswalk import pin as pinmod
 from registers_crosswalk.models import ArchiveCopy, Source
 from registers_crosswalk.pin import (
@@ -1279,10 +1280,17 @@ def _manifest_and_blobs(data, tmp_path, monkeypatch, capsys):
     there too.
     """
     xw = Crosswalk(data)
-    by_url = {}
+    # A document pin is one set of bytes per URL. A capture pin is one per URL and timestamp: two
+    # captures of one page on different UTC days are two pins, both live (xr_src_0104 and 0114).
+    by_url, by_capture = {}, {}
     for s in xw.sources.values():
-        by_url.setdefault(s.canonical_url, set()).add(s.artifact.sha256)
+        if fetchers.fixed_bytes(s.fetcher):
+            ts = re.search(r"/web/(\d{14})/", s.archives[0].url).group(1)
+            by_capture.setdefault((s.canonical_url, ts), set()).add(s.artifact.sha256)
+        else:
+            by_url.setdefault(s.canonical_url, set()).add(s.artifact.sha256)
     assert all(len(v) == 1 for v in by_url.values())
+    assert all(len(v) == 1 for v in by_capture.values())
 
     def fetch(url, headers=None):
         (sha,) = by_url[url]
@@ -1291,7 +1299,7 @@ def _manifest_and_blobs(data, tmp_path, monkeypatch, capsys):
 
     def capture(url, *, timeout=90):
         ts, original = re.fullmatch(r"https://web\.archive\.org/web/(\d{14})id_/(.+)", url).groups()
-        (sha,) = by_url[original]
+        (sha,) = by_capture[(original, ts)]
         when = datetime.strptime(ts, "%Y%m%d%H%M%S").replace(tzinfo=UTC)
         return sha.encode(), url, {"memento-datetime": format_datetime(when, usegmt=True)}
 

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0105",
+  "kind": "source",
+  "citation": "Rep. Nancy Mace Calls For Rep. Tony Gonzales To Resign Following Sexual Harassment Allegations",
+  "title": "Rep. Nancy Mace Calls For Rep. Tony Gonzales To Resign Following Sexual Harassment Allegations",
+  "publisher": "Office of Rep. Nancy Mace",
+  "canonical_url": "https://mace.house.gov/media/press-releases/rep-nancy-mace-calls-rep-tony-gonzales-resign-following-sexual-harassment",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-02-25",
+  "published_at": "2026-02-23",
+  "artifact": {
+    "sha256": "8db0afe4be63e6ff22fbd96824dea6f421fd3d2e4bdafb209764dc5391951d00",
+    "byte_length": 55214,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T18:44:42.256553Z",
+    "drift_key": "sha256",
+    "drift_value": "8db0afe4be63e6ff22fbd96824dea6f421fd3d2e4bdafb209764dc5391951d00"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260225073828/https://mace.house.gov/media/press-releases/rep-nancy-mace-calls-rep-tony-gonzales-resign-following-sexual-harassment",
+      "captured_at": "2026-02-25T07:38:28Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

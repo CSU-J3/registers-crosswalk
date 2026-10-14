@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0106",
+  "kind": "source",
+  "citation": "Rep. Tony Gonzales, forced into runoff, admits to affair with aide who died by suicide",
+  "title": "Rep. Tony Gonzales, forced into runoff, admits to affair with aide who died by suicide",
+  "publisher": "The Texas Tribune",
+  "canonical_url": "https://www.texastribune.org/2026/03/04/tony-gonzales-admits-affair-staffer-suicide-texas-23rd-district-congress/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-03-05",
+  "published_at": "2026-03-04",
+  "artifact": {
+    "sha256": "3558be1f10b6e6b1237deb065dcbe33f7ee2769f56965e29ad93bee95dd59480",
+    "byte_length": 324305,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T18:50:59.327317Z",
+    "drift_key": "sha256",
+    "drift_value": "3558be1f10b6e6b1237deb065dcbe33f7ee2769f56965e29ad93bee95dd59480"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260305012921/https://www.texastribune.org/2026/03/04/tony-gonzales-admits-affair-staffer-suicide-texas-23rd-district-congress/",
+      "captured_at": "2026-03-05T01:29:21Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

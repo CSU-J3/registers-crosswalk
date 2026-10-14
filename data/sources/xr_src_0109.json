@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0109",
+  "kind": "source",
+  "citation": "Troy Jackson files paperwork to explore replacing Graham Platner",
+  "title": "Troy Jackson files paperwork to explore replacing Graham Platner",
+  "publisher": "Bangor Daily News",
+  "canonical_url": "https://www.bangordailynews.com/2026/07/07/politics/elections/troy-jackson-exploring-graham-platner-replacement/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-07",
+  "published_at": "2026-07-07",
+  "artifact": {
+    "sha256": "f41b1192817e8b2785f4b757a6bac6acac058a5d4b64998b8939c33e070a4800",
+    "byte_length": 305406,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T19:07:50.474818Z",
+    "drift_key": "sha256",
+    "drift_value": "f41b1192817e8b2785f4b757a6bac6acac058a5d4b64998b8939c33e070a4800"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260707170952/https://www.bangordailynews.com/2026/07/07/politics/elections/troy-jackson-exploring-graham-platner-replacement/",
+      "captured_at": "2026-07-07T17:09:52Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

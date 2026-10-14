@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0119",
+  "kind": "source",
+  "citation": "Nebraska U.S. Senate primary loser seeks to force Dems to appoint replacement candidate after winner dropped out",
+  "title": "Nebraska U.S. Senate primary loser seeks to force Dems to appoint replacement candidate after winner dropped out",
+  "publisher": "Nebraska Public Media",
+  "canonical_url": "https://nebraskapublicmedia.org/en/news/news-articles/nebraska-senate-primary-loser-seeks-to-force-dems-to-appoint-replacement-candidate-after-winner-dropped-out/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-28",
+  "published_at": "2026-07-27",
+  "artifact": {
+    "sha256": "5cb66c0def645fad421d4250135264b50d26b979473cbc26d84e08dbdf8a9558",
+    "byte_length": 125992,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T21:15:13.265384Z",
+    "drift_key": "sha256",
+    "drift_value": "5cb66c0def645fad421d4250135264b50d26b979473cbc26d84e08dbdf8a9558"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260728062246/https://nebraskapublicmedia.org/en/news/news-articles/nebraska-senate-primary-loser-seeks-to-force-dems-to-appoint-replacement-candidate-after-winner-dropped-out/",
+      "captured_at": "2026-07-28T06:22:46Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0090",
+  "kind": "source",
+  "citation": "Statement from Maine Democratic Party Leadership on Allegations Against Graham Platner",
+  "title": "Statement from Maine Democratic Party Leadership on Allegations Against Graham Platner",
+  "publisher": "Maine Democratic Party",
+  "canonical_url": "https://mainedems.org/statement-from-maine-democratic-party-leadership-on-allegations-against-graham-platner/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-07",
+  "published_at": "2026-07-06",
+  "artifact": {
+    "sha256": "9680b93a7085db0567821238ad780c6d42d80def2d5fec04299f2fd38987918d",
+    "byte_length": 530796,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T00:23:41.429799Z",
+    "drift_key": "sha256",
+    "drift_value": "9680b93a7085db0567821238ad780c6d42d80def2d5fec04299f2fd38987918d"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260707003431/https://mainedems.org/statement-from-maine-democratic-party-leadership-on-allegations-against-graham-platner/",
+      "captured_at": "2026-07-07T00:34:31Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

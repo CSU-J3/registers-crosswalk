@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0104",
+  "kind": "source",
+  "citation": "Texts show Rep. Tony Gonzales asked for explicit photos from aide who later died by suicide",
+  "title": "Texts show Rep. Tony Gonzales asked for explicit photos from aide who later died by suicide",
+  "publisher": "The Texas Tribune",
+  "canonical_url": "https://www.texastribune.org/2026/02/23/tony-gonzales-affair-dead-staffer-texts-police-report/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-02-23",
+  "published_at": "2026-02-23",
+  "artifact": {
+    "sha256": "fd93a5f20a2722d391a3fed2c86379a111a969b2cb2c9b0040a2439000cf0f22",
+    "byte_length": 334274,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T18:40:30.345403Z",
+    "drift_key": "sha256",
+    "drift_value": "fd93a5f20a2722d391a3fed2c86379a111a969b2cb2c9b0040a2439000cf0f22"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260223214623/https://www.texastribune.org/2026/02/23/tony-gonzales-affair-dead-staffer-texts-police-report/",
+      "captured_at": "2026-02-23T21:46:23Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The earliest capture, 15 minutes after the dateline (Feb. 23, 2026, 3:31 p.m. Central). The Tribune later revised the sourcing sentence, with no correction note and no change to dateModified (2026-02-23T15:31:10-06:00): this copy says the aide's husband \"released these text messages to the San Antonio Express-News over the weekend\"; the page as served on 2026-10-14 says he \"shared these text messages with The Texas Tribune on Monday\" and that he told \"the San Antonio Express-News, which published the text messages first\"."
+}

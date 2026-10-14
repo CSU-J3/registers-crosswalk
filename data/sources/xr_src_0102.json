@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0102",
+  "kind": "source",
+  "citation": "Tony Gonzales had affair with aide who set herself on fire, ex-staffer says",
+  "title": "Tony Gonzales had affair with aide who set herself on fire, ex-staffer says",
+  "publisher": "San Antonio Express-News",
+  "canonical_url": "https://www.expressnews.com/news/article/tony-gonzales-affair-regina-santos-aviles-21357720.php",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-02-18",
+  "published_at": "2026-02-17",
+  "artifact": {
+    "sha256": "7350e8b26ba242b4c414a48cf06bb48ee36b5566cb43234c45c802ee3e98ad70",
+    "byte_length": 621059,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T18:31:30.522039Z",
+    "drift_key": "sha256",
+    "drift_value": "7350e8b26ba242b4c414a48cf06bb48ee36b5566cb43234c45c802ee3e98ad70"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260218022317/https://www.expressnews.com/news/article/tony-gonzales-affair-regina-santos-aviles-21357720.php",
+      "captured_at": "2026-02-18T02:23:17Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Wayback's first capture of this page, at 2026-02-18 01:47:33 UTC, is a 403."
+}

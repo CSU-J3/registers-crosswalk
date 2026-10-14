@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0092",
+  "kind": "source",
+  "citation": "Will Maine voters extend 'forgiveness' to another Graham Platner controversy?",
+  "title": "Will Maine voters extend 'forgiveness' to another Graham Platner controversy?",
+  "publisher": "NPR",
+  "canonical_url": "https://www.npr.org/2026/06/01/nx-s1-5822562/graham-platner-maine-senate-controversy-texts-iran-war-hegseth",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-06-01",
+  "published_at": "2026-06-01",
+  "artifact": {
+    "sha256": "baccb18d26530db3442b0150c38890d8482e9c3b0365f75c30ed9a4e6d60f975",
+    "byte_length": 96665,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T00:32:33.850428Z",
+    "drift_key": "sha256",
+    "drift_value": "baccb18d26530db3442b0150c38890d8482e9c3b0365f75c30ed9a4e6d60f975"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260601104603/https://www.npr.org/2026/06/01/nx-s1-5822562/graham-platner-maine-senate-controversy-texts-iran-war-hegseth",
+      "captured_at": "2026-06-01T10:46:03Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

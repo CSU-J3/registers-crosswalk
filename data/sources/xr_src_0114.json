@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0114",
+  "kind": "source",
+  "citation": "Texts show Rep. Tony Gonzales asked for explicit photos from aide who later died by suicide",
+  "title": "Texts show Rep. Tony Gonzales asked for explicit photos from aide who later died by suicide",
+  "publisher": "The Texas Tribune",
+  "canonical_url": "https://www.texastribune.org/2026/02/23/tony-gonzales-affair-dead-staffer-texts-police-report/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-28",
+  "published_at": "2026-02-23",
+  "artifact": {
+    "sha256": "966da53fcd8d44f9921f879e2a966424ada02cdbaa2b1401d1eaea19aaf5d81f",
+    "byte_length": 327804,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T20:26:58.514745Z",
+    "drift_key": "sha256",
+    "drift_value": "966da53fcd8d44f9921f879e2a966424ada02cdbaa2b1401d1eaea19aaf5d81f"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260728214308/https://www.texastribune.org/2026/02/23/tony-gonzales-affair-dead-staffer-texts-police-report/",
+      "captured_at": "2026-07-28T21:43:08Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The story as revised: it says the aide's husband \"shared these text messages with The Texas Tribune on Monday\" and that he told \"the San Antonio Express-News, which published the text messages first\". The capture at 2026-02-23 21:51:12 UTC still reads \"over the weekend\", so the revision landed between then and this capture, 2026-07-28 21:43:08 UTC, with no correction note. Wayback's listing gave this capture as 20260728214309; it is served, and recorded here, at 20260728214308. xr_src_0104 holds the first version."
+}

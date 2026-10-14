@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0088",
+  "kind": "source",
+  "citation": "Democrats begin pulling Platner endorsements after Maine Senate candidate faces sexual assault allegation",
+  "title": "Democrats begin pulling Platner endorsements after Maine Senate candidate faces sexual assault allegation",
+  "publisher": "PBS News",
+  "canonical_url": "https://www.pbs.org/newshour/politics/democrats-begin-pulling-platner-endorsements-after-maine-senate-candidate-faces-sexual-assault-allegation",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-07",
+  "published_at": "2026-07-07",
+  "artifact": {
+    "sha256": "66cbdb3c4bc5126089b21b1b2b1052d270cad8b818b7a38be4582798782693f7",
+    "byte_length": 272888,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T00:19:36.287639Z",
+    "drift_key": "sha256",
+    "drift_value": "66cbdb3c4bc5126089b21b1b2b1052d270cad8b818b7a38be4582798782693f7"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260707155507/https://www.pbs.org/newshour/politics/democrats-begin-pulling-platner-endorsements-after-maine-senate-candidate-faces-sexual-assault-allegation",
+      "captured_at": "2026-07-07T15:55:07Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "An Associated Press story (Kimberlee Kruesi, Nicholas Riccardi), as PBS News ran it."
+}

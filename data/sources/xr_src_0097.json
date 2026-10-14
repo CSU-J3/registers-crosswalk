@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0097",
+  "kind": "source",
+  "citation": "US Rep. Tony Gonzales refuses to answer questions about alleged affair with staffer who died after catching fire",
+  "title": "US Rep. Tony Gonzales refuses to answer questions about alleged affair with staffer who died after catching fire",
+  "publisher": "KSAT",
+  "canonical_url": "https://www.ksat.com/news/ksat-investigates/2025/11/11/us-rep-tony-gonzales-refuses-to-answer-questions-about-alleged-affair-with-staffer-who-died-after-catching-fire/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2025-11-11",
+  "published_at": "2025-11-11",
+  "artifact": {
+    "sha256": "cad9a92a08708f8773a8e3b7edf5626f9c0670f1cc3357d2d35376a4d7589b4a",
+    "byte_length": 948398,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T02:46:33.048429Z",
+    "drift_key": "sha256",
+    "drift_value": "cad9a92a08708f8773a8e3b7edf5626f9c0670f1cc3357d2d35376a4d7589b4a"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20251111234343/https://www.ksat.com/news/ksat-investigates/2025/11/11/us-rep-tony-gonzales-refuses-to-answer-questions-about-alleged-affair-with-staffer-who-died-after-catching-fire/",
+      "captured_at": "2025-11-11T23:43:43Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

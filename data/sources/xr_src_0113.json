@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0113",
+  "kind": "source",
+  "citation": "GOP Rep. Gonzales gives up on reelection bid",
+  "title": "GOP Rep. Gonzales gives up on reelection bid",
+  "publisher": "Roll Call",
+  "canonical_url": "https://rollcall.com/2026/03/05/gop-leadership-urges-gonzales-to-give-up-reelection-bid/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-03-06",
+  "published_at": "2026-03-05",
+  "artifact": {
+    "sha256": "e536554fe4d5f77d00f2843a7a324f439113ce5de39b0986af83ca60ddc0df04",
+    "byte_length": 230507,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T20:13:50.175379Z",
+    "drift_key": "sha256",
+    "drift_value": "e536554fe4d5f77d00f2843a7a324f439113ce5de39b0986af83ca60ddc0df04"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260306120711/https://rollcall.com/2026/03/05/gop-leadership-urges-gonzales-to-give-up-reelection-bid/",
+      "captured_at": "2026-03-06T12:07:11Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The updated story. The first version, captured 2026-03-05 21:22:34 UTC, is titled \"GOP leadership urges Gonzales to give up reelection bid\" and was posted at 3:14pm, before the announcement; the two captures together fix the order of the leaders' call and the withdrawal."
+}

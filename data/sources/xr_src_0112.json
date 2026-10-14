@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0112",
+  "kind": "source",
+  "citation": "Graham Platner drops his bid for Senate after facing an allegation of rape",
+  "title": "Graham Platner drops his bid for Senate after facing an allegation of rape",
+  "publisher": "NPR",
+  "canonical_url": "https://www.npr.org/2026/07/08/g-s1-132220/graham-platner-maine-senate-assault-allegation",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-09",
+  "published_at": "2026-07-08",
+  "artifact": {
+    "sha256": "c4ed8c91cfcc084e25fc00af7ebd2ec2a46a29b66a83629d7537132ddf1ce2fc",
+    "byte_length": 153848,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T20:09:44.341919Z",
+    "drift_key": "sha256",
+    "drift_value": "c4ed8c91cfcc084e25fc00af7ebd2ec2a46a29b66a83629d7537132ddf1ce2fc"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260709005645/https://www.npr.org/2026/07/08/g-s1-132220/graham-platner-maine-senate-assault-allegation",
+      "captured_at": "2026-07-09T00:56:45Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

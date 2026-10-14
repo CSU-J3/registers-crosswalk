@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0087",
+  "kind": "source",
+  "citation": "Top Democratic Leaders Call for Platner to Withdraw from Senate Race",
+  "title": "Top Democratic Leaders Call for Platner to Withdraw from Senate Race",
+  "publisher": "NOTUS",
+  "canonical_url": "https://www.notus.org/2026-election/top-democrats-call-platner-to-withdraw-maine-senate-race",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-07",
+  "published_at": "2026-07-06",
+  "artifact": {
+    "sha256": "02f4aaf7dab03e155c5ce68d34b0f100c05996cc4fadd3f5f9fe0c5d8240cad7",
+    "byte_length": 381483,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T00:17:33.742123Z",
+    "drift_key": "sha256",
+    "drift_value": "02f4aaf7dab03e155c5ce68d34b0f100c05996cc4fadd3f5f9fe0c5d8240cad7"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260707040615/https://www.notus.org/2026-election/top-democrats-call-platner-to-withdraw-maine-senate-race",
+      "captured_at": "2026-07-07T04:06:15Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The notus.org address now redirects to washingtonsun.com (seen 2026-10-04)."
+}

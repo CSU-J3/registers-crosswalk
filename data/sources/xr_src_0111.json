@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0111",
+  "kind": "source",
+  "citation": "Married Congressman had alleged affair with aide... before she set herself on fire: Bombshell revelation as police block release of 911 call and other evidence",
+  "title": "Married Congressman had alleged affair with aide... before she set herself on fire: Bombshell revelation as police block release of 911 call and other evidence",
+  "publisher": "Daily Mail",
+  "canonical_url": "https://www.dailymail.co.uk/news/article-15171481/Congressman-Tony-Gonzales-affair-staffer-Regina-Santos-Aviles-died-doused-gas-set-fire.html",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2025-10-20",
+  "published_at": "2025-10-20",
+  "artifact": {
+    "sha256": "c33c6c827bdb7b3c730549b87c40d5bb7a06d37173599d96b5ca8014bcc71112",
+    "byte_length": 947134,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T19:20:00.391790Z",
+    "drift_key": "sha256",
+    "drift_value": "c33c6c827bdb7b3c730549b87c40d5bb7a06d37173599d96b5ca8014bcc71112"
+  },
+  "grade": {
+    "reliability": "C",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20251020190954/https://www.dailymail.co.uk/news/article-15171481/Congressman-Tony-Gonzales-affair-staffer-Regina-Santos-Aviles-died-doused-gas-set-fire.html",
+      "captured_at": "2025-10-20T19:09:54Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The page states \"Published: 15:00 EDT, 20 October 2025 | Updated: 15:05 EDT, 20 October 2025\". A spokesman for Gonzales responded: \"[The aide] was a kind soul who had a lasting impact on her community, which she continued to serve until her untimely death,\" and \"To see political bottom feeders distort the circumstances around her passing is truly sickening. Tony Gonzales remains laser-focused on delivering historic achievements for Texas and condemns any attempts to misuse this tragedy.\" The page adds: \"His spokesman didn't engage when repeatedly offered the opportunity to deny the affair by the Daily Mail.\""
+}

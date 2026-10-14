@@ -214,6 +214,12 @@ def default_fetch(
         return _decoded(raw, resp.headers), media_type
 
 
+_GZIP_MAGIC = b"\x1f\x8b"
+# Set by `_fetch_capture` on the headers it returns, never by a server: the capture came with
+# "Content-Encoding: gzip" over a body that is not gzip, and the body was taken as served.
+ENCODING_MISMATCH = "x-registers-crosswalk-encoding-mismatch"
+
+
 def _decoded(raw: bytes, headers: Mapping[str, str]) -> bytes:
     """`raw` with its Content-Encoding undone. The hash is ALWAYS over the decoded bytes.
 
@@ -221,10 +227,15 @@ def _decoded(raw: bytes, headers: Mapping[str, str]) -> bytes:
     lowercase, and an exact-case lookup of a plain dict of those headers hashed still-gzipped bytes
     for seven courtlistener captures in a verification run on 2026-09-24, which then read as seven
     mismatches.
+
+    Only bytes that are gzip are decompressed. On 2026-10-14 Wayback served a capture of the
+    Nebraska Examiner with its stored "Content-Encoding: gzip" over a body it had already
+    decompressed, and `gzip.decompress` refused it. A body without the gzip magic bytes is taken as
+    served; `_fetch_capture` flags it (`ENCODING_MISMATCH`) so a pin's note can say so.
     """
     encoding = (_header(headers, "Content-Encoding") or "").lower()
     if encoding == "gzip":
-        return gzip.decompress(raw)
+        return gzip.decompress(raw) if raw[:2] == _GZIP_MAGIC else raw
     if encoding == "deflate":
         return zlib.decompress(raw)
     return raw
@@ -448,6 +459,8 @@ def _fetch_capture(url: str, *, timeout: float = 90) -> tuple[bytes, str, Mappin
         raw = resp.read()
         final = resp.geturl()
         headers = {key.lower(): value for key, value in resp.headers.items()}
+    if headers.get("content-encoding", "").lower() == "gzip" and raw[:2] != _GZIP_MAGIC:
+        headers[ENCODING_MISMATCH] = "gzip declared over a body that is not gzip; taken as served"
     return _decoded(raw, headers), final, headers
 
 

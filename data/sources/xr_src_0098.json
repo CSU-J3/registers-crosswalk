@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0098",
+  "kind": "source",
+  "citation": "2026 Republican Primary Election, official results (election 53813)",
+  "title": "2026 Republican Primary Election, official results (election 53813)",
+  "publisher": "Texas Secretary of State",
+  "canonical_url": "https://goelect.txelections.civixapps.com/api-ivis-system/api/s3/enr/election/53813",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "a9b22f704e57202d96dfe323217c47eba090e830472ef17e30b3524f90147cc0",
+    "byte_length": 1818632,
+    "media_type": "application/json",
+    "fetched_at": "2026-10-14T03:15:48.850034Z",
+    "drift_key": "sha256",
+    "drift_value": "a9b22f704e57202d96dfe323217c47eba090e830472ef17e30b3524f90147cc0"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Election of 2026-03-03; results last updated Apr 14, 2026 20:48:17, all 254 counties reporting, the official canvass report listed (PDF). U.S. Representative District 23: Brandon Herrera 23,932 (43.31%), Tony Gonzales (I) 23,073 (41.75%), Keith Barton 4,696 (8.50%), Francisco \"Quico\" Canseco 3,562 (6.45%); 55,263 votes."
+}

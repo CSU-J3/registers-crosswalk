@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0118",
+  "kind": "source",
+  "citation": "Nebraska judge says Democrats not required to replace dropout candidate on ballot",
+  "title": "Nebraska judge says Democrats not required to replace dropout candidate on ballot",
+  "publisher": "Courthouse News Service",
+  "canonical_url": "https://www.courthousenews.com/nebraska-judge-says-democrats-not-required-to-replace-dropout-candidate-on-ballot/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-09-22",
+  "published_at": "2026-08-26",
+  "artifact": {
+    "sha256": "5d6f5084fd76d91d908121e5df05a36a8932216cb84c23e162d8f32304a4d36a",
+    "byte_length": 110084,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T21:11:03.666447Z",
+    "drift_key": "sha256",
+    "drift_value": "5d6f5084fd76d91d908121e5df05a36a8932216cb84c23e162d8f32304a4d36a"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260922055843/https://www.courthousenews.com/nebraska-judge-says-democrats-not-required-to-replace-dropout-candidate-on-ballot/",
+      "captured_at": "2026-09-22T05:58:43Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

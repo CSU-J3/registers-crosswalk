@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0115",
+  "kind": "source",
+  "citation": "Live updates: Platner could address future of campaign Wednesday as Maine Dems call emergency meeting",
+  "title": "Live updates: Platner could address future of campaign Wednesday as Maine Dems call emergency meeting",
+  "publisher": "Portland Press Herald",
+  "canonical_url": "https://www.pressherald.com/2026/07/08/live-updates-platner-campaign-reportedly-confirms-contact-with-maine-dems-if-he-drops-out/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-08",
+  "published_at": "2026-07-08",
+  "artifact": {
+    "sha256": "75f045575b0c629c3e138e0439021206dfb4eae0808dce07485125d38ff8ff97",
+    "byte_length": 350834,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T20:29:05.828793Z",
+    "drift_key": "sha256",
+    "drift_value": "75f045575b0c629c3e138e0439021206dfb4eae0808dce07485125d38ff8ff97"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260708213226/https://www.pressherald.com/2026/07/08/live-updates-platner-campaign-reportedly-confirms-contact-with-maine-dems-if-he-drops-out/",
+      "captured_at": "2026-07-08T21:32:26Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The earliest capture holding the entry “Former Platner organizing director quits similar role for Maine Democrats over party’s refusal to work with campaign” (updated 4:46 pm, July 8, 2026)."
+}

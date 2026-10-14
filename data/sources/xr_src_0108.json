@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0108",
+  "kind": "source",
+  "citation": "Tony Gonzales faces GOP calls to resign over alleged affair",
+  "title": "Tony Gonzales faces GOP calls to resign over alleged affair",
+  "publisher": "Axios",
+  "canonical_url": "https://www.axios.com/2026/02/23/tony-gonzales-affair-staffer-gop-resignation-calls",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-02-24",
+  "published_at": "2026-02-23",
+  "artifact": {
+    "sha256": "4167309765fe083d082bd95762c515826ae32093c27e285b23f43f98b2656f14",
+    "byte_length": 218746,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T18:59:32.312110Z",
+    "drift_key": "sha256",
+    "drift_value": "4167309765fe083d082bd95762c515826ae32093c27e285b23f43f98b2656f14"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260224105558/https://www.axios.com/2026/02/23/tony-gonzales-affair-staffer-gop-resignation-calls",
+      "captured_at": "2026-02-24T10:55:58Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

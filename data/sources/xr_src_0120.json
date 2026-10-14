@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0120",
+  "kind": "source",
+  "citation": "NDP Press Release – Statement on William Forbes Lawsuit Ruled in Favor of the NDP",
+  "title": "NDP Press Release – Statement on William Forbes Lawsuit Ruled in Favor of the NDP",
+  "publisher": "Nebraska Democratic Party",
+  "canonical_url": "https://nebraskademocrats.org/blog/ndp-press-release-statement-on-william-forbes-lawsuit-ruled-in-favor-of-the-ndp/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-10-14",
+  "published_at": "2026-08-26",
+  "artifact": {
+    "sha256": "e13399d6f8b49d5ce436fb3611ce2b1ab57c1703208702fad2b36edb6cc03aaa",
+    "byte_length": 155622,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T23:08:43.236284Z",
+    "drift_key": "sha256",
+    "drift_value": "e13399d6f8b49d5ce436fb3611ce2b1ab57c1703208702fad2b36edb6cc03aaa"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20261014225642/https://nebraskademocrats.org/blog/ndp-press-release-statement-on-william-forbes-lawsuit-ruled-in-favor-of-the-ndp/",
+      "captured_at": "2026-10-14T22:56:42Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Wayback held no earlier capture of this page (a read on 2026-10-14 answered 404); the register asked Save Page Now for this one on 2026-10-14. The page's bytes change on every request under Cloudflare's email obfuscation. The page is dated August 26, 2026, while its subheading names the Nebraska Supreme Court's ruling of September 10, 2026: \"Nebraska Democratic Party Statement on the Nebraska Supreme Court Ruling in Our Favor on the William Forbes Lawsuit\"."
+}

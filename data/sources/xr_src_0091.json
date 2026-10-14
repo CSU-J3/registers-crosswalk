@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0091",
+  "kind": "source",
+  "citation": "Cuba: The Capital of 21st Century Communism",
+  "title": "Cuba: The Capital of 21st Century Communism",
+  "publisher": "U.S. Department of State",
+  "canonical_url": "https://www.state.gov/wp-content/uploads/2026/07/Cuba-Report.pdf",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-20",
+  "published_at": "2026-07-20",
+  "artifact": {
+    "sha256": "83e1185afc57af4afc0e83da16c813d88be0817e1c9675f2555c0207353e2246",
+    "byte_length": 46811453,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-14T00:28:28.454172Z",
+    "drift_key": "sha256",
+    "drift_value": "83e1185afc57af4afc0e83da16c813d88be0817e1c9675f2555c0207353e2246"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260720133150/https://www.state.gov/wp-content/uploads/2026/07/Cuba-Report.pdf",
+      "captured_at": "2026-07-20T13:31:50Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Landing page: https://www.state.gov/cuba-the-capital-of-21st-century-communism. The Communist Party membership figures are on page 8; the National Lawyers Guild passage opens page 75."
+}

@@ -1278,6 +1278,30 @@ def test_decoding_reads_a_lowercase_content_encoding():
     assert pinmod._decoded(raw, {"Content-Encoding": "gzip"}) == ARCHIVED_BODY  # noqa: SLF001
 
 
+def test_decoding_takes_a_body_that_is_not_gzip_as_served():
+    """2026-10-14: Wayback served the Nebraska Examiner's capture with its stored
+    "Content-Encoding: gzip" over a body it had already decompressed. Only gzip bytes are
+    decompressed; anything else is the body as served."""
+    assert pinmod._decoded(ARCHIVED_BODY, {"content-encoding": "gzip"}) == ARCHIVED_BODY  # noqa: SLF001
+    raw = gzip.compress(ARCHIVED_BODY)
+    assert pinmod._decoded(raw, {"content-encoding": "gzip"}) == ARCHIVED_BODY  # noqa: SLF001
+
+
+def test_a_capture_fetch_flags_a_gzip_header_over_a_plain_body(monkeypatch, real_capture_read):
+    final = f"https://web.archive.org/web/{ARCHIVED_TS}id_/{ECFR_URL}"
+    headers = {"content-encoding": "gzip", "memento-datetime": _memento(ARCHIVED_TS)}
+    plain = _FakeResponse(ARCHIVED_BODY, dict(headers), final)
+    monkeypatch.setattr(pinmod.urllib.request, "urlopen", lambda req, timeout=None: plain)
+    body, _, seen = pinmod._fetch_capture(final)  # noqa: SLF001
+    assert body == ARCHIVED_BODY
+    assert pinmod.ENCODING_MISMATCH in seen
+    gzipped = _FakeResponse(gzip.compress(ARCHIVED_BODY), dict(headers), final)
+    monkeypatch.setattr(pinmod.urllib.request, "urlopen", lambda req, timeout=None: gzipped)
+    body, _, seen = pinmod._fetch_capture(final)  # noqa: SLF001
+    assert body == ARCHIVED_BODY
+    assert pinmod.ENCODING_MISMATCH not in seen
+
+
 def test_a_capture_fetch_decodes_lowercase_headers_and_says_what_was_served(
     monkeypatch, real_capture_read
 ):

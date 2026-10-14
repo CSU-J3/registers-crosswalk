@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0078",
+  "kind": "source",
+  "citation": "Statement of the Chairman and Ranking Member of the Committee on Ethics Regarding Representative Tony Gonzales",
+  "title": "Statement of the Chairman and Ranking Member of the Committee on Ethics Regarding Representative Tony Gonzales",
+  "publisher": "U.S. House of Representatives, Committee on Ethics",
+  "canonical_url": "https://ethics.house.gov/wp-content/uploads/2026/03/Press-Release-Rep.-Gonzales-3.4.26.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2026-03-04",
+  "artifact": {
+    "sha256": "56d85ade29a2d509f076d1b4a1cb245864a25bfa7f434f391b7115a9e14b50a7",
+    "byte_length": 118500,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-13T21:08:21.713316Z",
+    "drift_key": "sha256",
+    "drift_value": "56d85ade29a2d509f076d1b4a1cb245864a25bfa7f434f391b7115a9e14b50a7"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "FOR RELEASE: Upon Receipt, March 4, 2026; one page."
+}

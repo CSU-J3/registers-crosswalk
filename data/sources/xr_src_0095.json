@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0095",
+  "kind": "source",
+  "citation": "Report: Al Franken Mulling Another Run At Public Office",
+  "title": "Report: Al Franken Mulling Another Run At Public Office",
+  "publisher": "CBS Minnesota",
+  "canonical_url": "https://www.cbsnews.com/minnesota/news/report-al-franken-mulling-another-run-at-public-office/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2025-02-15",
+  "published_at": "2021-09-14",
+  "artifact": {
+    "sha256": "3c4e2aa187ac5d349381eddf6e0d5144ee2dea31800f02a7a1a61eaa69fe1d9d",
+    "byte_length": 141839,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T02:38:20.110749Z",
+    "drift_key": "sha256",
+    "drift_value": "3c4e2aa187ac5d349381eddf6e0d5144ee2dea31800f02a7a1a61eaa69fe1d9d"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20250215124408/https://www.cbsnews.com/minnesota/news/report-al-franken-mulling-another-run-at-public-office/",
+      "captured_at": "2025-02-15T12:44:08Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

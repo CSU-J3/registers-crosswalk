@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0096",
+  "kind": "source",
+  "citation": "Report: Sources allege San Antonio U.S. Rep. Tony Gonzales had affair with staffer prior to her fiery death",
+  "title": "Report: Sources allege San Antonio U.S. Rep. Tony Gonzales had affair with staffer prior to her fiery death",
+  "publisher": "San Antonio Current",
+  "canonical_url": "https://www.sacurrent.com/news/san-antonio-news/gonzales-affair/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2025-10-21",
+  "published_at": "2025-10-21",
+  "artifact": {
+    "sha256": "a400e4b292cb6bbd7c6a1cf9681ec25f4803fb931a864fdab52fba6c9dd0d650",
+    "byte_length": 384677,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T02:42:25.984156Z",
+    "drift_key": "sha256",
+    "drift_value": "a400e4b292cb6bbd7c6a1cf9681ec25f4803fb931a864fdab52fba6c9dd0d650"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 3
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20251021212235/https://www.sacurrent.com/news/san-antonio-news/gonzales-affair/",
+      "captured_at": "2025-10-21T21:22:35Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

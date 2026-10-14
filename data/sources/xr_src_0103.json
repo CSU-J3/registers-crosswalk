@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0103",
+  "kind": "source",
+  "citation": "Rep. Tony Gonzales attacks primary opponent amid reporting of his affair with aide who died by suicide",
+  "title": "Rep. Tony Gonzales attacks primary opponent amid reporting of his affair with aide who died by suicide",
+  "publisher": "The Texas Tribune",
+  "canonical_url": "https://www.texastribune.org/2026/02/18/tony-gonzales-staffer-fire-affair-text-brandon-herrera/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-02-18",
+  "published_at": "2026-02-18",
+  "artifact": {
+    "sha256": "ca1fea7b11fe8c46c361e630c3317914c2119e9cff2993796d4b482d3f7506e9",
+    "byte_length": 315146,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T18:35:37.856091Z",
+    "drift_key": "sha256",
+    "drift_value": "ca1fea7b11fe8c46c361e630c3317914c2119e9cff2993796d4b482d3f7506e9"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260218173929/https://www.texastribune.org/2026/02/18/tony-gonzales-staffer-fire-affair-text-brandon-herrera/",
+      "captured_at": "2026-02-18T17:39:29Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

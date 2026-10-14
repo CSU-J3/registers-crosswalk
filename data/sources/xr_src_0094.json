@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0094",
+  "kind": "source",
+  "citation": "Murder in Mississippi",
+  "title": "Murder in Mississippi",
+  "publisher": "PBS, American Experience",
+  "canonical_url": "https://www.pbs.org/wgbh/americanexperience/features/freedomsummer-murder/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-03-31",
+  "published_at": null,
+  "artifact": {
+    "sha256": "da2064bf0fddac0f56a1ea0618df334b7efa3dcbfe711b068ca2f9c53bd4f31b",
+    "byte_length": 58170,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T02:34:14.744779Z",
+    "drift_key": "sha256",
+    "drift_value": "da2064bf0fddac0f56a1ea0618df334b7efa3dcbfe711b068ca2f9c53bd4f31b"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20170331044817/https://www.pbs.org/wgbh/americanexperience/features/freedomsummer-murder/",
+      "captured_at": "2017-03-31T04:48:17Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

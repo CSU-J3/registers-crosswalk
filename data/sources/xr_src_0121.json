@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0121",
+  "kind": "source",
+  "citation": "Nebraska Supreme Court sides with Democratic Senate candidate in last-minute dispute over her removal from the ballot",
+  "title": "Nebraska Supreme Court sides with Democratic Senate candidate in last-minute dispute over her removal from the ballot",
+  "publisher": "Nebraska Public Media",
+  "canonical_url": "https://nebraskapublicmedia.org/en/news/news-articles/nebraska-supreme-court-sides-with-democratic-senate-candidate-in-last-minute-dispute-over-her-removal-from-the-ballot/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-03-23",
+  "published_at": "2026-03-23",
+  "artifact": {
+    "sha256": "98cbc2f004e406616fec8a70200ab3215f3951359c1269ea17f085d34aa87237",
+    "byte_length": 124119,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T23:12:49.433269Z",
+    "drift_key": "sha256",
+    "drift_value": "98cbc2f004e406616fec8a70200ab3215f3951359c1269ea17f085d34aa87237"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260323153802/https://nebraskapublicmedia.org/en/news/news-articles/nebraska-supreme-court-sides-with-democratic-senate-candidate-in-last-minute-dispute-over-her-removal-from-the-ballot/",
+      "captured_at": "2026-03-23T15:38:02Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

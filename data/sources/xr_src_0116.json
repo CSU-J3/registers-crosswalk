@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0116",
+  "kind": "source",
+  "citation": "Forbes v. Nebraska Democratic Party, 322 Neb. 282 (2026)",
+  "title": "Forbes v. Nebraska Democratic Party, 322 Neb. 282 (2026)",
+  "publisher": "Nebraska Supreme Court",
+  "canonical_url": "https://storage.courtlistener.com/pdf/2026/09/10/forbes_v._nebraska_democratic_party.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2026-09-10",
+  "artifact": {
+    "sha256": "5e3e548065154280df2d9a5b0533da90f3113260d745e72dc98b435af4e820ef",
+    "byte_length": 285564,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-14T20:35:44.347044Z",
+    "drift_key": "sha256",
+    "drift_value": "5e3e548065154280df2d9a5b0533da90f3113260d745e72dc98b435af4e820ef"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "CourtListener's stored copy, through manual at B2 (ruling 7b): the court's own PDF (https://www.nebraska.gov/apps-courts-epub/public/viewAdvanced?docId=N00013458PUB) stamps each download with its time, and Wayback holds no capture of it. No. S-26-730, listed by the court 09/10/2026 (a Thursday) as an Advance (PDF)."
+}

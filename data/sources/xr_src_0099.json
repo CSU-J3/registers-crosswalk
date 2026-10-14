@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0099",
+  "kind": "source",
+  "citation": "Current Election Information: 2026 March Primary Election – March 3, 2026",
+  "title": "Current Election Information: 2026 March Primary Election – March 3, 2026",
+  "publisher": "Texas Secretary of State",
+  "canonical_url": "https://www.sos.state.tx.us/elections/laws/2026marchprimaryelection332026.shtml",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "93e489980000edec05d677e5a9fa682d3fca659cd5aed73d7809ffbab168fe57",
+    "byte_length": 18237,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T03:15:49.639530Z",
+    "drift_key": "sha256",
+    "drift_value": "93e489980000edec05d677e5a9fa682d3fca659cd5aed73d7809ffbab168fe57"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The page's 2026 section names the \"March 3, 2026 Primary Election Law Calendar and May 26, 2026 Primary Runoff Election Law Calendar\"."
+}

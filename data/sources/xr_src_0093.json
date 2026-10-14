@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0093",
+  "kind": "source",
+  "citation": "Donald Trump wins election in historic comeback after 2020 loss, indictments and bruising campaign",
+  "title": "Donald Trump wins election in historic comeback after 2020 loss, indictments and bruising campaign",
+  "publisher": "CBS News",
+  "canonical_url": "https://www.cbsnews.com/news/donald-trump-win-presidency-2024/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2024-11-06",
+  "published_at": "2024-11-06",
+  "artifact": {
+    "sha256": "21405da3003430865c7a8f772e151f0658029fb23e34e74bb7de2e10dca019fa",
+    "byte_length": 173925,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T02:29:53.102648Z",
+    "drift_key": "sha256",
+    "drift_value": "21405da3003430865c7a8f772e151f0658029fb23e34e74bb7de2e10dca019fa"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20241106103528/https://www.cbsnews.com/news/donald-trump-win-presidency-2024/",
+      "captured_at": "2024-11-06T10:35:28Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

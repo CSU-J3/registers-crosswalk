@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0084",
+  "kind": "source",
+  "citation": "Maine Democratic Party (C00179408), M8 2026-07-31, FEC file 2009209",
+  "title": "Form 3X image (PDF)",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://docquery.fec.gov/pdf/095/202608209903374095/202608209903374095.pdf",
+  "fetcher": "fecfiling",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-23",
+  "point_in_time": null,
+  "published_at": "2026-08-20",
+  "artifact": {
+    "sha256": "c1f20754b7e612e01ccd1a921ff6cde395b531b56fd260e3b9bd32ba237e6147",
+    "byte_length": 1870438,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-14T00:08:17.365486Z",
+    "drift_key": "sha256",
+    "drift_value": "c1f20754b7e612e01ccd1a921ff6cde395b531b56fd260e3b9bd32ba237e6147"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "original, received 2026-08-20; itemizes Gusto payroll"
+}

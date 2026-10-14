@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0117",
+  "kind": "source",
+  "citation": "Nebraska Supreme Court rejects primary loser’s appeal to force Democratic Party to replace candidate",
+  "title": "Nebraska Supreme Court rejects primary loser’s appeal to force Democratic Party to replace candidate",
+  "publisher": "Nebraska Examiner",
+  "canonical_url": "https://nebraskaexaminer.com/2026/09/10/nebraska-supreme-court-rejects-primary-losers-appeal-to-force-democratic-party-to-replace-candidate/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-09-11",
+  "published_at": "2026-09-10",
+  "artifact": {
+    "sha256": "1d629ad986312b45baf528d00aced28ff4ad9c837aa019d27197dfc40ed9fde3",
+    "byte_length": 160067,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T21:06:58.160581Z",
+    "drift_key": "sha256",
+    "drift_value": "1d629ad986312b45baf528d00aced28ff4ad9c837aa019d27197dfc40ed9fde3"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260911064517/https://nebraskaexaminer.com/2026/09/10/nebraska-supreme-court-rejects-primary-losers-appeal-to-force-democratic-party-to-replace-candidate/",
+      "captured_at": "2026-09-11T06:45:17Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Wayback serves this capture with \"Content-Encoding: gzip\" over a body that is not gzip; the register took the body as served."
+}

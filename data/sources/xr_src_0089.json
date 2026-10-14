@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0089",
+  "kind": "source",
+  "citation": "In Letter, Platner Volunteer Network Warns Dems: Nominee Must Back Same Agenda to Win Our Full Support",
+  "title": "In Letter, Platner Volunteer Network Warns Dems: Nominee Must Back Same Agenda to Win Our Full Support",
+  "publisher": "Drop Site News",
+  "canonical_url": "https://www.dropsitenews.com/p/platner-volunteer-maine-democratic-party-replacement-nominee-delegates",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-11",
+  "published_at": "2026-07-10",
+  "artifact": {
+    "sha256": "f5b096ab870b2f602c6f43af5de4ab88c2d36d7fb8af24759304a62da969713b",
+    "byte_length": 251263,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T00:21:38.772510Z",
+    "drift_key": "sha256",
+    "drift_value": "f5b096ab870b2f602c6f43af5de4ab88c2d36d7fb8af24759304a62da969713b"
+  },
+  "grade": {
+    "reliability": "C",
+    "credibility": 3
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260711100532/https://www.dropsitenews.com/p/platner-volunteer-maine-democratic-party-replacement-nominee-delegates",
+      "captured_at": "2026-07-11T10:05:32Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "A guest post by Nathan Bernard."
+}

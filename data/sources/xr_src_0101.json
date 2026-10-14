@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0101",
+  "kind": "source",
+  "citation": "‘The rumors are completely untruthful’: Rep. Gonzales speaks out for first time since staffer’s death",
+  "title": "‘The rumors are completely untruthful’: Rep. Gonzales speaks out for first time since staffer’s death",
+  "publisher": "KSAT",
+  "canonical_url": "https://www.ksat.com/news/ksat-investigates/2025/11/14/the-rumors-are-completely-untruthful-rep-gonzales-speaks-out-for-first-time-since-staffers-death/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2025-11-14",
+  "published_at": "2025-11-13",
+  "artifact": {
+    "sha256": "f5b2c61ecffcb9570a987862a671544c3594e681f8386d2262ad8333363d713a",
+    "byte_length": 1020762,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T03:32:37.892713Z",
+    "drift_key": "sha256",
+    "drift_value": "f5b2c61ecffcb9570a987862a671544c3594e681f8386d2262ad8333363d713a"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20251114003358/https://www.ksat.com/news/ksat-investigates/2025/11/14/the-rumors-are-completely-untruthful-rep-gonzales-speaks-out-for-first-time-since-staffers-death/",
+      "captured_at": "2025-11-14T00:33:58Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0110",
+  "kind": "source",
+  "citation": "Troy Jackson files to explore Senate run in case Graham Platner drops out",
+  "title": "Troy Jackson files to explore Senate run in case Graham Platner drops out",
+  "publisher": "Portland Press Herald",
+  "canonical_url": "https://www.pressherald.com/2026/07/07/troy-jackson-files-to-explore-senate-run-but-platner-hasnt-dropped-out-yet/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-08",
+  "published_at": "2026-07-07",
+  "artifact": {
+    "sha256": "ecab7f6bfbb69c2b11241d879ab94d6f3d53226b1c0aa4394b00147c48f60992",
+    "byte_length": 227789,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T19:11:59.042450Z",
+    "drift_key": "sha256",
+    "drift_value": "ecab7f6bfbb69c2b11241d879ab94d6f3d53226b1c0aa4394b00147c48f60992"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260708040138/https://www.pressherald.com/2026/07/07/troy-jackson-files-to-explore-senate-run-but-platner-hasnt-dropped-out-yet/",
+      "captured_at": "2026-07-08T04:01:38Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

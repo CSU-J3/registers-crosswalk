@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0107",
+  "kind": "source",
+  "citation": "Mike Johnson calls on Tony Gonzales to drop out after affair with staffer",
+  "title": "Mike Johnson calls on Tony Gonzales to drop out after affair with staffer",
+  "publisher": "Axios",
+  "canonical_url": "https://www.axios.com/2026/03/05/mike-johnson-tony-gonzales-affair-staffer-reelection",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-03-05",
+  "published_at": "2026-03-05",
+  "artifact": {
+    "sha256": "7d8b812988368b8096910fc1314a5b24b7821d431072ad8a962e4ecfb97c6547",
+    "byte_length": 185539,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T18:55:05.659628Z",
+    "drift_key": "sha256",
+    "drift_value": "7d8b812988368b8096910fc1314a5b24b7821d431072ad8a962e4ecfb97c6547"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260305193208/https://www.axios.com/2026/03/05/mike-johnson-tony-gonzales-affair-staffer-reelection",
+      "captured_at": "2026-03-05T19:32:08Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0122",
+  "kind": "source",
+  "citation": "Brandon Rottinghaus, Scandal: Why Politicians Survive Controversy in a Partisan Era",
+  "title": "Brandon Rottinghaus, Scandal: Why Politicians Survive Controversy in a Partisan Era, catalog page",
+  "publisher": "Columbia University Press",
+  "canonical_url": "https://cup.columbia.edu/book/scandal/9780231218825/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-10-05",
+  "published_at": null,
+  "artifact": {
+    "sha256": "5b5ac297644939d6c3faff9e7f7d544e4c1ef3f72cdfe714548932da1c990066",
+    "byte_length": 110931,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T23:16:54.847224Z",
+    "drift_key": "sha256",
+    "drift_value": "5b5ac297644939d6c3faff9e7f7d544e4c1ef3f72cdfe714548932da1c990066"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20261005133542/https://cup.columbia.edu/book/scandal/9780231218825/",
+      "captured_at": "2026-10-05T13:35:42Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": "xr_src_0073",
+  "merged_into": null,
+  "notes": "The publisher's catalog page: Pub Date November 2025. xr_src_0073's note adds that the book's copyright page reads 2026, from New Gray's ruling of 2026-10-04; no copy of this page that the register has read shows a copyright year."
+}

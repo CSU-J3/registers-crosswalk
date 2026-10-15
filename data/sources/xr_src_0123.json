@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0123",
+  "kind": "source",
+  "citation": "SNCC debates Freedom Summer",
+  "title": "SNCC debates Freedom Summer, timeline entry for January 1964",
+  "publisher": "SNCC Digital Gateway",
+  "canonical_url": "https://snccdigital.org/events/sncc-debates-freedom-summer/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-04-11",
+  "published_at": null,
+  "artifact": {
+    "sha256": "32984465bf6c5dc0e860de92aca16aa60a1b3db4e86d6c4d86c73e0c3f3bd554",
+    "byte_length": 44355,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-14T23:48:08.460612Z",
+    "drift_key": "sha256",
+    "drift_value": "32984465bf6c5dc0e860de92aca16aa60a1b3db4e86d6c4d86c73e0c3f3bd554"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260411012546/https://snccdigital.org/events/sncc-debates-freedom-summer/",
+      "captured_at": "2026-04-11T01:25:46Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": "xr_src_0076",
+  "merged_into": null,
+  "notes": "Wayback's nearest capture to 2026-10-06, six months before xr_src_0076 was pinned. Its page dates (published 2016-10-13, modified 2021-09-24) are 0076's, so it is the same version of the entry, and the cited passage and \"January 1964\" are on it. 0076's own bytes are not kept; against the page as served on 2026-10-13, 8 bytes shorter than them, its visible text is the same and its markup differs: WordPress 6.9.4 with older plugin and theme versions, and three embeds in the entry's sources (a Duke University interview player, a PDF viewer and an audio player's source file) that the later page no longer carries. Wayback holds no later capture, and this one does not reproduce 0076's bytes of 2026-10-06."
+}

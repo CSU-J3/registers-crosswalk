@@ -724,6 +724,23 @@ answered those two is not known; the test did not record it. That makes three re
 on 2026-10-08, with no 429 on the first. #48 gave that test a stand-in and put every test behind
 the offline guard.
 
+**The first queue of capture pins ran on 2026-10-14 (UTC): 75 requests to Wayback, 00:17 to 23:47.**
+New Gray's requests of 2026-10-03, 2026-10-05 and 2026-10-11 ran as one queue under the author's
+rulings of 2026-10-13: a discovery read and then a mint read of each capture (the mint read alone
+where the timestamp was already fixed), at least 122 seconds from one answer to the next request, no
+CDX lookups, and a stop on anything but a 200. It minted 33 capture pins. Sixty-nine requests
+answered 200. One answered 500 and was repeated once, 42 minutes later, on the author's word. One
+was a 403 that Wayback had captured from the publisher; the next capture held the story. Four were
+404s, where Wayback holds no capture: a republication, the Nebraska Supreme Court's PDF at both its
+addresses, and a party statement. One 200 declared gzip over a body that wasn't gzip, which the
+reader failed to decode; since 2d4f80f it decodes gzip only when the body starts with gzip's magic
+bytes, takes the body as served otherwise, and flags the mismatch for the pin's note. Two requests
+were Save Page Now, the job and its one poll, for the party statement Wayback had never captured;
+the mint read waited out the ten minutes `_NEW_CAPTURE_WAITS` gives a new capture and was served at
+exactly the timestamp the job returned. One pin was minted from its discovery read's bytes, at the
+author's word, with no mint read. The last three requests re-ran the three captures the weekly check
+of 2026-10-12 left UNCHECKED, one sample each: all OK. No 429.
+
 ## `add` cannot write a record that fails to load
 
 Before writing, `pin add` runs the would-be record through

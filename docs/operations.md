@@ -733,13 +733,13 @@ answered 200. One answered 500 and was repeated once, 42 minutes later, on the a
 was a 403 that Wayback had captured from the publisher; the next capture held the story. Four were
 404s, where Wayback holds no capture: a republication, the Nebraska Supreme Court's PDF at both its
 addresses, and a party statement. One 200 declared gzip over a body that wasn't gzip, which the
-reader failed to decode; since 2d4f80f it decodes gzip only when the body starts with gzip's magic
-bytes, takes the body as served otherwise, and flags the mismatch for the pin's note. Two requests
-were Save Page Now, the job and its one poll, for the party statement Wayback had never captured;
-the mint read waited out the ten minutes `_NEW_CAPTURE_WAITS` gives a new capture and was served at
-exactly the timestamp the job returned. One pin was minted from its discovery read's bytes, at the
-author's word, with no mint read. The last three requests re-ran the three captures the weekly check
-of 2026-10-12 left UNCHECKED, one sample each: all OK. No 429.
+reader failed to decode; since 968497b (2d4f80f on PR #50's branch) it decodes gzip only when the
+body starts with gzip's magic bytes, takes the body as served otherwise, and flags the mismatch for
+the pin's note. Two requests were Save Page Now, the job and its one poll, for the party statement
+Wayback had never captured; the mint read waited out the ten minutes `_NEW_CAPTURE_WAITS` gives a
+new capture and was served at exactly the timestamp the job returned. One pin was minted from its
+discovery read's bytes, at the author's word, with no mint read. The last three requests re-ran the
+three captures the weekly check of 2026-10-12 left UNCHECKED, one sample each: all OK. No 429.
 
 ## `add` cannot write a record that fails to load
 

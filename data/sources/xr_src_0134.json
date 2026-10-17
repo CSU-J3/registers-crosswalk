@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0134",
+  "kind": "source",
+  "citation": "Osborn For Senate, Form 3 12P 2026-04-22, FEC file 2027940",
+  "title": "Form 3 electronic filing (.fec)",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://docquery.fec.gov/dcdev/posted/2027940.fec",
+  "fetcher": "fecfiling",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-23",
+  "point_in_time": null,
+  "published_at": "2026-10-15",
+  "artifact": {
+    "sha256": "788a6d474bdbd0d13010d25c1e719ddbd7389f0eae8056f306e4783adde8f0d4",
+    "byte_length": 554343,
+    "media_type": "binary/octet-stream",
+    "fetched_at": "2026-10-17T15:10:00.004709Z",
+    "drift_key": "sha256",
+    "drift_value": "788a6d474bdbd0d13010d25c1e719ddbd7389f0eae8056f306e4783adde8f0d4"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": "xr_src_0042",
+  "merged_into": null,
+  "notes": "amendment 1 of 1, received 2026-10-15; amends FEC file 1971946 (received 2026-04-30), the original; itemizes Helix Campaigns: 2 Schedule B lines totaling $37,281.00, 1 Schedule D line (beginning $18,440.00, incurred $0.00, paid $18,440.00, owed at close $0.00); no Fight Agency line on any schedule"
+}

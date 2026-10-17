@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0124",
+  "kind": "source",
+  "citation": "Graham For Maine, Form 3 Q3 2026-09-30, FEC file 2027012",
+  "title": "Form 3 electronic filing (.fec)",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://docquery.fec.gov/dcdev/posted/2027012.fec",
+  "fetcher": "fecfiling",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-23",
+  "point_in_time": null,
+  "published_at": "2026-10-15",
+  "artifact": {
+    "sha256": "ae4798e23aaf46bf1fddb2d413ef53765b7d9da4146a7ce959e1761b5fb293cf",
+    "byte_length": 1314423,
+    "media_type": "binary/octet-stream",
+    "fetched_at": "2026-10-17T15:09:11.960597Z",
+    "drift_key": "sha256",
+    "drift_value": "ae4798e23aaf46bf1fddb2d413ef53765b7d9da4146a7ce959e1761b5fb293cf"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "original, received 2026-10-15; itemizes Helix Campaigns: 2 Schedule B lines totaling $178,544.00, no Schedule D line; no Fight Agency line on any schedule"
+}

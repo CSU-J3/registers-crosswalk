@@ -821,10 +821,12 @@ drift run. On the six MUR pins currently in `data/`, four were going unchecked.
   which, never the value. In CI only `COURTLISTENER_TOKEN` is wired; any other key has to be wired
   into the workflows on purpose first (*Source API keys*, above). Set it and re-run; until then you
   know nothing about those sources.
-- **3 — the check could not run: the transport failed** (`FETCH_FAILED`) — timeout, non-2xx, DNS,
-  connection refused. Also not a finding. Usually transient, so re-run before investigating; if it
-  persists, a 404 on a canonical URL means the document moved, which *is* a finding.
-  `check` retries these once, after one 30-second wait per run, so a reported one failed twice.
+- **3 — the check could not run: the transport failed, or what came back is not the document**
+  (`FETCH_FAILED`) — timeout, non-2xx, DNS, connection refused, or a 200 without the document's
+  marks (see `FETCH_FAILED`, below). Also not a finding. Usually transient, so re-run before
+  investigating; if it persists, a 404 on a canonical URL means the document moved, which *is* a
+  finding. `check` retries these once, after one 30-second wait per run, so a reported one failed
+  twice.
 - **4 — `pin add` or `pin search` only: api.data.gov refused the key.** One line on stderr,
   `CREDENTIAL FAILURE <fetcher> <status> <code>`, and nothing written; the console shows the same
   line in its pane and prints it on its terminal. `check` never exits 4: it makes no keyed
@@ -850,7 +852,8 @@ drift run. On the six MUR pins currently in `data/`, four were going unchecked.
 changed document. They demand opposite responses — one is "wait and retry", the other is "read the
 new text and re-pin" — and a checker that conflates them teaches you to ignore both. In the code
 this is the split between `except OSError` (every urllib transport error subclasses it) and
-everything else. When a run mixes statuses, the precedence is **2 > 3 > 1 > 0**: fix the
+everything else, plus `_not_the_document`, which reads a 200's marks before anything is parsed out
+of it. When a run mixes statuses, the precedence is **2 > 3 > 1 > 0**: fix the
 environment, then the network, and only then read the drift answers, which are not trustworthy
 until every source was actually reachable. `check --archives` asks a different question, of
 Wayback rather than the publishers, and has codes of its own, 5 to 7, under **The weekly
@@ -878,9 +881,16 @@ Each line is one of six statuses, and they mean genuinely different things:
 - **`FETCH_FAILED`** — the document could not be reached at all: timeout, non-2xx, DNS failure,
   connection refused. Exit 3, never exit 1, because this says nothing about whether the document
   changed. Re-run first; a 404 that persists means the document moved, which *is* a finding.
-- **`ERROR`** — the fetch worked but the parse blew up: a page that no longer states its currency
-  date, an API that changed shape. Exit 1, because the document really did change under us — just
-  not in a way the drift key could measure.
+  It is also a 200 whose body is not the document by its marks, read before any parse: a pinned
+  PDF's body starts `%PDF-`, a pinned `.fec` filing's starts with its `HDR` line, and a uscode
+  page carries its section heading. The detail names what was served, as `served <type>
+  "<title>" (<n> bytes), not the document: <why>`. Since 2026-10-04 uscode.house.gov has answered
+  every pinned section address with House's "Under Maintenance" page as a 200, which every run
+  reported as `ERROR` until the marks were read. On 2026-10-19 all 61 pinned PDFs started `%PDF-`
+  and all 28 pinned `.fec` filings started `HDR`, so no pin's own bytes fail the marks.
+- **`ERROR`** — the fetch served the document, by its marks, but the parse blew up: a section page
+  that no longer carries its source credit, an API that changed shape. Exit 1, because the document
+  really did change under us — just not in a way the drift key could measure.
 
 **HTML sources are noisy.** A page pinned through `manual` has its raw hash as its drift key, so a
 nav change, a cookie banner or a rotating build id reads as DRIFT. That is the honest answer for a
@@ -1288,14 +1298,15 @@ way, and is restarted the same way; everything below holds for it too.
   `ARCHIVE-MISSING` counting against it. Until then, a run in which every report is FIXED shows a
   green dot and "All fetched documents = 1:1" over zero documents; the unit gives that case its own
   wording.
-- **A refused page says which page it was.** Open, not started (logged 2026-10-05). That day's
+- **A refused page says which page it was.** Done 2026-10-19 (logged 2026-10-05). That day's
   status-page runs reported `xr_src_0005`, `0024`, `0056` and `0064` as ERROR "no source-credit
   element found in the page". A fetch by hand of § 30116 showed why: uscode.house.gov was serving
   its House "Under Maintenance" page with HTTP 200, and nothing in the report said so. The unit:
   when a fetcher's parse refuses a page, the error detail also names what was served, at least its
   `<title>`, so a page that did not load reads apart from one whose layout or text changed. The
   ERROR is already the safe answer, since nothing reads the wrong page as the document, so this
-  changes the wording only.
+  changes the wording only. As done, it changes the status as well: a 200 without the document's
+  marks is `FETCH_FAILED`, exit 3, and its detail names what was served (`FETCH_FAILED`, above).
 - **Node 20 → newer action majors.** `actions/checkout@v4` and `actions/setup-python@v5` currently
   run on Node 24 with a deprecation warning (Node 20 sunset, GitHub 2025-09-19). Bump to action
   majors that target Node 24 across every workflow (`ci.yml`, `cross-repo.yml`,

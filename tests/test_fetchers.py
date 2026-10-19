@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from registers_crosswalk import fetchers
 from registers_crosswalk.fetchers import (
     MissingKey,
     courtlistener,
@@ -419,6 +420,27 @@ def test_uscode_raises_when_the_source_credit_is_gone():
     page = load_page(USCODE_STEM).replace(b'class="source-credit"', b'class="gone"', 1)
     with pytest.raises(ValueError, match="no source-credit element"):
         uscode.drift_value(page)
+
+
+# What uscode.house.gov served at § 30116's pinned address on 2026-10-15, as a 200: House's
+# maintenance page, which it has served at every pinned section address since 2026-10-04.
+USCODE_MAINTENANCE_STEM = "uscode_maintenance_title52_section30116"
+
+
+def test_captured_uscode_page_carries_one_section_heading():
+    # The anchor `not_the_document` reads. If OLRC drops it, re-capture the page; don't edit it.
+    assert load_page(USCODE_STEM).count(b'class="section-head"') == 1
+
+
+def test_uscode_tells_a_section_page_from_the_maintenance_page():
+    assert uscode.not_the_document(load_page(USCODE_STEM)) is None
+    assert uscode.not_the_document(load_page(USCODE_MAINTENANCE_STEM)) == "no section heading"
+
+
+def test_a_fetcher_without_the_hook_takes_every_body():
+    page = load_page(USCODE_MAINTENANCE_STEM)
+    assert fetchers.not_the_document("manual", page) is None
+    assert fetchers.not_the_document("uscode", page) == "no section heading"
 
 
 def test_uscode_spec_takes_its_point_in_time_from_the_page():

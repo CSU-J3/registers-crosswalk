@@ -16,6 +16,8 @@ A fetcher module exposes:
     spec(...)       -> PinSpec, keyword-only, the API the tests drive
     add_arguments(parser) / spec_from_args(args, *, fetch, env)   the CLI adapter for spec()
     drift_value(body) -> str
+    not_the_document(body) -> str | None   optional; why a 200 is not this fetcher's page at all,
+                    read by `check` before the parse; uscode only
     content_request(url, *, env) -> (url, headers)   optional; re-attaches an API key at fetch time
     amended_since(source, *, fetch) -> date | None   optional; eCFR only
 
@@ -150,6 +152,16 @@ def credential(name: str, env: Mapping[str, str]) -> str | None:
 
 def drift_value(name: str, body: bytes) -> str:
     return get(name).drift_value(body)
+
+
+def not_the_document(name: str, body: bytes) -> str | None:
+    """Why a 200's `body` is not the fetcher's kind of page at all, or None.
+
+    A fetcher without the hook takes every body. The marks a pinned PDF or `.fec` must carry are
+    the pin's own type, so `pin` tests those itself, whatever the fetcher.
+    """
+    fn = getattr(get(name), "not_the_document", None)
+    return None if fn is None else fn(body)
 
 
 def drift_key(name: str) -> DriftKey:

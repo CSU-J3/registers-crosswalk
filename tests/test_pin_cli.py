@@ -38,7 +38,7 @@ def _failing_archive(url, **_):
     return None  # archive() never raises; it returns None on any failure
 
 
-BODY = b"a document"
+BODY = b"%PDF-1.4 a document"
 URL = "https://www.fec.gov/files/legal/aos/2023-01/2023-01.pdf"
 
 
@@ -166,10 +166,10 @@ def test_check_exits_0_when_nothing_drifted(tmp_path, capsys):
 def test_check_exits_1_on_drift(tmp_path, capsys):
     _add(tmp_path)
     capsys.readouterr()
-    assert main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"changed")) == 1
+    assert main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"%PDF-1.4 changed")) == 1
     out = capsys.readouterr().out
     assert "DRIFT" in out
-    assert sha256_hex(b"changed") in out
+    assert sha256_hex(b"%PDF-1.4 changed") in out
 
 
 def _move_govinfo_pin_to_the_api_host(tmp_path, xr_id="xr_src_0001"):
@@ -304,7 +304,11 @@ def test_check_defaults_to_every_live_pin_sharing_a_citation(tmp_path, capsys):
     # Three documents of ONE citation, the shape an FEC MUR has: a certification, a General
     # Counsel's report and a closing notification are not versions of each other, so none of them
     # may be dropped from a drift run in favour of whichever one sorts latest.
-    for n, body in ((1, b"certification"), (2, b"gc report"), (3, b"notification")):
+    for n, body in (
+        (1, b"%PDF-1.4 certification"),
+        (2, b"%PDF-1.4 gc report"),
+        (3, b"%PDF-1.4 notification"),
+    ):
         assert (
             _add(
                 tmp_path,
@@ -317,7 +321,10 @@ def test_check_defaults_to_every_live_pin_sharing_a_citation(tmp_path, capsys):
         )
     capsys.readouterr()  # drop what `add` printed
 
-    assert main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"certification")) == 1
+    assert (
+        main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"%PDF-1.4 certification"))
+        == 1
+    )
     default_run = capsys.readouterr().out
     assert all(x in default_run for x in ("xr_src_0001", "xr_src_0002", "xr_src_0003"))
 
@@ -1462,6 +1469,22 @@ def test_exit_3_when_the_transport_fails(tmp_path, capsys):
     assert "FETCH_FAILED" in capsys.readouterr().out
 
 
+def test_exit_3_when_what_came_back_is_not_the_document(tmp_path, capsys):
+    # A 200 that is not the document reads as the document not reached, never as a changed one,
+    # and its row names what was served.
+    _add(tmp_path)
+    capsys.readouterr()
+    page = sorted(FIXTURES.glob("uscode_maintenance_title52_section30116_*.html"))[-1].read_bytes()
+    served = _fetch(body=page, media_type="text/html")
+    assert main(["--data-dir", str(tmp_path), "check"], fetch=served, sleep_fn=_no_wait) == 3
+    out = capsys.readouterr().out
+    assert "FETCH_FAILED xr_src_0001  FEC Advisory Opinion 2023-01" in out
+    assert (
+        'served text/html "Under Maintenance" (14,617 bytes), not the document: a PDF starts '
+        "%PDF- (retried once after 30s)"
+    ) in out
+
+
 def test_transport_failure_does_not_read_as_drift(tmp_path, capsys):
     # The whole point of splitting 3 from 1: an unreachable endpoint must never be reported as a
     # changed document, because the two demand opposite responses.
@@ -1515,7 +1538,7 @@ def test_transport_failure_outranks_drift(tmp_path, capsys):
     def mixed(url, headers=None):
         if "2023-02" in url:
             raise TimeoutError("read timed out")
-        return b"changed", "application/pdf"
+        return b"%PDF-1.4 changed", "application/pdf"
 
     assert (
         main(["--data-dir", str(tmp_path), "check", "--all"], fetch=mixed, sleep_fn=_no_wait) == 3
@@ -1557,7 +1580,7 @@ def _archive_the_pin(tmp_path, xr_id="xr_src_0001"):
 def test_drift_row_on_an_unarchived_pin_says_unrecoverable(tmp_path, capsys):
     _add(tmp_path)
     capsys.readouterr()
-    assert main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"changed")) == 1
+    assert main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"%PDF-1.4 changed")) == 1
     out = capsys.readouterr().out
     assert "DRIFT unrecoverable (no archive)" in out
 
@@ -1566,7 +1589,7 @@ def test_drift_row_on_an_archived_pin_is_plain_drift(tmp_path, capsys):
     _add(tmp_path)
     _archive_the_pin(tmp_path)
     capsys.readouterr()
-    assert main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"changed")) == 1
+    assert main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"%PDF-1.4 changed")) == 1
     out = capsys.readouterr().out
     assert "DRIFT " in out
     assert "unrecoverable" not in out
@@ -1576,10 +1599,14 @@ def test_the_archive_distinction_does_not_move_the_exit_code(tmp_path, capsys):
     # Same severity, different recoverability. Exit 1 either way.
     _add(tmp_path)
     capsys.readouterr()
-    unarchived_code = main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"changed"))
+    unarchived_code = main(
+        ["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"%PDF-1.4 changed")
+    )
     _archive_the_pin(tmp_path)
     capsys.readouterr()
-    archived_code = main(["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"changed"))
+    archived_code = main(
+        ["--data-dir", str(tmp_path), "check"], fetch=_fetch(body=b"%PDF-1.4 changed")
+    )
     assert unarchived_code == archived_code == 1
 
 

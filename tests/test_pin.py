@@ -209,6 +209,10 @@ def test_blob_dir_inside_the_repo_refused(inside):
 
 # --------------------------------------------------------------------------- drift
 
+# The Federal Register pin's bytes. `check` reads a pinned PDF's marks before it compares anything,
+# so what these tests serve under it starts as a PDF does.
+FR_PDF = b"%PDF-1.4 60 FR 7862, the pinned notice"
+
 
 def _fr_source(**over) -> Source:
     base = dict(
@@ -220,12 +224,12 @@ def _fr_source(**over) -> Source:
         fetcher="federalregister",
         published_at="1995-02-09",
         artifact={
-            "sha256": sha256_hex(BODY),
-            "byte_length": len(BODY),
+            "sha256": sha256_hex(FR_PDF),
+            "byte_length": len(FR_PDF),
             "media_type": "application/pdf",
             "fetched_at": "2026-09-17T12:00:00Z",
             "drift_key": "sha256",
-            "drift_value": sha256_hex(BODY),
+            "drift_value": sha256_hex(FR_PDF),
         },
         grade={"reliability": "A", "credibility": 1},
     )
@@ -233,17 +237,21 @@ def _fr_source(**over) -> Source:
     return Source.model_validate(base)
 
 
+def _pdf_fetch(body=FR_PDF):
+    return _fetch(body=body, media_type="application/pdf")
+
+
 def test_check_reports_ok_on_identical_bytes():
-    report = check(_fr_source(), fetch=_fetch(), env={})
+    report = check(_fr_source(), fetch=_pdf_fetch(), env={})
     assert report.status == "ok"
-    assert report.expected == report.actual == sha256_hex(BODY)
+    assert report.expected == report.actual == sha256_hex(FR_PDF)
 
 
 def test_check_reports_drift_on_changed_bytes():
-    report = check(_fr_source(), fetch=_fetch(body=b"different"), env={})
+    report = check(_fr_source(), fetch=_pdf_fetch(b"%PDF-1.4 different"), env={})
     assert report.status == "drift"
-    assert report.expected == sha256_hex(BODY)
-    assert report.actual == sha256_hex(b"different")
+    assert report.expected == sha256_hex(FR_PDF)
+    assert report.actual == sha256_hex(b"%PDF-1.4 different")
 
 
 def test_check_reports_error_when_the_fetch_raises_a_non_transport_error():
@@ -271,7 +279,7 @@ def test_check_reports_key_missing_rather_than_ok():
 
 def test_check_reattaches_the_key_from_env():
     source = _fr_source(fetcher="govinfo", canonical_url=GOVINFO_API_PDF)
-    fetch = _fetch()
+    fetch = _pdf_fetch()
     report = check(source, fetch=fetch, env={"GOVINFO_API_KEY": "SECRET"})
     assert report.status == "ok"
     assert fetch.calls[0][0].endswith("?api_key=SECRET")
@@ -281,7 +289,7 @@ def test_check_needs_no_key_for_a_govinfo_content_url():
     source = _fr_source(
         fetcher="govinfo", canonical_url="https://www.govinfo.gov/content/pkg/X/pdf/X.pdf"
     )
-    fetch = _fetch()
+    fetch = _pdf_fetch()
     report = check(source, fetch=fetch, env={})
     assert report.status == "ok"
     assert "api_key" not in fetch.calls[0][0]
@@ -387,6 +395,104 @@ def test_uscode_last_amended_parsed_from_the_page():
     assert uscode.drift_value(USCODE_PAGE) == USCODE_LAST_AMENDED
     with pytest.raises(ValueError, match="no source-credit element"):
         uscode.drift_value(b"<html>nothing here</html>")
+
+
+# ---------------------------------------------- a 200 that is not the document is FETCH_FAILED
+
+# What uscode.house.gov has served as a 200 at every pinned section address since 2026-10-04:
+# House's maintenance page, as the fetcher's own request got it for § 30116 on 2026-10-15.
+MAINTENANCE = load_page("uscode_maintenance_title52_section30116")
+FEC_URL = "https://docquery.fec.gov/dcdev/posted/1903438.fec"
+# A .fec filing opens with its HDR record, as all 28 pinned .fec files did on 2026-10-19.
+FEC_BODY = b"HDR\x1cFEC\x1c8.5\x1cthe pinned filing"
+
+
+def _fec_source() -> Source:
+    return _fr_source(
+        fetcher="fecfiling",
+        canonical_url=FEC_URL,
+        artifact={
+            "sha256": sha256_hex(FEC_BODY),
+            "byte_length": len(FEC_BODY),
+            "media_type": "binary/octet-stream",
+            "fetched_at": "2026-09-23T12:00:00Z",
+            "drift_key": "sha256",
+            "drift_value": sha256_hex(FEC_BODY),
+        },
+    )
+
+
+def test_a_maintenance_page_is_fetch_failed_not_error():
+    # Not a section that lost its source credit, which is ERROR, a changed document: not the
+    # section at all, so the check could not read the document. Exit 3, and the detail says what
+    # was served.
+    served = _fetch(body=MAINTENANCE, media_type="text/html")
+    report = check(_uscode_source(), fetch=served, env={})
+    assert report.status == "fetch_failed"
+    assert report.actual is None
+    assert report.detail == (
+        'served text/html "Under Maintenance" (14,617 bytes), not the document: no section heading'
+    )
+
+
+def test_a_pdf_pin_served_a_page_that_is_not_a_pdf_is_fetch_failed():
+    served = _fetch(body=MAINTENANCE, media_type="text/html")
+    report = check(_fr_source(), fetch=served, env={})
+    assert report.status == "fetch_failed"
+    assert report.detail == (
+        'served text/html "Under Maintenance" (14,617 bytes), not the document: a PDF starts %PDF-'
+    )
+
+
+def test_a_fec_pin_served_a_body_without_its_hdr_line_is_fetch_failed():
+    served = _fetch(body=MAINTENANCE, media_type="text/html")
+    report = check(_fec_source(), fetch=served, env={})
+    assert report.status == "fetch_failed"
+    assert report.detail.endswith("not the document: a .fec filing starts with its HDR line")
+    filing = _fetch(body=FEC_BODY, media_type="binary/octet-stream")
+    assert check(_fec_source(), fetch=filing, env={}).status == "ok"
+
+
+def test_a_page_with_an_empty_title_says_so():
+    blank = MAINTENANCE.replace(b"<title>Under Maintenance</title>", b"<title></title>", 1)
+    report = check(_uscode_source(), fetch=_fetch(body=blank, media_type="text/html"), env={})
+    assert report.detail == (
+        f"served text/html an empty <title> ({len(blank):,} bytes), not the document: "
+        "no section heading"
+    )
+
+
+def test_a_body_with_no_title_is_named_by_its_first_bytes():
+    untitled = re.sub(rb"<title>.*?</title>", b"", MAINTENANCE, count=1, flags=re.S)
+    report = check(_fr_source(), fetch=_fetch(body=untitled, media_type="text/html"), env={})
+    assert report.detail == (
+        f"served text/html starting {untitled[:16]!r} ({len(untitled):,} bytes), not the "
+        "document: a PDF starts %PDF-"
+    )
+
+
+def test_a_body_that_is_not_the_document_is_retried_once_like_a_transport_failure():
+    clock = _Clock()
+    answers = [MAINTENANCE, USCODE_PAGE]
+
+    def fetch(url, headers=None):
+        return answers.pop(0), "text/html"
+
+    [report] = check_all([_uscode_source()], fetch=fetch, env={}, sleep_fn=clock.sleep)
+    assert report.status == "ok"
+    assert clock.slept == [30.0]
+
+
+def test_a_served_title_never_carries_the_key():
+    # `check` attaches a key only to an API-host URL, and a server that echoed the request in its
+    # page's title would otherwise put the key in the report.
+    source = _fr_source(fetcher="govinfo", canonical_url=GOVINFO_API_PDF)
+    page = MAINTENANCE.replace(b">Under Maintenance<", b">Under Maintenance: ?api_key=SECRET<", 1)
+    served = _fetch(body=page, media_type="text/html")
+    report = check(source, fetch=served, env={"GOVINFO_API_KEY": "SECRET"})
+    assert report.status == "fetch_failed"
+    assert "SECRET" not in report.detail
+    assert '"Under Maintenance: ?api_key=******"' in report.detail
 
 
 def _ecfr_source(**over) -> Source:
@@ -2749,8 +2855,10 @@ def test_transport_failure_reports_fetch_failed_not_drift(exc):
 
 
 def test_parse_failure_is_content_not_transport():
-    # The fetch worked; the document no longer carries its source credit. Exit 1, not 3.
-    report = check(_uscode_source(), fetch=_fetch(body=b"<html>no date here</html>"), env={})
+    # The fetch served the section page, and the page no longer carries its source credit. Exit 1,
+    # not 3. A page that is not a section page at all is the maintenance-page case: exit 3.
+    gone = USCODE_PAGE.replace(b'class="source-credit"', b'class="gone"', 1)
+    report = check(_uscode_source(), fetch=_fetch(body=gone, media_type="text/html"), env={})
     assert report.status == "error"
 
 
@@ -2801,7 +2909,7 @@ def _flaky(clock, failures, body=BODY, *, only=None):
 
 def test_a_fetch_that_fails_once_then_succeeds_is_ok():
     clock = _Clock()
-    fetch = _flaky(clock, 1)
+    fetch = _flaky(clock, 1, body=FR_PDF)
     [report] = check_all([_fr_source()], fetch=fetch, env={}, sleep_fn=clock.sleep)
     assert report.status == "ok"
     assert [at for _url, at in fetch.calls] == [0.0, 30.0]  # the retry comes after the wait
@@ -2818,7 +2926,7 @@ def test_a_fetch_that_fails_twice_is_fetch_failed():
 
 def test_a_drifted_document_is_fetched_once_and_reported_drift():
     clock = _Clock()
-    fetch = _flaky(clock, 0, body=b"changed")
+    fetch = _flaky(clock, 0, body=b"%PDF-1.4 changed")
     [report] = check_all([_fr_source()], fetch=fetch, env={}, sleep_fn=clock.sleep)
     assert report.status == "drift"
     assert len(fetch.calls) == 1
@@ -2841,7 +2949,7 @@ def test_many_failing_pins_share_one_wait():
     # One host down must not cost 30s per pin: 20 of the live pins sit on docquery.fec.gov.
     clock = _Clock()
     sources = [_fr_source(xr_id=f"xr_src_{n:04d}") for n in range(1, 6)]
-    fetch = _flaky(clock, 5)
+    fetch = _flaky(clock, 5, body=FR_PDF)
     reports = check_all(sources, fetch=fetch, env={}, sleep_fn=clock.sleep)
     assert [r.status for r in reports] == ["ok"] * 5
     assert clock.slept == [30.0]
@@ -2859,7 +2967,7 @@ def test_an_unreachable_ecfr_amendment_history_is_retried_too():
 
 
 def test_drift_report_marks_an_unarchived_pin():
-    report = check(_fr_source(), fetch=_fetch(body=b"changed"), env={})
+    report = check(_fr_source(), fetch=_pdf_fetch(b"%PDF-1.4 changed"), env={})
     assert report.status == "drift"
     assert report.archived is False
 
@@ -2868,11 +2976,12 @@ def test_drift_report_marks_an_archived_pin():
     archived = _fr_source(
         archives=[{"service": "wayback", "url": "https://web.archive.org/web/1/x"}]
     )
-    report = check(archived, fetch=_fetch(body=b"changed"), env={})
+    report = check(archived, fetch=_pdf_fetch(b"%PDF-1.4 changed"), env={})
     assert report.status == "drift"
     assert report.archived is True
 
 
 def test_archived_flag_serializes_for_json_output():
-    report = check(_fr_source(), fetch=_fetch(body=b"changed"), env={})
+    report = check(_fr_source(), fetch=_pdf_fetch(b"%PDF-1.4 changed"), env={})
+    assert report.status == "drift"
     assert report.model_dump(mode="json")["archived"] is False

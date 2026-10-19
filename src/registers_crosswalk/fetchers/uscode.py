@@ -89,6 +89,10 @@ _CREDIT_DATE = re.compile(
 # account for every one of these; a leftover is a month spelling this parser does not know, and
 # silently dropping it would lower the maximum and hide an amendment.
 _DATE_SHAPED = re.compile(r"\b([A-Z][a-zA-Z]{1,4}\.?)\s+(\d{1,2}),\s+(\d{4})")
+# A section page heads its text with one <h3 class="section-head">, as both pages read on
+# 2026-09-18 do. Since 2026-10-04 the pinned addresses have answered 200 with House's "Under
+# Maintenance" page (14,617 bytes against § 30116's 195,752), which has none.
+_SECTION_HEAD = re.compile(rb'<h3[^>]*\bclass="section-head"')
 
 
 def section_url(title: int | str, section: str) -> str:
@@ -138,6 +142,17 @@ def last_amended(body: bytes) -> date:
 
 def drift_value(body: bytes) -> str:
     return last_amended(body).isoformat()
+
+
+def not_the_document(body: bytes) -> str | None:
+    """Why `body` is not a section page at all, or None when it is one.
+
+    Asked by `check` before the parse, so a page that never loaded is not reported as a section
+    that lost its source credit. Neither `spec()` nor the drift parse calls it.
+    """
+    if _SECTION_HEAD.search(body) is None:
+        return "no section heading"
+    return None
 
 
 def spec(*, title: int | str, section: str, fetch: FetchFn = default_fetch) -> PinSpec:

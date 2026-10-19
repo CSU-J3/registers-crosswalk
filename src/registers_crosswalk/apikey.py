@@ -136,10 +136,11 @@ def redact(exc: BaseException, secret: str) -> BaseException:
     `URLError.reason`), then the same again for every exception reachable through `__cause__`,
     `__context__` or `reason`.
 
-    Not searched: a response body, which holds the key only if the server echoes it and which
-    nothing here prints, and frame locals, which only a locals-capturing traceback shows.
+    Not searched: a response body, which holds the key only if the server echoes it, and frame
+    locals, which only a locals-capturing traceback shows. What `check` quotes from a body goes
+    through `redact_text`.
     """
-    forms = {secret, quote_plus(secret), quote(secret, safe="")} - {""}
+    forms = _forms(secret)
     seen: set[int] = set()
     todo: list[object] = [exc]
     while todo:
@@ -171,6 +172,16 @@ def redact(exc: BaseException, secret: str) -> BaseException:
                     pass  # a read-only property derived from something masked above
         todo += [e.__cause__, e.__context__]
     return exc
+
+
+def redact_text(text: str, secret: str) -> str:
+    """`text` with `secret`, raw or URL-encoded, masked as `redact` masks it. For a report line
+    quoting what a server sent back, such as a page's `<title>`, which `redact` never sees."""
+    return str(_masked(text, _forms(secret), []))
+
+
+def _forms(secret: str) -> set[str]:
+    return {secret, quote_plus(secret), quote(secret, safe="")} - {""}
 
 
 def _masked(value: object, forms: set[str], todo: list[object]) -> object:

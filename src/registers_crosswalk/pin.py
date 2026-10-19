@@ -14,6 +14,7 @@ import argparse
 import functools
 import gzip
 import hashlib
+import html
 import json
 import os
 import re
@@ -30,7 +31,7 @@ from pathlib import Path, PurePosixPath
 from typing import Literal
 from urllib.parse import urlencode, urljoin, urlsplit
 
-from .apikey import CredentialFailure, redact
+from .apikey import CredentialFailure, redact, redact_text
 from .ids import SRC_ID
 from .models import (
     ArchiveCopy,
@@ -1181,6 +1182,49 @@ def _failure(exc: Exception, secret: str | None) -> str:
     return f"{type(exc).__name__}: {exc}"
 
 
+# A 200 is not always the document. Since 2026-10-04 uscode.house.gov has answered every pinned
+# section address with House's "Under Maintenance" page as a 200, and the parse refused it as a
+# section that had lost its source credit: ERROR, exit 1, a changed document, while the endpoint
+# was down. So `check` reads a body's marks before it parses anything. A pinned PDF starts "%PDF-"
+# and a pinned FEC filing starts with its HDR record, whoever fetched them, and a fetcher may name
+# marks of its own (uscode: the section heading). A body without them is FETCH_FAILED, exit 3,
+# retried once with the rest, and its detail says what was served.
+_MARKS: dict[str, tuple[bytes, str]] = {
+    ".pdf": (b"%PDF-", "a PDF starts %PDF-"),
+    ".fec": (b"HDR", "a .fec filing starts with its HDR line"),
+}
+_TITLE = re.compile(rb"<title[^>]*>(.*?)</title>", re.I | re.S)
+
+
+def _served(body: bytes, media_type: str) -> str:
+    """What a fetch served, for a report line: its type, its `<title>` or first bytes, its size."""
+    m = _TITLE.search(body, 0, 65536)
+    if m is None:
+        what = f"starting {body[:16]!r}"
+    else:
+        title = " ".join(html.unescape(m.group(1).decode("utf-8", "replace")).split())
+        what = f'"{title[:100]}"' if title else "an empty <title>"
+    return f"{media_type or 'no media type'} {what} ({len(body):,} bytes)"
+
+
+def _not_the_document(source: Source, body: bytes, media_type: str) -> str | None:
+    """Why a 200's `body` is not the pinned document at all, or None when it may be.
+
+    Judged before any parse. A body that passes and then fails to parse is the document no longer
+    stating what was read from it, which is ERROR, not this.
+    """
+    from . import fetchers
+
+    ext = _extension(source.artifact.media_type, source.canonical_url)
+    if ext in _MARKS and not body.startswith(_MARKS[ext][0]):
+        why: str | None = _MARKS[ext][1]
+    else:
+        why = fetchers.not_the_document(source.fetcher, body)
+    if why is None:
+        return None
+    return f"served {_served(body, media_type)}, not the document: {why}"
+
+
 DriftStatus = Literal["ok", "fixed", "drift", "amended", "key_missing", "fetch_failed", "error"]
 
 # What `check` says about a pin read from one Wayback capture (`wayback`), instead of fetching it.
@@ -1204,6 +1248,8 @@ _EXIT_CODES: dict[str, int] = {
     # source credit, an API changed shape). The fetch worked, so it is a content problem: exit 1.
     "error": 1,
     "key_missing": 2,
+    # The document could not be reached: a transport error, or a 200 that is not the document at
+    # all (`_not_the_document`), such as House's maintenance page where a section should be.
     "fetch_failed": 3,
 }
 # `add` and `search` exit with this when api.data.gov refuses the key, after printing one line,
@@ -1654,6 +1700,9 @@ def check(
     """Re-fetch a pinned document and compare it against what was pinned. One attempt; the retry
     of a `fetch_failed` lives in `check_all`.
 
+    A 200 that is not the document at all by its marks (`_not_the_document`) is `fetch_failed`
+    too, with a detail that names what was served, and nothing is parsed out of it.
+
     Compares the fetcher's own drift key, not always the hash: uscode.house.gov re-renders its
     markup, so for those sources the parsed "laws in effect on" date is the signal. For eCFR
     sources a matching hash is not the end of it — the point-in-time URL keeps returning the same
@@ -1690,13 +1739,18 @@ def check(
     secret = fetchers.credential(source.fetcher, env)
     # The fetch and the parse are caught separately on purpose: whatever the fetch callable raises
     # is a transport problem, whatever the parse raises is a content problem, and they get
-    # different exit codes.
+    # different exit codes. A 200 that is not the document at all goes with the transport: the
+    # endpoint answered, but not with the document.
     try:
-        body, _ = fetch(url, headers)
+        body, media_type = fetch(url, headers)
     except _TRANSPORT as exc:
         return DriftReport(**base, status="fetch_failed", detail=_failure(exc, secret))
     except Exception as exc:
         return DriftReport(**base, status="error", detail=_failure(exc, secret))
+    refused = _not_the_document(source, body, media_type)
+    if refused is not None:
+        detail = redact_text(refused, secret) if secret else refused
+        return DriftReport(**base, status="fetch_failed", detail=detail)
     try:
         actual = fetchers.drift_value(source.fetcher, body)
     except Exception as exc:

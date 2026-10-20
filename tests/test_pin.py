@@ -426,12 +426,16 @@ def test_a_maintenance_page_is_fetch_failed_not_error():
     # Not a section that lost its source credit, which is ERROR, a changed document: not the
     # section at all, so the check could not read the document. Exit 3, and the detail says what
     # was served.
+    # Both addresses serve it here: the pinned one, and the temporary one the check reads next.
     served = _fetch(body=MAINTENANCE, media_type="text/html")
     report = check(_uscode_source(), fetch=served, env={})
     assert report.status == "fetch_failed"
     assert report.actual is None
     assert report.detail == (
-        'served text/html "Under Maintenance" (14,617 bytes), not the document: no section heading'
+        'the pinned address served text/html "Under Maintenance" (14,617 bytes), not the document: '
+        "no section heading; the fallback address "
+        "https://uscode.house.gov/us/usc/119-118/t52/s30116/ served text/html "
+        '"Under Maintenance" (14,617 bytes), not the document: no section heading'
     )
 
 
@@ -455,10 +459,10 @@ def test_a_fec_pin_served_a_body_without_its_hdr_line_is_fetch_failed():
 
 def test_a_page_with_an_empty_title_says_so():
     blank = MAINTENANCE.replace(b"<title>Under Maintenance</title>", b"<title></title>", 1)
-    report = check(_uscode_source(), fetch=_fetch(body=blank, media_type="text/html"), env={})
+    report = check(_fr_source(), fetch=_fetch(body=blank, media_type="text/html"), env={})
     assert report.detail == (
         f"served text/html an empty <title> ({len(blank):,} bytes), not the document: "
-        "no section heading"
+        "a PDF starts %PDF-"
     )
 
 
@@ -473,12 +477,12 @@ def test_a_body_with_no_title_is_named_by_its_first_bytes():
 
 def test_a_body_that_is_not_the_document_is_retried_once_like_a_transport_failure():
     clock = _Clock()
-    answers = [MAINTENANCE, USCODE_PAGE]
+    answers = [(MAINTENANCE, "text/html"), (FR_PDF, "application/pdf")]
 
     def fetch(url, headers=None):
-        return answers.pop(0), "text/html"
+        return answers.pop(0)
 
-    [report] = check_all([_uscode_source()], fetch=fetch, env={}, sleep_fn=clock.sleep)
+    [report] = check_all([_fr_source()], fetch=fetch, env={}, sleep_fn=clock.sleep)
     assert report.status == "ok"
     assert clock.slept == [30.0]
 
@@ -493,6 +497,172 @@ def test_a_served_title_never_carries_the_key():
     assert report.status == "fetch_failed"
     assert "SECRET" not in report.detail
     assert '"Under Maintenance: ?api_key=******"' in report.detail
+
+
+# ------------------------------------------- uscode reads its fallback address while it is down
+
+# § 30116 at the OLRC's temporary address, as the fetcher's own request got it on 2026-10-19.
+TEMPORARY_PAGE = load_page("uscode_temporary_title52_section30116")
+TEMPORARY_URL = "https://uscode.house.gov/us/usc/119-118/t52/s30116/"
+MAINTENANCE_SERVED = (
+    'the pinned address served text/html "Under Maintenance" (14,617 bytes), not the document: '
+    "no section heading"
+)
+
+
+def _s30116() -> Source:
+    """xr_src_0005's shape: § 30116's pinned address, its source credit last dated 2014-12-16."""
+    return _fr_source(
+        citation="52 U.S.C. § 30116",
+        canonical_url=USCODE_URL,
+        fetcher="uscode",
+        published_at=None,
+        point_in_time="2026-09-18",
+        artifact={
+            "sha256": sha256_hex(b"the pinned section page"),
+            "byte_length": 195752,
+            "media_type": "text/html",
+            "fetched_at": "2026-09-19T12:00:00Z",
+            "drift_key": "last_amended",
+            "drift_value": "2014-12-16",
+        },
+    )
+
+
+def _down(temporary=TEMPORARY_PAGE, pinned=MAINTENANCE):
+    """The pinned address serves `pinned`, House's maintenance page unless a test says otherwise,
+    and the temporary address `temporary`. Either may be an exception to raise. Records each URL
+    asked for."""
+    calls = []
+
+    def fetch(url, headers=None):
+        calls.append(url)
+        answer = pinned if "view.xhtml" in url else temporary
+        if isinstance(answer, BaseException):
+            raise answer
+        return answer, "text/html"
+
+    fetch.calls = calls
+    return fetch
+
+
+def _http(url, code, reason):
+    return urllib.error.HTTPError(url, code, reason, {}, None)
+
+
+def test_a_down_section_is_read_at_its_temporary_address():
+    fetch = _down()
+    report = check(_s30116(), fetch=fetch, env={})
+    assert report.status == "ok"
+    assert report.actual == "2014-12-16"
+    assert fetch.calls == [USCODE_URL, TEMPORARY_URL]
+    assert report.detail == (
+        f"read at the fallback address {TEMPORARY_URL}, which states laws in effect through "
+        f"Public Law 119-120 (October 7, 2026); {MAINTENANCE_SERVED}"
+    )
+
+
+def test_an_amendment_read_at_the_temporary_address_is_drift():
+    amended = _append_to_source_credit(TEMPORARY_PAGE, b"; Pub. L. 119-40, Mar. 4, 2026")
+    report = check(_s30116(), fetch=_down(amended), env={})
+    assert report.status == "drift"
+    assert report.actual == "2026-03-04"
+    assert report.detail.startswith(
+        f"expected 2014-12-16, got 2026-03-04; read at the fallback address {TEMPORARY_URL}"
+    )
+
+
+def test_a_temporary_page_without_its_source_credit_is_error_and_says_where_it_was_read():
+    gone = TEMPORARY_PAGE.replace(b'class="source-credit"', b'class="gone"', 1)
+    report = check(_s30116(), fetch=_down(gone), env={})
+    assert report.status == "error"
+    assert "no source-credit element" in report.detail
+    assert f"read at the fallback address {TEMPORARY_URL}" in report.detail
+
+
+def test_a_temporary_address_that_answers_404_is_fetch_failed():
+    gone = _http(TEMPORARY_URL, 404, "Not Found")
+    report = check(_s30116(), fetch=_down(gone), env={})
+    assert report.status == "fetch_failed"
+    assert report.detail == (
+        f"{MAINTENANCE_SERVED}; the fallback address {TEMPORARY_URL}: HTTPError: HTTP Error 404: "
+        "Not Found"
+    )
+
+
+def test_a_section_whose_pinned_address_answers_500_is_read_at_its_temporary_address():
+    # As §§ 30116, 30118 and 30106 did on 2026-10-19 and 2026-10-20: the server failing at that
+    # address, not a verdict on the section, so the temporary page is read and the detail says
+    # what failed.
+    fetch = _down(pinned=_http(USCODE_URL, 500, "Internal Server Error"))
+    report = check(_s30116(), fetch=fetch, env={})
+    assert report.status == "ok"
+    assert report.actual == "2014-12-16"
+    assert fetch.calls == [USCODE_URL, TEMPORARY_URL]
+    assert report.detail == (
+        f"read at the fallback address {TEMPORARY_URL}, which states laws in effect through "
+        "Public Law 119-120 (October 7, 2026); the pinned address: HTTPError: HTTP Error 500: "
+        "Internal Server Error"
+    )
+
+
+def test_a_5xx_at_both_addresses_is_fetch_failed_and_names_both():
+    fetch = _down(
+        temporary=_http(TEMPORARY_URL, 503, "Service Unavailable"),
+        pinned=_http(USCODE_URL, 500, "Internal Server Error"),
+    )
+    report = check(_s30116(), fetch=fetch, env={})
+    assert report.status == "fetch_failed"
+    assert report.actual is None
+    assert report.detail == (
+        "the pinned address: HTTPError: HTTP Error 500: Internal Server Error; the fallback "
+        f"address {TEMPORARY_URL}: HTTPError: HTTP Error 503: Service Unavailable"
+    )
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        _http(USCODE_URL, 404, "Not Found"),  # the address is gone, which *is* a finding
+        _http(USCODE_URL, 403, "Forbidden"),
+        urllib.error.URLError(ConnectionRefusedError(10061, "refused")),
+        urllib.error.URLError(socket.gaierror(11001, "getaddrinfo failed")),  # DNS
+        TimeoutError("read timed out"),
+    ],
+)
+def test_no_fallback_read_when_the_pinned_address_fails_short_of_a_5xx(exc):
+    fetch = _down(pinned=exc)
+    report = check(_s30116(), fetch=fetch, env={})
+    assert report.status == "fetch_failed"
+    assert fetch.calls == [USCODE_URL]
+    assert report.detail == f"{type(exc).__name__}: {exc}"
+
+
+def test_a_5xx_for_a_fetcher_without_a_fallback_is_fetch_failed_after_one_read():
+    calls = []
+
+    def fetch(url, headers=None):
+        calls.append(url)
+        raise _http(url, 500, "Internal Server Error")
+
+    report = check(_fr_source(), fetch=fetch, env={})
+    assert report.status == "fetch_failed"
+    assert report.detail == "HTTPError: HTTP Error 500: Internal Server Error"
+    assert len(calls) == 1
+
+
+def test_no_fallback_read_when_the_pinned_address_serves_its_section():
+    fetch = _fetch(body=USCODE_PAGE, media_type="text/html")
+    report = check(_uscode_source(), fetch=fetch, env={})
+    assert (report.status, report.detail) == ("ok", None)
+    assert [url for url, _ in fetch.calls] == [USCODE_URL]
+
+
+def test_a_fetcher_without_a_fallback_reads_once():
+    fetch = _fetch(body=MAINTENANCE, media_type="text/html")
+    report = check(_fr_source(), fetch=fetch, env={})
+    assert report.status == "fetch_failed"
+    assert len(fetch.calls) == 1
 
 
 def _ecfr_source(**over) -> Source:

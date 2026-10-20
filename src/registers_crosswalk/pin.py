@@ -1225,6 +1225,19 @@ def _not_the_document(source: Source, body: bytes, media_type: str) -> str | Non
     return f"served {_served(body, media_type)}, not the document: {why}"
 
 
+def _quoted(detail: str, secret: str | None) -> str:
+    """A detail that quotes what a server sent, with the fetcher's key masked out of it."""
+    return redact_text(detail, secret) if secret else detail
+
+
+def _server_error(exc: OSError) -> bool:
+    """Whether a failed fetch is the server answering 5xx: its own failure at that address, which
+    a second address for the same document may not share. Observed 2026-10-19 and 2026-10-20
+    (UTC): three of the four pinned uscode addresses answered HTTP 500 while their temporary pages
+    served the sections."""
+    return isinstance(exc, urllib.error.HTTPError) and 500 <= exc.code <= 599
+
+
 DriftStatus = Literal["ok", "fixed", "drift", "amended", "key_missing", "fetch_failed", "error"]
 
 # What `check` says about a pin read from one Wayback capture (`wayback`), instead of fetching it.
@@ -1701,7 +1714,11 @@ def check(
     of a `fetch_failed` lives in `check_all`.
 
     A 200 that is not the document at all by its marks (`_not_the_document`) is `fetch_failed`
-    too, with a detail that names what was served, and nothing is parsed out of it.
+    too, with a detail that names what was served, and nothing is parsed out of it. Where the
+    fetcher knows a second address for the document (uscode: the OLRC's temporary format), that
+    address is read once instead, as it is when the pinned address answers HTTP 5xx, and the
+    report's detail says so. Any other transport failure is the answer as it came: a 404, a
+    timeout, DNS, a refused connection.
 
     Compares the fetcher's own drift key, not always the hash: uscode.house.gov re-renders its
     markup, so for those sources the parsed "laws in effect on" date is the signal. For eCFR
@@ -1737,6 +1754,11 @@ def check(
         # One pin's bad record is that pin's error, not the end of the run.
         return DriftReport(**base, status="error", detail=f"{type(exc).__name__}: {exc}")
     secret = fetchers.credential(source.fetcher, env)
+    # A fetcher may know a second address for the same document (uscode: the OLRC's temporary
+    # format). It is read once when the pinned address does not serve the document, and the
+    # report says so; without one, what the pinned address did is the answer.
+    fallback = fetchers.fallback_url(source.fetcher, source.canonical_url)
+    pinned: str | None = None
     # The fetch and the parse are caught separately on purpose: whatever the fetch callable raises
     # is a transport problem, whatever the parse raises is a content problem, and they get
     # different exit codes. A 200 that is not the document at all goes with the transport: the
@@ -1744,20 +1766,46 @@ def check(
     try:
         body, media_type = fetch(url, headers)
     except _TRANSPORT as exc:
-        return DriftReport(**base, status="fetch_failed", detail=_failure(exc, secret))
+        # A 5xx is the server failing at that address, and the second address may not share it.
+        # Anything else (a 404, a timeout, DNS, a refused connection) is the answer as it came.
+        if fallback is None or not _server_error(exc):
+            return DriftReport(**base, status="fetch_failed", detail=_failure(exc, secret))
+        pinned = f"the pinned address: {_failure(exc, secret)}"
     except Exception as exc:
         return DriftReport(**base, status="error", detail=_failure(exc, secret))
-    refused = _not_the_document(source, body, media_type)
-    if refused is not None:
-        detail = redact_text(refused, secret) if secret else refused
-        return DriftReport(**base, status="fetch_failed", detail=detail)
+    else:
+        refused = _not_the_document(source, body, media_type)
+        if refused is not None:
+            if fallback is None:
+                return DriftReport(**base, status="fetch_failed", detail=_quoted(refused, secret))
+            pinned = f"the pinned address {refused}"
+    via: str | None = None
+    if pinned is not None:
+        try:
+            body, media_type = fetch(fallback, headers)
+        except _TRANSPORT as exc:
+            detail = f"{pinned}; the fallback address {fallback}: {_failure(exc, secret)}"
+            return DriftReport(**base, status="fetch_failed", detail=_quoted(detail, secret))
+        except Exception as exc:
+            return DriftReport(**base, status="error", detail=_failure(exc, secret))
+        again = _not_the_document(source, body, media_type)
+        if again is not None:
+            detail = f"{pinned}; the fallback address {fallback} {again}"
+            return DriftReport(**base, status="fetch_failed", detail=_quoted(detail, secret))
+        stated = fetchers.stated_currency(source.fetcher, body)
+        said = f", which states {stated}" if stated else ""
+        via = _quoted(f"read at the fallback address {fallback}{said}; {pinned}", secret)
     try:
         actual = fetchers.drift_value(source.fetcher, body)
     except Exception as exc:
-        return DriftReport(**base, status="error", detail=f"{type(exc).__name__}: {exc}")
+        detail = f"{type(exc).__name__}: {exc}"
+        return DriftReport(**base, status="error", detail=f"{detail}; {via}" if via else detail)
 
     if actual != source.artifact.drift_value:
-        return DriftReport(**base, status="drift", actual=actual)
+        if via is None:
+            return DriftReport(**base, status="drift", actual=actual)
+        detail = f"expected {source.artifact.drift_value}, got {actual}; {via}"
+        return DriftReport(**base, status="drift", actual=actual, detail=detail)
 
     amended_since = fetchers.amended_since(source.fetcher)
     if amended_since is not None:
@@ -1781,7 +1829,7 @@ def check(
                 actual=actual,
                 detail=f"amended since pin: latest substantive amendment {amended.isoformat()}",
             )
-    return DriftReport(**base, status="ok", actual=actual)
+    return DriftReport(**base, status="ok", actual=actual, detail=via)
 
 
 # --------------------------------------------------------------------------- emitting

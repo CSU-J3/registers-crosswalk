@@ -18,6 +18,10 @@ A fetcher module exposes:
     drift_value(body) -> str
     not_the_document(body) -> str | None   optional; why a 200 is not this fetcher's page at all,
                     read by `check` before the parse; uscode only
+    fallback_url(url) -> str | None   optional; a second address `check` reads when the first
+                    answers HTTP 5xx or serves something that is not the document; uscode only
+    stated_currency(body) -> str | None   optional; the page's own currency claim, which `check`
+                    quotes when it read the fallback; uscode only
     content_request(url, *, env) -> (url, headers)   optional; re-attaches an API key at fetch time
     amended_since(source, *, fetch) -> date | None   optional; eCFR only
 
@@ -161,6 +165,19 @@ def not_the_document(name: str, body: bytes) -> str | None:
     the pin's own type, so `pin` tests those itself, whatever the fetcher.
     """
     fn = getattr(get(name), "not_the_document", None)
+    return None if fn is None else fn(body)
+
+
+def fallback_url(name: str, url: str) -> str | None:
+    """Where `check` reads a pin whose own address answered HTTP 5xx or served something that is
+    not the document, or None: the fetcher has no second address, or none for this URL."""
+    fn = getattr(get(name), "fallback_url", None)
+    return None if fn is None else fn(url)
+
+
+def stated_currency(name: str, body: bytes) -> str | None:
+    """The page's own currency claim, as the fetcher reads it, or None."""
+    fn = getattr(get(name), "stated_currency", None)
     return None if fn is None else fn(body)
 
 

@@ -2266,7 +2266,7 @@ class _Wayback:
     def asked(self, ts):
         return sum(1 for kind, url in self.events if kind == "capture" and f"/{ts}id_/" in url)
 
-    def run(self, *sources, on_final=None):
+    def run(self, *sources, on_final=None, on_429=None):
         return pinmod.check_archives(
             sources,
             capture_fn=self.capture_fn,
@@ -2275,6 +2275,7 @@ class _Wayback:
             now=WEEKLY_NOW,
             on_final=on_final,
             clock=lambda: self.now,
+            on_429=on_429,
         )
 
 
@@ -3048,6 +3049,123 @@ def test_a_connection_never_made_and_a_5xx_share_the_5xx_budget():
         pinmod._retrying(call, sleep_fn=slept.append, refused=True)  # noqa: SLF001
     assert not isinstance(caught.value, urllib.error.HTTPError)  # the fourth answer, a refusal
     assert slept == [10.0, 20.0, 30.0]
+
+
+# ---------------------- --stop-on-429: a 429 ends the run there; a refused connection doesn't
+#
+# A run from this machine passes `on_429`: the first 429 ends the check where it was answered, and
+# nothing is waited out. Without it, as archives.yml runs it, a 429 is waited out as before.
+
+OTHER_URL = FR_URL.replace("95-3162", "95-3163")
+THIRD_URL = FR_URL.replace("95-3162", "95-3164")
+
+
+def _a_429_at_the_second_of_three():
+    wayback = _Wayback(
+        {TS_A: [_serves()], TS_B: [_refused(429, "60"), _serves()], TS_C: [_serves()]}
+    )
+    sources = [_archived(ts, xr_id=f"xr_src_000{i}") for i, ts in enumerate((TS_A, TS_B, TS_C), 1)]
+    return wayback, sources
+
+
+def test_a_429_on_a_capture_ends_the_run_there_when_asked_to():
+    """The entry it answered and the entry not yet asked are UNCHECKED with its reason; the one
+    settled before it stays OK. Nothing more is asked, and the 429 isn't waited out."""
+    wayback, sources = _a_429_at_the_second_of_three()
+    heard = []
+    reports = wayback.run(*sources, on_429=heard.append)
+    assert [(r.status, r.detail) for r in reports] == [
+        ("ok", f"the capture at {TS_A} reproduces the pin's sha256"),
+        ("unchecked", "429 at xr_src_0002; its answers so far: unreachable"),
+        ("unchecked", "429 at xr_src_0002; its answers so far: none"),
+    ]
+    assert heard == ["429 at xr_src_0002"]
+    assert wayback.events == [
+        ("capture", f"https://web.archive.org/web/{TS_A}id_/{FR_URL}"),
+        ("sleep", 5.0),
+        ("capture", f"https://web.archive.org/web/{TS_B}id_/{FR_URL}"),
+    ]
+
+
+def test_without_on_429_the_same_429_is_waited_out_as_before():
+    wayback, sources = _a_429_at_the_second_of_three()
+    reports = wayback.run(*sources)
+    assert [r.status for r in reports] == ["ok", "ok", "ok"]
+    assert [s for kind, s in wayback.events if kind == "sleep"] == [5.0, 5.0, 300.0]
+    assert (wayback.asked(TS_B), wayback.asked(TS_C)) == (2, 1)
+
+
+def test_a_mismatch_in_hand_when_a_429_ends_the_run_is_still_lost():
+    """As when the budget runs out: that is Wayback's own answer about the capture."""
+    wayback = _Wayback({TS_D: [_serves(b"other bytes")], TS_E: [_not_found, _refused(429)]})
+    reports = wayback.run(_archived(TS_D), _archived(TS_E, xr_id="xr_src_0002"), on_429=[].append)
+    assert [(r.status, r.detail) for r in reports] == [
+        (
+            "lost",
+            "429 at xr_src_0002; its answers so far: mismatch, mismatch. "
+            "Next: `pin archive --repair xr_src_0001`.",
+        ),
+        ("unchecked", "429 at xr_src_0002; its answers so far: not_served, unreachable"),
+    ]
+    assert [s for kind, s in wayback.events if kind == "sleep"] == [5.0, 300.0, 5.0]
+
+
+def test_a_429_on_the_cdx_listing_ends_the_run_there_and_is_not_retried():
+    """Three entries the listing decides. The first's reads `[]`, MISSING, which stands; the
+    second's answers 429, which ends the run: it and the third are UNCHECKED, and the 429 is
+    neither retried nor waited out."""
+    limited = urllib.error.HTTPError(OTHER_URL, 429, "slow", _message({"Retry-After": "1"}), None)
+    wayback = _Wayback(
+        {TS_D: [_not_found], TS_E: [_not_found], TS_C: [_not_found]},
+        listings={FR_URL: [], OTHER_URL: limited, THIRD_URL: []},
+    )
+    heard = []
+    reports = wayback.run(
+        _archived(TS_D),
+        _archived(TS_E, xr_id="xr_src_0002", url=OTHER_URL),
+        _archived(TS_C, xr_id="xr_src_0003", url=THIRD_URL),
+        on_429=heard.append,
+    )
+    four = "its answers so far: not_served, not_served, not_served, not_served"
+    assert [r.status for r in reports] == ["missing", "unchecked", "unchecked"]
+    assert [r.detail for r in reports[1:]] == [f"429 at xr_src_0002; {four}"] * 2
+    assert heard == ["429 at xr_src_0002"]
+    read = [
+        parse_qs(urlsplit(url).query)["url"][0] for kind, url in wayback.events if kind == "cdx"
+    ]
+    assert read == [FR_URL, OTHER_URL]  # once each, and never the third's
+    assert wayback.events[-1][0] == "cdx"  # nothing waited after it
+
+
+def _connection_refused(url):
+    raise _refused_connection()
+
+
+def test_a_refused_connection_does_not_end_a_run_that_ends_at_a_429():
+    """A capture refused every time is UNCHECKED once its rounds are done, and a CDX read refused
+    every time once it has had a refused CDX read's retries; the run goes on past both, to the
+    entries after them, and nothing is heard as a 429."""
+    wayback = _Wayback(
+        {TS_A: [_connection_refused], TS_B: [_serves()], TS_D: [_not_found], TS_E: [_not_found]},
+        listings={FR_URL: _refused_connection(), OTHER_URL: []},
+    )
+    heard = []
+    reports = wayback.run(
+        _archived(TS_A),
+        _archived(TS_B, xr_id="xr_src_0002"),
+        _archived(TS_D, xr_id="xr_src_0003"),
+        _archived(TS_E, xr_id="xr_src_0004", url=OTHER_URL),
+        on_429=heard.append,
+    )
+    refused = "URLError: <urlopen error [Errno 111] Connection refused>"
+    assert [r.status for r in reports] == ["unchecked", "ok", "unchecked", "missing"]
+    assert reports[0].detail == f"no answer in 4 sample(s); the last: {refused}"
+    assert reports[2].detail.endswith(f"and the CDX listing could not be read ({refused})")
+    read = [
+        parse_qs(urlsplit(url).query)["url"][0] for kind, url in wayback.events if kind == "cdx"
+    ]
+    assert read == [FR_URL] * 4 + [OTHER_URL]  # refused, then retried after 10, 20 and 30 s
+    assert heard == []
 
 
 # --------------------------------------------------------------------------- emitting

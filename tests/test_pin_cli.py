@@ -963,7 +963,8 @@ def _add_archived_at(tmp_path, timestamp, n=1, extra=()):
 def _weekly(monkeypatch, answers, *, listing=(), calls=None):
     """Wayback for `check --archives`. `answers` maps a timestamp to each sample's answer, in
     order, the last repeated: "ok" (the pinned bytes, served there), "other" (other bytes, served
-    there), an HTTP status, or "timeout". `listing` is the CDX rows for every URL."""
+    there), an HTTP status, "timeout", or "refused" (a connection refused). `listing` is the CDX
+    rows for every URL."""
     queues = {ts: list(seq) for ts, seq in answers.items()}
 
     def fetch_capture(url, *, timeout=90):
@@ -974,6 +975,8 @@ def _weekly(monkeypatch, answers, *, listing=(), calls=None):
         answer = seq.pop(0) if len(seq) > 1 else seq[0]
         if answer == "timeout":
             raise TimeoutError("timed out")
+        if answer == "refused":
+            raise urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
         if isinstance(answer, int):
             raise urllib.error.HTTPError(url, answer, "refused", {}, None)
         when = datetime.strptime(asked, "%Y%m%d%H%M%S").replace(tzinfo=UTC)
@@ -1304,6 +1307,119 @@ def test_check_archives_missing_detail_gives_the_age_and_the_next_step(
     out = capsys.readouterr().out
     assert re.search(r"the capture is \d+ day\(s\) old", out)
     assert "run `pin archive --repair xr_src_0001`" in out
+
+
+def _three_with_a_429_at_the_second(tmp_path, monkeypatch, calls=None):
+    for n, at in enumerate((AT_1, AT_2, AT_3), 1):
+        _add_archived_at(tmp_path, at, n)
+    _weekly(monkeypatch, {AT_1: ["ok"], AT_2: [429, "ok"], AT_3: ["ok"]}, calls=calls)
+
+
+@pytest.mark.parametrize("as_json", [False, True])
+def test_check_archives_stop_on_429_ends_the_run_at_the_first_429_and_says_so_last(
+    tmp_path, monkeypatch, capsys, as_json
+):
+    calls, slept = [], []
+    _three_with_a_429_at_the_second(tmp_path, monkeypatch, calls)
+    capsys.readouterr()
+    extra = ["--stop-on-429", "--json"] if as_json else ["--stop-on-429"]
+    assert _check_archives(tmp_path, *extra, sleep_fn=slept.append) == 7
+    captured = capsys.readouterr()
+    lines = (captured.err if as_json else captured.out).splitlines()
+    assert lines[2:] == [
+        "UNCHECKED       xr_src_0002  FEC AO 2023-02",
+        "                429 at xr_src_0002; its answers so far: unreachable",
+        "UNCHECKED       xr_src_0003  FEC AO 2023-03",
+        "                429 at xr_src_0002; its answers so far: none",
+        "3 attached capture(s): 1 OK, 0 ARCHIVE-LOST, 0 ARCHIVE-MISSING, 2 UNCHECKED, "
+        "0 NOT CHECKABLE",
+        "ENDED: 429 at xr_src_0002",
+    ]
+    assert [re.search(r"/web/(\d{14})id_/", url).group(1) for _, url, _ in calls] == [AT_1, AT_2]
+    assert slept == [5.0]  # the gap before the second request; the 429 isn't waited out
+    if as_json:
+        reports = json.loads(captured.out)  # still the JSON alone
+        assert [r["status"] for r in reports] == ["ok", "unchecked", "unchecked"]
+
+
+def test_check_archives_without_stop_on_429_waits_the_same_429_out(tmp_path, monkeypatch, capsys):
+    """As archives.yml runs it: the next round is the 429's retry, and the run goes on."""
+    _three_with_a_429_at_the_second(tmp_path, monkeypatch)
+    capsys.readouterr()
+    slept = []
+    assert _check_archives(tmp_path, sleep_fn=slept.append) == 0
+    out = capsys.readouterr().out
+    assert out.count("OK              xr_src_000") == 3
+    assert "ENDED" not in out
+    assert slept == [5.0, 5.0, 300.0]
+
+
+def test_check_archives_stop_on_429_keeps_a_lost_already_in_hand(tmp_path, monkeypatch, capsys):
+    """Exit 5: the mismatch answered before the 429 outranks the UNCHECKED it leaves."""
+    _add_archived_at(tmp_path, AT_1, 1)
+    _add_archived_at(tmp_path, AT_2, 2)
+    _weekly(monkeypatch, {AT_1: ["other"], AT_2: [429]})
+    capsys.readouterr()
+    assert _check_archives(tmp_path, "--stop-on-429") == 5
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == "ARCHIVE-LOST    xr_src_0001  FEC AO 2023-01"
+    assert out[2] == "UNCHECKED       xr_src_0002  FEC AO 2023-02"
+    assert out[-1] == "ENDED: 429 at xr_src_0002"
+
+
+def test_check_archives_stop_on_429_ends_at_a_cdx_429_and_keeps_the_missing_before_it(
+    tmp_path, monkeypatch, capsys
+):
+    """Exit 6: the first listing reads `[]`, MISSING; the second answers 429, which ends the run
+    there, unretried."""
+    _add_archived_at(tmp_path, AT_1, 1)
+    _add_archived_at(tmp_path, AT_2, 2)
+    _weekly(monkeypatch, {AT_1: [404], AT_2: [404]})
+    listing = pinmod._json_call  # the fake just installed
+    reads = []
+
+    def json_call(url, headers=None, data=None, *, timeout=90):
+        reads.append(url)
+        if len(reads) == 2:
+            raise urllib.error.HTTPError(url, 429, "slow", {}, None)
+        return listing(url, headers, data, timeout=timeout)
+
+    monkeypatch.setattr("registers_crosswalk.pin._json_call", json_call)
+    capsys.readouterr()
+    assert _check_archives(tmp_path, "--stop-on-429") == 6
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == "ARCHIVE-MISSING xr_src_0001  FEC AO 2023-01"
+    assert out[2:4] == [
+        "UNCHECKED       xr_src_0002  FEC AO 2023-02",
+        "                429 at xr_src_0002; its answers so far: not_served, not_served, "
+        "not_served, not_served",
+    ]
+    assert out[-1] == "ENDED: 429 at xr_src_0002"
+    assert len(reads) == 2
+
+
+def test_check_archives_stop_on_429_goes_on_past_a_refused_connection(
+    tmp_path, monkeypatch, capsys
+):
+    """A refused connection is no 429: its entry is UNCHECKED once its rounds are done, the entry
+    after it is still asked, and nothing says the run ended."""
+    _add_archived_at(tmp_path, AT_1, 1)
+    _add_archived_at(tmp_path, AT_2, 2)
+    _weekly(monkeypatch, {AT_1: ["refused"], AT_2: ["ok"]})
+    capsys.readouterr()
+    assert _check_archives(tmp_path, "--stop-on-429") == 7
+    out = capsys.readouterr().out
+    assert "UNCHECKED       xr_src_0001" in out and "OK              xr_src_0002" in out
+    assert "Connection refused" in out
+    assert "ENDED" not in out
+
+
+def test_check_refuses_stop_on_429_without_archives_and_fetches_nothing(tmp_path, capsys):
+    _add(tmp_path)
+    capsys.readouterr()
+    argv = ["--data-dir", str(tmp_path), "check", "--stop-on-429"]
+    assert main(argv, fetch=_never_fetch, archive_fn=_never_archive, sleep_fn=lambda _s: None) == 1
+    assert "--stop-on-429 goes with --archives" in capsys.readouterr().err
 
 
 # --------------------------------------------------- the manifest verifies; the record lists all

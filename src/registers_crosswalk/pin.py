@@ -1492,6 +1492,11 @@ class _OutOfBudget(Exception):
     """A wait or a request the run's budget can't cover. Its message is the reason."""
 
 
+class _RateLimited(_OutOfBudget):
+    """A 429 in a run told to end at one (`on_429`): what is pending is cut short, as when the
+    budget runs out. Its message is the reason."""
+
+
 class _Paced:
     """Every request at least `_ARCHIVE_GAP` after the one before, and every wait inside the run's
     budget. A wait already taken between two requests (a round's five minutes, a retry's) counts
@@ -1586,7 +1591,9 @@ def _verdict_from_samples(entry: _ArchiveEntry) -> tuple[ArchiveStatus, str] | N
 
 
 def _verdict_from_listing(
-    entry: _ArchiveEntry, listing: Callable[[str], list[dict[str, object]]], now: datetime
+    entry: _ArchiveEntry,
+    listing: Callable[[_ArchiveEntry], list[dict[str, object]]],
+    now: datetime,
 ) -> tuple[ArchiveStatus, str]:
     """The verdict on an entry every answer about which was `not_served`: MISSING if the CDX
     listing answers without a row holding a document at that timestamp (`[]` is an answer)."""
@@ -1594,7 +1601,7 @@ def _verdict_from_listing(
     answered = [s for s in entry.samples if s.status != "unreachable"]
     seen = f"not served at {ts} in {len(answered)} answer(s) ({answered[-1].detail})"
     try:
-        rows = listing(entry.url)
+        rows = listing(entry)
     except _OutOfBudget:
         raise  # not an answer about the listing: the run stops asking
     except Exception as exc:  # noqa: BLE001 - a listing that can't be read decides nothing
@@ -1645,6 +1652,7 @@ def check_archives(
     on_final: Callable[[ArchiveReport], None] | None = None,
     clock: Callable[[], float] | None = None,
     budget: float = _ARCHIVE_BUDGET,
+    on_429: Callable[[str], None] | None = None,
 ) -> list[ArchiveReport]:
     """Check every entry of every source's `archives`, and return one report each, in order.
 
@@ -1660,19 +1668,33 @@ def check_archives(
     at call time): what is pending then is UNCHECKED, with the reason, or LOST where a sample was
     already a mismatch. `on_final` hears each
     report as soon as it is final, so a run cut short by the job's timeout has already said what
-    it reached. Never writes.
+    it reached. With `on_429` (`--stop-on-429`), the first 429, on a capture or on a CDX read,
+    ends the run there instead of being waited out: nothing more is asked, what is pending is cut
+    short as when the budget runs out, with the reason "429 at xr_src_NNNN", and `on_429` hears
+    it. A connection never made is no 429, and is retried or sampled again as before. Never
+    writes.
     """
     paced = _Paced(sleep_fn, clock or time.monotonic, budget)
     entries = [_ArchiveEntry(source, copy, []) for source in sources for copy in source.archives]
     fetch = functools.partial(paced.request, capture_fn)
     refusals: list[OSError] = []  # what the CDX API, or a connection to it, refused, reading one
 
-    def ask_listing(*args: object) -> object:
+    def end_at_429(entry: _ArchiveEntry) -> None:
+        """With `on_429`, the run ends at this 429, answered about `entry`; without it, the 429
+        is waited out as before."""
+        if on_429 is not None:
+            reason = f"429 at {entry.source.xr_id}"
+            on_429(reason)
+            raise _RateLimited(reason)
+
+    def ask_listing(entry: _ArchiveEntry, *args: object) -> object:
         paced.ready("budget spent while reading the CDX listing")
         try:
             return paced.request(json_fn, *args)
         except OSError as exc:
             refusals.append(exc)
+            if isinstance(exc, urllib.error.HTTPError) and exc.code == 429:
+                end_at_429(entry)
             raise
 
     def wait_to_retry_listing(seconds: float) -> None:
@@ -1687,9 +1709,10 @@ def check_archives(
         # a retry is a request too, so it waits at least as long as any other
         paced.wait(max(seconds, _ARCHIVE_GAP), why)
 
-    def listing(url: str) -> list[dict[str, object]]:
+    def listing(entry: _ArchiveEntry) -> list[dict[str, object]]:
         refusals.clear()
-        return _cdx_listing(url, json_fn=ask_listing, sleep_fn=wait_to_retry_listing)
+        ask = functools.partial(ask_listing, entry)
+        return _cdx_listing(entry.url, json_fn=ask, sleep_fn=wait_to_retry_listing)
 
     def settle(entry: _ArchiveEntry, status: ArchiveStatus, detail: str) -> None:
         entry.report = ArchiveReport(
@@ -1753,6 +1776,8 @@ def check_archives(
                 expected = ExpectedDrift.of(entry.source)
                 check = _check_attached(entry.copy, expected, capture_fn=fetch)
                 entry.samples.append(check)
+                if check.retry_after is not None:  # a 429
+                    end_at_429(entry)
                 if check.status == "unreachable":
                     unanswered_in_a_row += 1
                     if check.retry_after is not None:
@@ -2754,6 +2779,7 @@ def _cmd_check_archives(args: argparse.Namespace, sleep_fn: SleepFn) -> int:
     def show(report: ArchiveReport) -> None:
         print(_archive_line(report), file=log, flush=True)
 
+    ended: list[str] = []  # with --stop-on-429, the 429 that ended the run, if one did
     reports = check_archives(
         targets,
         # Looked up here, at call time, so a test's stand-in for either is the one used.
@@ -2766,6 +2792,7 @@ def _cmd_check_archives(args: argparse.Namespace, sleep_fn: SleepFn) -> int:
         sleep_fn=sleep_fn,
         now=datetime.now(tz=UTC),
         on_final=show,
+        on_429=ended.append if args.stop_on_429 else None,
     )
     checkable = [r for r in reports if r.status != "not_checkable"]
     unreachable = bool(checkable) and all(
@@ -2780,6 +2807,8 @@ def _cmd_check_archives(args: argparse.Namespace, sleep_fn: SleepFn) -> int:
     print(f"{len(reports)} attached capture(s): {counts}", file=log)
     if unreachable:
         print("WAYBACK UNREACHABLE", file=log)
+    if ended:
+        print(f"ENDED: {ended[0]}", file=log)
     return max(
         (_ARCHIVE_EXIT_CODES[r.status] for r in reports), default=0, key=_ARCHIVE_EXIT_RANK.get
     )
@@ -2789,6 +2818,13 @@ def _cmd_check(
     args: argparse.Namespace, fetch: FetchFn, archive_fn: ArchiveFn, sleep_fn: SleepFn
 ) -> int:
     del archive_fn  # check never archives
+    if args.stop_on_429 and not args.archives:
+        # Refused, not ignored: ignored, it would let the drift check re-fetch every document
+        # under a flag that reads as a stop.
+        print(
+            "--stop-on-429 goes with --archives; the drift check has no such stop", file=sys.stderr
+        )
+        return 1
     if args.archives:
         return _cmd_check_archives(args, sleep_fn)
     xw = Crosswalk(args.data_dir)
@@ -3029,6 +3065,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="re-verify every attached Wayback capture at its exact timestamp instead of "
         "re-fetching documents: 0 ok, 5 lost, 6 missing, 7 unchecked; never writes, needs no key",
+    )
+    check_parser.add_argument(
+        "--stop-on-429",
+        action="store_true",
+        help="with --archives: Wayback's first 429 ends the run instead of being waited out; the "
+        'entries still pending are UNCHECKED, and the last line is "ENDED: 429 at xr_src_NNNN"',
     )
     check_parser.add_argument("--json", action="store_true")
 

@@ -4,6 +4,7 @@ import http.client
 import json
 import re
 import socket
+import time
 import urllib.error
 from datetime import UTC, date, datetime, timedelta
 from email.utils import format_datetime
@@ -2413,6 +2414,11 @@ def test_one_answer_only_is_unchecked():
     "reply, said",
     [
         (urllib.error.HTTPError(FR_URL, 503, "busy", {}, None), "(HTTP 503)"),
+        # refused on every try, the 5xx schedule's three retries included
+        (
+            urllib.error.URLError(ConnectionRefusedError(111, "Connection refused")),
+            "(URLError: <urlopen error [Errno 111] Connection refused>)",
+        ),
         ({"not": "a listing"}, "_NotAListing"),
         ([["no", "header"], ["x"]], "_NotAListing"),
     ],
@@ -2424,8 +2430,20 @@ def test_a_listing_that_cannot_be_read_is_unchecked(reply, said):
     assert "the CDX listing could not be read" in report.detail and said in report.detail
 
 
-def test_a_listing_503_is_retried_as_reuse_retries_it():
-    listing = [urllib.error.HTTPError(FR_URL, 503, "busy", {}, None)]
+@pytest.mark.parametrize(
+    "failure",
+    [
+        urllib.error.HTTPError(FR_URL, 503, "busy", {}, None),
+        # xr_src_0017 on 2026-09-28: its answers pointed to ARCHIVE-MISSING, and its one CDX read
+        # was refused and not retried, which left it UNCHECKED.
+        urllib.error.URLError(ConnectionRefusedError(111, "Connection refused")),
+        urllib.error.URLError(
+            pinmod._ConnectTimeout("no connection to web.archive.org within 10 s")  # noqa: SLF001
+        ),
+    ],
+)
+def test_a_listing_503_or_connection_never_made_is_retried_as_reuse_retries_it(failure):
+    listing = [failure]
 
     class Flaky(_Wayback):
         def json_fn(self, url, headers=None, data=None):
@@ -2881,6 +2899,155 @@ def test_a_429_and_a_5xx_do_not_share_a_budget():
     copy = archive(ECFR_URL, json_fn=json_fn, sleep_fn=slept.append, env=KEYS)
     assert copy.url == f"https://web.archive.org/web/20260919120000/{ECFR_URL}"
     assert slept[:2] == [5.0, 10.0]  # the 429's own wait, then the first 5xx wait
+
+
+# ------------------------------------- a connection never made: fail fast, and retry a CDX read
+#
+# On 2026-09-28 the first runner run's refused connections took about 18 seconds each, 21 of them
+# 6.3 minutes of its 25-minute budget, and its one CDX read was refused once and not retried.
+
+
+def _refused_connection():
+    return urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
+
+
+def _connect_timed_out():
+    return urllib.error.URLError(
+        pinmod._ConnectTimeout("no connection to web.archive.org within 10 s")  # noqa: SLF001
+    )
+
+
+def _spy_on_connections(monkeypatch):
+    """Record the timeout each connection is opened with, then open it as the guard allows."""
+    asked = []
+    guarded = socket.create_connection
+
+    def create_connection(address, timeout=None, *args, **kwargs):
+        asked.append(timeout)
+        return guarded(address, timeout, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "create_connection", create_connection)
+    return asked
+
+
+def test_a_connection_is_made_within_the_connect_timeout_and_read_at_the_read_timeout(monkeypatch):
+    asked = _spy_on_connections(monkeypatch)
+    with socket.create_server(("127.0.0.1", 0)) as server:
+        connection = pinmod._connecting(http.client.HTTPConnection, 10.0)(  # noqa: SLF001
+            "127.0.0.1", server.getsockname()[1], timeout=60.0
+        )
+        connection.connect()
+        try:
+            assert asked == [10.0]
+            assert connection.sock.gettimeout() == 60.0
+        finally:
+            connection.close()
+
+
+@pytest.mark.parametrize("read", ["_json_call", "_fetch_capture"])
+def test_a_connection_not_made_in_time_is_a_connect_timeout_not_a_slow_answer(
+    read, monkeypatch, real_capture_read
+):
+    def never(address, timeout=None, *args, **kwargs):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(socket, "create_connection", never)
+    with pytest.raises(urllib.error.URLError) as caught:
+        getattr(pinmod, read)("http://127.0.0.1:9/web/20260923013800id_/x", timeout=(10.0, 60.0))
+    assert isinstance(caught.value.reason, pinmod._ConnectTimeout)  # noqa: SLF001
+    assert str(caught.value.reason) == "no connection to 127.0.0.1 within 10 s"
+    assert pinmod._never_connected(caught.value)  # noqa: SLF001
+
+
+def test_an_answer_that_does_not_come_times_out_at_the_read_timeout(monkeypatch):
+    # The server's backlog takes the connection, and nothing ever answers on it.
+    asked = _spy_on_connections(monkeypatch)
+    with socket.create_server(("127.0.0.1", 0)) as server:
+        url = f"http://127.0.0.1:{server.getsockname()[1]}/cdx/search/cdx?url=x"
+        started = time.monotonic()
+        with pytest.raises(TimeoutError) as caught:
+            pinmod._json_call(url, timeout=(10.0, 0.2))  # noqa: SLF001
+        assert time.monotonic() - started < 5
+    assert asked == [10.0]
+    assert not isinstance(caught.value, pinmod._ConnectTimeout)  # noqa: SLF001
+    assert not pinmod._never_connected(caught.value)  # noqa: SLF001
+
+
+def test_a_tls_handshake_is_part_of_the_connection_and_of_its_timeout():
+    # The server takes the connection and never speaks TLS.
+    with socket.create_server(("127.0.0.1", 0)) as server:
+        connection = pinmod._connecting(http.client.HTTPSConnection, 0.2)(  # noqa: SLF001
+            "127.0.0.1", server.getsockname()[1], timeout=60.0
+        )
+        started = time.monotonic()
+        with pytest.raises(pinmod._ConnectTimeout):  # noqa: SLF001
+            connection.connect()
+        assert time.monotonic() - started < 5
+        connection.close()
+
+
+def test_a_connection_never_made_is_retried_only_where_it_is_asked_for():
+    slept = []
+    answers = [_refused_connection(), _refused_connection()]
+
+    def listing():
+        if answers:
+            raise answers.pop()
+        return "the listing"
+
+    got = pinmod._retrying(listing, sleep_fn=slept.append, refused=True)  # noqa: SLF001
+    assert got == "the listing"
+    assert slept == [10.0, 20.0]  # the 5xx schedule
+
+    def save():
+        raise _refused_connection()
+
+    slept.clear()
+    with pytest.raises(urllib.error.URLError):
+        pinmod._retrying(save, sleep_fn=slept.append)  # noqa: SLF001 - Save Page Now's calls
+    assert slept == []
+
+
+@pytest.mark.parametrize(
+    "exc, retried",
+    [
+        (_refused_connection(), True),
+        (ConnectionRefusedError(111, "Connection refused"), True),
+        (_connect_timed_out(), True),
+        (TimeoutError("timed out"), False),  # the connection was made, and the answer didn't come
+        (ConnectionResetError("wayback went away"), False),  # made, then dropped
+        (urllib.error.URLError(socket.gaierror(11001, "getaddrinfo failed")), False),  # DNS
+    ],
+)
+def test_only_a_connection_never_made_is_retried_as_one(exc, retried):
+    slept, tries = [], []
+
+    def call():
+        tries.append(1)
+        raise exc
+
+    with pytest.raises(type(exc)):
+        pinmod._retrying(call, sleep_fn=slept.append, refused=True)  # noqa: SLF001
+    assert len(tries) == (4 if retried else 1)
+    assert slept == ([10.0, 20.0, 30.0] if retried else [])
+
+
+def test_a_connection_never_made_and_a_5xx_share_the_5xx_budget():
+    slept = []
+    answers = [
+        urllib.error.HTTPError(FR_URL, 503, "busy", {}, None),
+        _refused_connection(),
+        urllib.error.HTTPError(FR_URL, 503, "busy", {}, None),
+        _refused_connection(),
+    ]
+
+    def call():
+        raise answers.pop(0)
+
+    with pytest.raises(urllib.error.URLError) as caught:
+        pinmod._retrying(call, sleep_fn=slept.append, refused=True)  # noqa: SLF001
+    assert not isinstance(caught.value, urllib.error.HTTPError)  # the fourth answer, a refusal
+    assert slept == [10.0, 20.0, 30.0]
 
 
 # --------------------------------------------------------------------------- emitting

@@ -679,8 +679,9 @@ caller's: 1 where the text is confirmed against the live page or other outlets, 
 party's own statement pinned this way is B1, not A1. The grade is about custody of the copy, not
 about whose words it holds.
 
-**`check` does not fetch these pins. It prints FIXED** and exits 0 for them. The status page shows a
-grey pill, counts them neither as 1:1 nor against it, and says in its band how many it left out:
+**`check` does not fetch these pins. It prints FIXED** and exits 0 for them. The status page gives
+each the weekly archive check's verdict when it has one (after this list), and otherwise a grey
+pill that counts neither as 1:1 nor against it, with the band saying how many it left out:
 
 - A capture's bytes cannot change. Two things can still go wrong with one: Wayback stops serving it
   (removal on an owner's request, an exclusion), or serves another capture at its timestamp.
@@ -694,9 +695,11 @@ grey pill, counts them neither as 1:1 nor against it, and says in its band how m
   adding an answer.
 
 Every run still prints a line for each one, so the pins a run reports add up to the pins it holds.
-Until the status page takes its verdicts from the archive run (a tracked chore, below), a capture
-pin whose capture is lost or missing shows as a red archives run (exit 5 or 6), not on the status
-page.
+The status page takes each capture pin's verdict from the newest archives run, which `archives.yml`
+keeps as an artifact: `OK` counts as 1:1, `ARCHIVE-LOST` or `ARCHIVE-MISSING` is red and counts
+against it, and `UNCHECKED` is grey and left out of the count, as is a capture pin that run did not
+hold. The band says when that run was. A lost or missing capture is also a red archives run (exit
+5 or 6). With no artifact to read, the page shows capture pins as FIXED, as it did before.
 
 **`blobs` reads them from the capture**, at its exact timestamp, each read at least five seconds
 after the one before. Once Wayback answers 429 in a run, the capture pins after it are reported as
@@ -1103,7 +1106,9 @@ answers so far; an entry with a mismatch among them is `LOST`, since that is Way
 about the capture. The run ends on its own verdicts; the job's `timeout-minutes: 30` is only the
 backstop. Each line prints as soon as its verdict is final. It never writes,
 never asks Save Page Now for anything, and needs no key. `--only xr_src_NNNN` narrows it to one
-record; `--json` prints one report per entry, each sample's answer included, and nothing else.
+record; `--json` prints one report per entry, each sample's answer included, and nothing else on
+stdout, while the lines and the count go to stderr as they come. That is how `archives.yml` runs
+it: the JSON becomes the `archives` artifact the status page reads, and the log keeps the lines.
 
 - **`OK`**: some sample was served at the exact timestamp and reproduced the pin's drift value.
 - **`ARCHIVE-LOST`**: none reproduced, and some sample was served at the exact timestamp with
@@ -1287,14 +1292,19 @@ uncommitted under `data/sources/`, because the failure mode of a GUI is a pin ma
 `.github/workflows/status-page.yml` runs `pin check --json`, feeds the JSON to
 `python -m registers_crosswalk.status`, and publishes the one HTML file it writes to GitHub
 Pages. Reproduce it locally with `python -m registers_crosswalk.status --out
-build/status/index.html` (add `--drift-json` if you have a check's JSON to hand).
+build/status/index.html` (add `--drift-json` if you have a check's JSON to hand, and
+`--archive-json`, with `--archive-checked-at`, if you have an archive check's).
 
 - **Generated, not tracked.** The page lands in `build/`, which is gitignored, and in the Pages
   artifact in CI. No HTML is committed, so there is nothing in the tree that can go stale and
   nothing to regenerate by hand after a `pin add`.
-- **It reads two things and nothing else:** `data/` and the check's JSON. It has no fetch of its
-  own and never reads `.env`. Everything it shows is already public in this repository, which is
-  what makes publishing it a non-decision.
+- **It reads three things and nothing else:** `data/`, the check's JSON, and the newest archives
+  run's JSON, which decides capture pins' rows only. It has no fetch of its own and never reads
+  `.env`. Everything it shows is already public in this repository, which is what makes publishing
+  it a non-decision. An archives artifact it can't read costs nothing but those rows' verdicts:
+  they show FIXED, and the log says why.
+- **It runs after each archives run as well,** beside its 12:20 cron, so the capture pins'
+  verdicts reach the page the day they are taken. That run re-fetches the pinned documents too.
 - **The workflow exits with the check's code.** The check step is `continue-on-error` and its exit
   code is carried to the last step, which re-raises it. The page is therefore built and deployed
   whatever the check found: a red check is a red run *and* a red page at once, and the page can
@@ -1332,15 +1342,17 @@ way, and is restarted the same way; everything below holds for it too.
 
 ## Tracked chores
 
-- **The status page takes capture pins' verdicts from the archive run.** Open, not started (logged
-  2026-10-03). `pin check` never fetches a capture pin (`wayback`), so the page shows it as a grey
-  FIXED and leaves it out of the band's count, and a lost or missing capture shows only as a red
-  `archives.yml` run (exit 5 or 6). The unit: `archives.yml` saves `pin check --archives --json` as
-  an artifact, `status-page.yml` runs after it and hands that file to `status.py`, and a capture
-  pin's archive verdict becomes its row's verdict, `OK` counting as 1:1 and `ARCHIVE-LOST` or
-  `ARCHIVE-MISSING` counting against it. Until then, a run in which every report is FIXED shows a
-  green dot and "All fetched documents = 1:1" over zero documents; the unit gives that case its own
-  wording.
+- **The status page takes capture pins' verdicts from the archive run.** Done 2026-10-20 (logged
+  2026-10-03); its workflow half can only be proven once it is on `main`. `pin check` never
+  fetches a capture pin (`wayback`), so the page showed it as a grey FIXED and left it out of the
+  band's count, and a lost or missing capture showed only as a red `archives.yml` run (exit 5 or
+  6). The unit: `archives.yml` saves `pin check --archives --json` as an artifact, `status-page.yml`
+  runs after it and hands that file to `status.py`, and a capture pin's archive verdict becomes its
+  row's verdict, `OK` counting as 1:1 and `ARCHIVE-LOST` or `ARCHIVE-MISSING` counting against it.
+  A run in which every report was FIXED showed a green dot and "All fetched documents = 1:1" over
+  zero documents; the unit gives that case its own wording. As done, `UNCHECKED` is grey and left
+  out of the count, the band says when the archives run was, and the 12:20 cron stays beside the
+  run after each archives run.
 - **A refused page says which page it was.** Done 2026-10-19 (logged 2026-10-05). That day's
   status-page runs reported `xr_src_0005`, `0024`, `0056` and `0064` as ERROR "no source-credit
   element found in the page". A fetch by hand of § 30116 showed why: uscode.house.gov was serving

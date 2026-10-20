@@ -14,6 +14,16 @@ name: status-page
 # job's schedule sits twenty minutes behind that cron so the page is rebuilt just after the check
 # that people actually watch.
 #
+# CAPTURE PINS TAKE THE ARCHIVES RUN'S VERDICTS. `pin check` never fetches a capture pin
+# (`wayback`), so on its own this job can only show one as a grey FIXED. archives.yml keeps its
+# verdicts as an artifact, and this job downloads the newest completed run's on every run and hands
+# it to `status`: a capture it verified counts as 1:1, one it found lost or missing counts against,
+# and one it could not check stays grey. So that the verdicts reach the page the day they are
+# taken, this job also runs when an archives run on main completes, beside the 12:20 cron, which is
+# kept; that run re-fetches the pinned documents too, one more fetch a week. Downloading needs
+# `actions: read` and nothing else, and no secret. Without an artifact the page shows capture pins
+# as FIXED, as before.
+#
 # WHY THIS ONE FETCHES ON `push` AND THAT ONE DOES NOT. sources-drift's header rules out per-push
 # re-fetching: a pin drifts on the publisher's schedule, not ours, and hitting every canonical URL
 # on every commit would be rude to the services and slow. That rule is kept here, not broken.
@@ -26,7 +36,8 @@ name: status-page
 # without a check has to SAY so, and a page that spends most of the week saying "Not checked in
 # this build" is a worse artifact than one that is checked when it changes. The two are not in
 # tension: the page never claims a check it did not run. `status` takes the verdicts from
-# `--drift-json` and from nothing else, and with no JSON it prints "Not checked in this build"
+# `--drift-json`, and capture pins' from the archives run's `--archive-json` with that run's time
+# beside them, and from nothing else; with no drift JSON it prints "Not checked in this build"
 # and no pills at all. There is no path by which a stale or assumed OK reaches the page.
 #
 # CI needs no API secret: every stored canonical URL is key-free. The api.data.gov key
@@ -44,12 +55,17 @@ on:
     branches: [main]
   schedule:
     - cron: "20 12 * * 1"
+  workflow_run:
+    workflows: [archives]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 # One deploy at a time, and never cancel one in flight: a cancelled deploy can leave the site on
 # the previous build with no indication of it.
@@ -108,14 +124,38 @@ jobs:
                   print(f"{r['xr_id']}  {r['status'].upper():<12}  {detail}".rstrip())
           EOF
 
+      - name: Fetch the newest archive check's verdicts
+        # The newest completed archives run on main, whatever started this one; after an archives
+        # run, that is the run that just finished. Its time goes on the page beside its verdicts.
+        # `continue-on-error`: with no artifact (none yet, or the run kept none), the page shows
+        # capture pins as FIXED, as it did before this step existed.
+        id: archives
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          read -r id at < <(gh run list --repo "$GITHUB_REPOSITORY" --workflow archives.yml \
+            --branch main --status completed --limit 1 --json databaseId,createdAt \
+            --jq '.[0] | "\(.databaseId) \(.createdAt)"')
+          gh run download "$id" --repo "$GITHUB_REPOSITORY" --name archives --dir build/archives
+          echo "at=$at" >> "$GITHUB_OUTPUT"
+
       - name: Build the status page
-        # The only step that reads data/. It never touches the network. The guard is for the one
-        # case the check cannot report through its JSON — it died before printing any — and it
-        # keeps that from costing us the page as well as the check.
+        # The only step that reads data/. It never touches the network. The guards are for the
+        # cases a check cannot report through its JSON — it died before printing any — and they
+        # keep that from costing us the page as well as the check.
+        env:
+          ARCHIVE_AT: ${{ steps.archives.outputs.at }}
         run: |
           args=""
           if [ -s build/drift.json ]; then
             args="--drift-json build/drift.json"
+          fi
+          if [ -s build/archives/archives.json ]; then
+            args="$args --archive-json build/archives/archives.json"
+            if [ -n "$ARCHIVE_AT" ]; then
+              args="$args --archive-checked-at $ARCHIVE_AT"
+            fi
           fi
           python -m registers_crosswalk.status $args --out build/status/index.html
 

@@ -1054,7 +1054,8 @@ for a new capture, and that capture is fetched back at the timestamp it reported
 
 The listing is an optimisation, so a broken CDX API can't refuse a pin; it just means the long way
 round. A 5xx or 429 from it is retried the way Save Page Now's are: on 2026-09-24 it answered 503
-twice in a row and then served the listing.
+twice in a row and then served the listing. A refused connection to it is retried on the 5xx
+schedule too, which Save Page Now's calls are not, since nothing reached the server.
 
 Why the new capture is checked too: on 2026-09-22 Save Page Now reported captures for
 `xr_src_0012` and `xr_src_0013`, and nothing checked them before the records were written. When
@@ -1085,9 +1086,13 @@ bytes don't depend on its pin's liveness. A copy that isn't a Wayback capture wi
 `NOT CHECKABLE` at once, and nothing is asked about it. Every other entry is sampled once, at its
 own URL and timestamp; each that isn't OK is sampled again in up to three more rounds, five
 minutes apart (a 429's `Retry-After` apart, if longer, up to ten minutes), and one good answer
-settles an entry. Requests go at least five seconds apart. Three unanswered in a row end a round,
-and the next round starts with the entries that one didn't reach, so captures that keep failing
-at the front of the list can't keep the rest from being asked. After the last round, the
+settles an entry. Requests go at least five seconds apart. Wayback gets ten seconds to take each
+connection, TLS handshake included, apart from the 60 it then gets to answer a capture on it (90
+for a CDX listing), and a CDX read whose connection is refused, or not made in those ten seconds,
+is retried on the 5xx schedule; on 2026-09-28 (below) a refused connection took about 18 seconds,
+and one refused CDX read left a verdict `UNCHECKED`. Three unanswered in a row end a round, and
+the next round starts with the entries that one didn't reach, so captures that keep failing at the
+front of the list can't keep the rest from being asked. After the last round, the
 verdicts the samples decide come first; then the CDX listing is read for each entry whose every
 answer was "not served", if there were at least two (one is too few to call a capture missing,
 whatever the listing says). The check has a budget of its own, 25 minutes from its start: no wait
@@ -1350,16 +1355,19 @@ way, and is restarted the same way; everything below holds for it too.
   majors that target Node 24 across every workflow (`ci.yml`, `cross-repo.yml`,
   `sources-drift.yml`, `status-page.yml`, `archives.yml`). Warning only, non-urgent; do it in
   step with the sibling repos so all four move together.
-- **Archive check hardening, after Monday's run (2026-09-28).** Two notes from the first runner run,
-  to be decided with Monday's numbers beside them. A refused connection cost about 18 seconds rather
-  than failing at once, and 21 of them put the check at 24m45s of its 25-minute budget. And a CDX
-  read gets a single attempt when its connection is refused, since `_retrying` retries only an HTTP
-  5xx or 429: one refusal left `xr_src_0017` `UNCHECKED` where its two answers, neither serving it
-  (the last a 404), pointed to `ARCHIVE-MISSING`. Beside them, two fixes to the details printed for
-  a prelim. Its `ARCHIVE-MISSING` detail should say to run `--repair` now, not to wait a day. And
-  the clause a prelim's `LOST` or `MISSING` detail adds, that `--repair` can find another capture
-  with the same last amendment "until the section is next amended", claims what code 6 of the weekly
-  archive check corrects: captures made before an amendment still show the old last amendment and
-  still reproduce the pin. What an amendment ends is fresh captures, so the pool repair can draw on
-  stops growing and only shrinks with the index. The paragraph after the codes, which repeats the
-  clause, changes with it.
+- **Archive check hardening, after Monday's run (2026-09-28).** The two runner notes were done
+  2026-10-20; the two prelim fixes beside them are still open. The notes, from the first runner
+  run: a refused connection cost about 18 seconds rather than failing at once, and 21 of them put
+  the check at 24m45s of its 25-minute budget; and a CDX read got a single attempt when its
+  connection was refused, since `_retrying` retried only an HTTP 5xx or 429: one refusal left
+  `xr_src_0017` `UNCHECKED` where its two answers, neither serving it (the last a 404), pointed to
+  `ARCHIVE-MISSING`. As done, Wayback gets ten seconds to take a connection, apart from the time it
+  gets to answer on it, and a CDX read whose connection is refused or not made in those ten seconds
+  is retried on the 5xx schedule (the weekly archive check, above). Still open: two fixes to the
+  details printed for a prelim. Its `ARCHIVE-MISSING` detail should say to run `--repair` now, not
+  to wait a day. And the clause a prelim's `LOST` or `MISSING` detail adds, that `--repair` can
+  find another capture with the same last amendment "until the section is next amended", claims
+  what code 6 of the weekly archive check corrects: captures made before an amendment still show
+  the old last amendment and still reproduce the pin. What an amendment ends is fresh captures, so
+  the pool repair can draw on stops growing and only shrinks with the index. The paragraph after
+  the codes, which repeats the clause, changes with it.

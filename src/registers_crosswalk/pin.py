@@ -15,6 +15,7 @@ import functools
 import gzip
 import hashlib
 import html
+import http.client
 import json
 import os
 import re
@@ -453,10 +454,71 @@ def _response_headers(
         return dict(resp.headers)
 
 
-def _fetch_capture(url: str, *, timeout: float = 90) -> tuple[bytes, str, Mapping[str, str]]:
+# A Wayback read's timeout: seconds, which urllib gives the connection and then each read on it;
+# or (connect, read), as `requests` spells it, which keeps a server that never takes the connection
+# apart from one that takes it and is slow to answer. The weekly archive check uses the pair.
+Timeout = float | tuple[float, float]
+
+
+class _ConnectTimeout(TimeoutError):
+    """No connection, TLS handshake included, within a connect timeout: the server never took the
+    request, so nothing reached it."""
+
+
+@functools.cache
+def _connecting(
+    base: type[http.client.HTTPConnection], connect: float
+) -> type[http.client.HTTPConnection]:
+    """`base`, making its connection within `connect` seconds and then reading at its own
+    timeout. One class per pair, however many requests use it."""
+
+    class Connection(base):
+        def connect(self) -> None:
+            read, self.timeout = self.timeout, connect
+            try:
+                super().connect()
+            except TimeoutError as exc:
+                raise _ConnectTimeout(f"no connection to {self.host} within {connect:g} s") from exc
+            finally:
+                self.timeout = read
+            self.sock.settimeout(read)
+
+    return Connection
+
+
+class _HTTPWithin(urllib.request.HTTPHandler):
+    def __init__(self, connect: float) -> None:
+        super().__init__()
+        self._connection = _connecting(http.client.HTTPConnection, connect)
+
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(self._connection, req)
+
+
+class _HTTPSWithin(urllib.request.HTTPSHandler):
+    def __init__(self, connect: float) -> None:
+        super().__init__()
+        self._connection = _connecting(http.client.HTTPSConnection, connect)
+
+    def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(self._connection, req, context=self._context)
+
+
+def _urlopen(req: urllib.request.Request, timeout: Timeout) -> http.client.HTTPResponse:
+    """`urllib.request.urlopen`, where `timeout` may be (connect, read). A connection not made in
+    time raises `URLError` with a `_ConnectTimeout` as its reason; a read that times out raises
+    `TimeoutError`, as urlopen's does."""
+    if not isinstance(timeout, tuple):
+        return urllib.request.urlopen(req, timeout=timeout)
+    connect, read = timeout
+    opener = urllib.request.build_opener(_HTTPWithin(connect), _HTTPSWithin(connect))
+    return opener.open(req, timeout=read)
+
+
+def _fetch_capture(url: str, *, timeout: Timeout = 90) -> tuple[bytes, str, Mapping[str, str]]:
     """`default_fetch`'s request, returning the final URL and the headers along with the body."""
     req = urllib.request.Request(url, headers=_BASE_HEADERS)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with _urlopen(req, timeout) as resp:
         raw = resp.read()
         final = resp.geturl()
         headers = {key.lower(): value for key, value in resp.headers.items()}
@@ -470,11 +532,11 @@ def _json_call(
     headers: Mapping[str, str] | None = None,
     data: bytes | None = None,
     *,
-    timeout: float = 90,
+    timeout: Timeout = 90,
 ) -> Mapping[str, object]:
     """POST (with `data`) or GET `url` and parse the JSON reply. No gzip: these bodies are tiny."""
     req = _request(url, headers, base={"User-Agent": _UA}, data=data)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with _urlopen(req, timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -749,15 +811,23 @@ def _retry_after(exc: urllib.error.HTTPError) -> float | None:
     return max(0.0, (when - datetime.now(tz=UTC)).total_seconds())
 
 
+def _never_connected(exc: BaseException) -> bool:
+    """Whether a request failed before a connection was made: refused, or not made within a
+    connect timeout. Nothing reached the server, so asking again is safe for any request."""
+    reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
+    return isinstance(reason, ConnectionRefusedError | _ConnectTimeout)
+
+
 def _retrying(
     call: Callable[[], object],
     *,
     sleep_fn: SleepFn,
     waits: Sequence[float] = _ARCHIVE_RETRY_WAITS,
     rate_limit_tries: int = _RATE_LIMIT_TRIES,
+    refused: bool = False,
 ) -> object:
-    """Run `call`, retrying a 5xx or a 429. Each has its own budget, because each means something
-    different.
+    """Run `call`, retrying a 5xx or a 429, and with `refused` a connection that was never made.
+    The 5xx and the 429 have budgets of their own, because each means something different.
 
     **5xx.** Save Page Now answers 503 with an HTML "Internet Archive: Temporarily Offline" page
     during short outages — one was observed lasting under a minute on 2026-09-20, with the very
@@ -770,6 +840,11 @@ def _retrying(
 
     Any other 4xx is Wayback saying no — a url it will not take, a bad credential — and asking
     again cannot change the answer.
+
+    **A connection never made**, refused or not made within a connect timeout (`_never_connected`),
+    is retried with `refused`, on the 5xx schedule and its budget. Only a CDX read asks for it: on
+    2026-09-28 one was refused once, got no second attempt, and left `xr_src_0017` UNCHECKED
+    where its two answers pointed to ARCHIVE-MISSING.
     """
     server_failures = 0
     rate_limit_tries_used = 0
@@ -789,6 +864,13 @@ def _retrying(
             if server_failures > len(waits):
                 raise
             sleep_fn(waits[server_failures - 1])
+        except OSError as exc:
+            if not (refused and _never_connected(exc)):
+                raise
+            server_failures += 1
+            if server_failures > len(waits):
+                raise
+            sleep_fn(waits[server_failures - 1])
 
 
 class _NotAListing(ValueError):
@@ -800,10 +882,12 @@ def _cdx_listing(url: str, *, json_fn: JsonFn, sleep_fn: SleepFn) -> list[dict[s
 
     `[]` when it lists none, an empty reply or a header row alone, and that is an answer. A reply
     that is not a listing raises `_NotAListing`; a request that fails raises what it raised, once
-    `_retrying` has retried a 5xx or a 429.
+    `_retrying` has retried a 5xx, a 429 or a connection never made.
     """
     query = urlencode({"url": url, "output": "json", "fl": "timestamp,statuscode,digest"})
-    rows = _retrying(lambda: json_fn(f"{_WAYBACK_CDX}?{query}", None, None), sleep_fn=sleep_fn)
+    rows = _retrying(
+        lambda: json_fn(f"{_WAYBACK_CDX}?{query}", None, None), sleep_fn=sleep_fn, refused=True
+    )
     if not isinstance(rows, list):
         raise _NotAListing(f"the reply is a {type(rows).__name__}, not a list")
     if not rows:
@@ -1340,6 +1424,12 @@ _ARCHIVE_ROUND_WAIT = 300.0
 _ARCHIVE_ROUND_WAIT_MAX = 600.0
 # A capture fetch's timeout. Part A's slowest took 2.7 seconds.
 _ARCHIVE_CAPTURE_TIMEOUT = 60.0
+# A CDX listing's, `_json_call`'s own.
+_ARCHIVE_LISTING_TIMEOUT = 90.0
+# How long Wayback gets to take each connection, before either of those starts. On 2026-09-28 the
+# first runner run's refused connections took about 18 seconds each (15 to 25) rather than failing
+# at once, and its 21 of them took 6.3 minutes of the 25-minute budget.
+_ARCHIVE_CONNECT_TIMEOUT = 10.0
 # This many unanswered requests in a row end a round, and the next round starts with the entries
 # it didn't reach. Twenty timeouts would say no more about an outage than three do.
 _ARCHIVE_UNREACHABLE_STOP = 3
@@ -1575,18 +1665,20 @@ def check_archives(
     paced = _Paced(sleep_fn, clock or time.monotonic, budget)
     entries = [_ArchiveEntry(source, copy, []) for source in sources for copy in source.archives]
     fetch = functools.partial(paced.request, capture_fn)
-    refusals: list[urllib.error.HTTPError] = []  # what the CDX API refused, while reading one
+    refusals: list[OSError] = []  # what the CDX API, or a connection to it, refused, reading one
 
     def ask_listing(*args: object) -> object:
         paced.ready("budget spent while reading the CDX listing")
         try:
             return paced.request(json_fn, *args)
-        except urllib.error.HTTPError as exc:
+        except OSError as exc:
             refusals.append(exc)
             raise
 
     def wait_to_retry_listing(seconds: float) -> None:
-        asked = _retry_after(refusals[-1]) if refusals and refusals[-1].code == 429 else None
+        last = refusals[-1] if refusals else None
+        limited = isinstance(last, urllib.error.HTTPError) and last.code == 429
+        asked = _retry_after(last) if limited else None
         why = (
             f"the CDX listing's Retry-After {asked:g} s exceeds the run's budget"
             if asked
@@ -2661,8 +2753,12 @@ def _cmd_check_archives(args: argparse.Namespace, sleep_fn: SleepFn) -> int:
     reports = check_archives(
         targets,
         # Looked up here, at call time, so a test's stand-in for either is the one used.
-        capture_fn=functools.partial(_fetch_capture, timeout=_ARCHIVE_CAPTURE_TIMEOUT),
-        json_fn=_json_call,
+        capture_fn=functools.partial(
+            _fetch_capture, timeout=(_ARCHIVE_CONNECT_TIMEOUT, _ARCHIVE_CAPTURE_TIMEOUT)
+        ),
+        json_fn=functools.partial(
+            _json_call, timeout=(_ARCHIVE_CONNECT_TIMEOUT, _ARCHIVE_LISTING_TIMEOUT)
+        ),
         sleep_fn=sleep_fn,
         now=datetime.now(tz=UTC),
         on_final=show,

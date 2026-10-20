@@ -1019,7 +1019,21 @@ def test_check_archives_reads_wayback_and_nothing_else(tmp_path, monkeypatch, ca
         "2 attached capture(s): 2 OK, 0 ARCHIVE-LOST, 0 ARCHIVE-MISSING, 0 UNCHECKED, "
         "0 NOT CHECKABLE"
     )
-    assert [c[2] for c in calls] == [60.0, 60.0]  # the capture fetch's own timeout
+    assert [c[2] for c in calls] == [(10.0, 60.0), (10.0, 60.0)]  # 10 s to connect, 60 to answer
+
+
+def test_check_archives_gives_wayback_ten_seconds_to_connect_apart_from_answering(
+    tmp_path, monkeypatch, capsys
+):
+    _add_archived_at(tmp_path, AT_1, 1)
+    calls = []
+    _weekly(monkeypatch, {AT_1: [404]}, calls=calls)
+    capsys.readouterr()
+    assert _check_archives(tmp_path) == 6  # four answers, none serving it, and an empty listing
+    assert sorted({(kind, timeout) for kind, _, timeout in calls}) == [
+        ("capture", (10.0, 60.0)),
+        ("cdx", (10.0, 90.0)),
+    ]
 
 
 @pytest.mark.parametrize(

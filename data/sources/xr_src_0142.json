@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0142",
+  "kind": "source",
+  "citation": "Barry Arrested on Cocaine Charges in Undercover FBI, Police Operation",
+  "title": "Barry Arrested on Cocaine Charges in Undercover FBI, Police Operation",
+  "publisher": "The Washington Post",
+  "canonical_url": "https://www.washingtonpost.com/wp-srv/local/longterm/tours/scandal/barry.htm",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2010-05-30",
+  "published_at": "1990-01-19",
+  "artifact": {
+    "sha256": "498ee74712086d50572b8dbc45bf88446267a00b3f855b8b17164146715ec545",
+    "byte_length": 14097,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-20T20:19:19.817388Z",
+    "drift_key": "sha256",
+    "drift_value": "498ee74712086d50572b8dbc45bf88446267a00b3f855b8b17164146715ec545"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20100530095122/https://www.washingtonpost.com/wp-srv/local/longterm/tours/scandal/barry.htm",
+      "captured_at": "2010-05-30T09:51:22Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The Post's own copy of the article (Friday, Jan. 19, 1990; Page A01; by Sharon LaFraniere) on its \"Scandal\" tour pages, as Wayback captured it from the page's http address on 2010-05-30. robots.txt now disallows this path for every agent, so it was not read live. The archive page New Gray gave, washingtonpost.com/archive/politics/1990/01/19/barry-arrested-on-cocaine-charges-in-undercover-fbi-police-operation/16e8e950-766a-4962-9dfa-20bc574437ed/, timed out twice from the register on 2026-10-20, and its captures of 2026-02-18 and 2026-03-04 answer 403."
+}

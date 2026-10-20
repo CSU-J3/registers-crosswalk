@@ -443,6 +443,38 @@ def test_a_fetcher_without_the_hook_takes_every_body():
     assert fetchers.not_the_document("uscode", page) == "no section heading"
 
 
+# § 30116 at the OLRC's temporary address, as the fetcher's own request got it on 2026-10-19.
+USCODE_TEMPORARY_STEM = "uscode_temporary_title52_section30116"
+
+
+def test_captured_temporary_page_carries_the_anchors_the_parser_needs():
+    # The same two anchors as the pinned page, which is what lets the fallback reuse the parse.
+    page = load_page(USCODE_TEMPORARY_STEM)
+    assert page.count(b'class="section-head"') == 1
+    assert page.count(b'class="source-credit"') == 1
+    assert uscode.not_the_document(page) is None
+    assert uscode.drift_value(page) == "2014-12-16"  # xr_src_0005's pinned value
+
+
+def test_uscode_fallback_url_is_the_temporary_address_of_the_same_section():
+    assert (
+        uscode.fallback_url(uscode.section_url(52, "30116"))
+        == "https://uscode.house.gov/us/usc/119-118/t52/s30116/"
+    )
+    assert uscode.fallback_url("https://uscode.house.gov/browse.html") is None
+    assert fetchers.fallback_url("manual", uscode.section_url(52, "30116")) is None
+
+
+def test_uscode_states_each_page_s_own_currency():
+    assert (
+        uscode.stated_currency(load_page(USCODE_TEMPORARY_STEM))
+        == "laws in effect through Public Law 119-120 (October 7, 2026)"
+    )
+    assert uscode.stated_currency(load_page(USCODE_STEM)) == "laws in effect on September 17, 2026"
+    assert uscode.stated_currency(load_page(USCODE_MAINTENANCE_STEM)) is None
+    assert fetchers.stated_currency("manual", load_page(USCODE_TEMPORARY_STEM)) is None
+
+
 def test_uscode_spec_takes_its_point_in_time_from_the_page():
     page = load_page(USCODE_STEM)
 
@@ -1443,9 +1475,11 @@ def test_courtlistener_stamps_its_live_run_onto_every_record():
         (federalregister, date(2026, 9, 18)),
         # manual: no field mapping exists to be wrong, so nothing to exercise.
         (manual, date(2026, 9, 17)),
-        # uscode: a scratch `add --title 52 --section 30116 --archive` on 2026-09-19 (UTC), the
-        # first capture this tree took through the keyed SPN2 path.
-        (uscode, date(2026, 9, 19)),
+        # uscode: a live `check` through the fallback to the OLRC's temporary address, which reset
+        # it, on 2026-10-19 (UTC), and through the fallback read on a 5xx on 2026-10-20. Its mint
+        # path was last run live on 2026-09-19, a scratch `add --title 52 --section 30116
+        # --archive`, the first capture through the keyed SPN2 path.
+        (uscode, date(2026, 10, 20)),
         # courtlistener: a scratch `add --cluster-id 1481640 --archive` on 2026-09-20 (UTC), the
         # first run with a token in this tree. It corrected two things — see the module docstring.
         (courtlistener, date(2026, 9, 20)),

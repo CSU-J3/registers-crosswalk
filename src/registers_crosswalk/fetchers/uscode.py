@@ -34,6 +34,13 @@ code path: `point_in_time` 2026-09-18 from the page's own currency sentence, `dr
 job interface. Every field spec() maps was checked against the capture the run read. Any further
 edit to spec() or its parsing resets this to False — see the convention in docs/operations.md.
 
+The fallback to the OLRC's temporary address reset it. A live `check` read § 30111 through it on
+2026-10-19 (UTC), after its pinned address served "Page Not Found - US Code" as a 200. Reading the
+fallback on an HTTP 5xx as well was a further edit, and a live `check` on 2026-10-20 (UTC) read
+§§ 30116, 30118 and 30106 through it after their pinned addresses answered 500. All four read their
+pins' values. spec() and the mint path were not changed and could not be re-run while the pinned
+addresses were down.
+
 For a citation that must be byte-stable, pin the signed annual edition through the `govinfo`
 fetcher instead (`USCODE-{year}-title{t}`).
 """
@@ -56,9 +63,11 @@ DRIFT_KEY = "last_amended"
 # `add uscode --title 52 --section 30116 --archive` outside the repo, which read the currency
 # sentence "laws in effect on September 18, 2026" and the § 30116 source credit ending
 # Dec. 16, 2014. The committed xr_src_0005 carries the same drift_value. Any further edit to spec()
-# or its parsing resets this to False — see the convention in docs/operations.md.
+# or its parsing resets this to False — see the convention in docs/operations.md. The fallback
+# below was such an edit, and reading it on a 5xx another; the live `check` of 2026-10-20 (UTC)
+# through it is the run dated here.
 VERIFIED = True
-VERIFIED_AT = date(2026, 9, 19)
+VERIFIED_AT = date(2026, 10, 20)
 # The canonical URL has no version axis: it serves whatever OLRC currently publishes. Once the
 # section is amended, nothing can reproduce the pinned text except the archive copy, so a pin
 # without one is refused rather than written and regretted.
@@ -93,6 +102,17 @@ _DATE_SHAPED = re.compile(r"\b([A-Z][a-zA-Z]{1,4}\.?)\s+(\d{1,2}),\s+(\d{4})")
 # 2026-09-18 do. Since 2026-10-04 the pinned addresses have answered 200 with House's "Under
 # Maintenance" page (14,617 bytes against § 30116's 195,752), which has none.
 _SECTION_HEAD = re.compile(rb'<h3[^>]*\bclass="section-head"')
+# Where a pinned section is read while its own address is down. Observed 2026-10-19 (UTC): the
+# site's browse page says it "is currently operating in a temporary format" and serves each
+# section at /us/usc/119-118/t{title}/s{section}/. The four pinned sections read there carried one
+# section heading and one source-credit element each, as the pinned pages do, and the same latest
+# credit dates as their pins. No page read names the 119-118 segment, so it is kept as observed;
+# when the site moves on, a 404 there is FETCH_FAILED like any other.
+TEMPORARY = "https://uscode.house.gov/us/usc/119-118/t{title}/s{section}/"
+_GRANULE = re.compile(r"[?&]req=granuleid:USC-prelim-title(\w+)-section([^&]+)")
+# The page's claim about its own currency: "laws in effect on September 17, 2026" on a pinned
+# page, "laws in effect through Public Law 119-120 (October 7, 2026)" on a temporary one.
+_STATED = re.compile(rb"laws in effect (?:on|through)\s[^<]*")
 
 
 def section_url(title: int | str, section: str) -> str:
@@ -153,6 +173,22 @@ def not_the_document(body: bytes) -> str | None:
     if _SECTION_HEAD.search(body) is None:
         return "no section heading"
     return None
+
+
+def fallback_url(url: str) -> str | None:
+    """The temporary-format address of a pinned section, which `check` reads when the pinned
+    address answers HTTP 5xx or serves something that is not the section. None for any URL that
+    is not one."""
+    m = _GRANULE.search(url)
+    return None if m is None else TEMPORARY.format(title=m.group(1), section=m.group(2))
+
+
+def stated_currency(body: bytes) -> str | None:
+    """The page's own currency sentence, for a report line, or None when it states none."""
+    m = _STATED.search(body)
+    if m is None:
+        return None
+    return " ".join(html.unescape(m.group(0).decode("utf-8")).split()).rstrip(".")
 
 
 def spec(*, title: int | str, section: str, fetch: FetchFn = default_fetch) -> PinSpec:

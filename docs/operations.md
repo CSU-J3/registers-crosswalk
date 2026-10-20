@@ -887,7 +887,9 @@ Each line is one of six statuses, and they mean genuinely different things:
   "<title>" (<n> bytes), not the document: <why>`. Since 2026-10-04 uscode.house.gov has answered
   every pinned section address with House's "Under Maintenance" page as a 200, which every run
   reported as `ERROR` until the marks were read. On 2026-10-19 all 61 pinned PDFs started `%PDF-`
-  and all 28 pinned `.fec` filings started `HDR`, so no pin's own bytes fail the marks.
+  and all 28 pinned `.fec` filings started `HDR`, so no pin's own bytes fail the marks. A uscode
+  pin whose address serves such a page, or answers HTTP 5xx, is read at its section's temporary
+  address instead, and is `FETCH_FAILED` only when that fails too (see `uscode`, below).
 - **`ERROR`** — the fetch served the document, by its marks, but the parse blew up: a section page
   that no longer carries its source credit, an API that changed shape. Exit 1, because the document
   really did change under us — just not in a way the drift key could measure.
@@ -941,6 +943,42 @@ committed pin is `xr_src_0005`, archived, carrying the same `drift_value`. The f
 scratch run had just made, so the record's `captured_at` precedes its `fetched_at`: expected, and
 not a defect, because what the archive preserves is the credit date and the text, not the bytes,
 which vary from request to request.
+
+**From 2026-10-04 the pinned addresses were down, and `check` reads the OLRC's temporary format.**
+Every pinned `view.xhtml?req=granuleid:` address answered with House's "Under Maintenance" page as
+a 200 from 2026-10-04, which read as `ERROR` "no source-credit element found in the page" until the
+check learned the document's marks (`FETCH_FAILED`, above). On 2026-10-19 at 23:49 UTC the same
+four addresses answered HTTP 500 (§§ 30116, 30118, 30106) and a 200 "Page Not Found - US Code"
+(§ 30111). At 01:01 UTC on 2026-10-20 the three answered 500 again, each with the same 75-byte
+body, "The page cannot be displayed because an internal server error has occurred." The site's
+browse page says it "is currently operating in a temporary format" and serves each section at
+`/us/usc/119-118/t{title}/s{section}/`. The four pinned sections read there at 23:38 UTC on
+2026-10-19 carried the same section heading and source-credit element as the pinned pages, and the
+same latest credit dates as their pins (2014-12-16, 2002-03-27, 2002-10-29, 1997-10-10). So when a
+pinned address answers HTTP 5xx, or serves a page without a section heading, `check` reads that
+section's temporary address once, takes `last_amended` from it as always, and says so in the
+report's detail, with the page's own currency sentence and what the pinned address did. The
+canonical URL and the records are unchanged. Any other failure at the pinned address is
+`FETCH_FAILED` as it came, with no second read: a 404, a timeout, DNS, a refused connection. A 5xx
+is the server failing at that address; a 404 that persists says the address itself is gone, which
+is a finding (`FETCH_FAILED`, above).
+
+**The detail quotes the section page's own currency sentence, and on 2026-10-19 the site's two
+statements disagreed.** The browse page said the code was "current through Public Law 119-121
+(October 9, 2026)"; all four temporary section pages said "laws in effect through Public Law
+119-120 (October 7, 2026)". The detail quotes the section page because that is the page the value
+was read from. No page read names the `119-118` segment, so it is kept in `uscode.TEMPORARY` as
+observed; once the site moves on, a 404 there is `FETCH_FAILED` too, and the stated currency in an
+`OK` line shows how current its copy is.
+
+**The fallback was verified live on 2026-10-19 and 2026-10-20 (UTC).** Adding it reset `VERIFIED`.
+A live `check` at 23:49 UTC on 2026-10-19 read § 30111 through it, after its pinned address served
+"Page Not Found"; the three that answered 500 stayed `FETCH_FAILED`, since that version read the
+fallback only for a 200. Reading it on a 5xx as well was a further edit, and a live `check` at
+01:01 UTC on 2026-10-20 read §§ 30116, 30118 and 30106 through it after their pinned addresses
+answered 500. Each of the four read its pin's value, and the three temporary pages were
+byte-identical to their 2026-10-19 reads. `VERIFIED_AT` is 2026-10-20. `spec()` and the mint path
+were not changed, and could not be re-run while the pinned addresses were down.
 
 **The signed annual edition is pinned beside it, as `xr_src_0014`.** `xr_src_0005` is the prelim
 text: its URL serves only the current version, which is why its drift key had to be redesigned

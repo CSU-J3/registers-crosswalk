@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0144",
+  "kind": "source",
+  "citation": "Final and Complete Election Results for the November 8, 1994 General Election",
+  "title": "Final and Complete Election Results for the November 8, 1994 General Election",
+  "publisher": "District of Columbia Board of Elections",
+  "canonical_url": "https://dcboe.org/Elections/Election-Results-Archives/Election-Year-1994/November-8-General-Election",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2023-04-25",
+  "published_at": null,
+  "artifact": {
+    "sha256": "ffaee4adcc31ed1959586e7f1a7e8819d31d24307280658ce31807bec665ab0f",
+    "byte_length": 51183,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-20T20:23:23.527879Z",
+    "drift_key": "sha256",
+    "drift_value": "ffaee4adcc31ed1959586e7f1a7e8819d31d24307280658ce31807bec665ab0f"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20230425143624/https://dcboe.org/Elections/Election-Results-Archives/Election-Year-1994/November-8-General-Election",
+      "captured_at": "2023-04-25T14:36:24Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Wikipedia's reference for the page: the Board's 1994 results page as Wayback captured it on 2023-04-25. Its totals include the absentee and special ballots counted on November 18, 1994, and it carries no date of its own. The live page answered 404 on 2026-10-20."
+}

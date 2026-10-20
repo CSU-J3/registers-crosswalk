@@ -1109,6 +1109,15 @@ never asks Save Page Now for anything, and needs no key. `--only xr_src_NNNN` na
 record; `--json` prints one report per entry, each sample's answer included, and nothing else on
 stdout, while the lines and the count go to stderr as they come. That is how `archives.yml` runs
 it: the JSON becomes the `archives` artifact the status page reads, and the log keeps the lines.
+`--stop-on-429` is for a run from this machine; `archives.yml` doesn't pass it. With it, the
+first 429, on a capture or on a CDX read, ends the check there instead of being waited out:
+nothing more is asked, every entry still pending is `UNCHECKED` with the reason "429 at
+xr_src_NNNN" and its answers so far (`LOST` where a mismatch is among them, as when the budget
+runs out), the exit code is the strongest finding as always, and the last line is `ENDED: 429 at
+xr_src_NNNN`. A refused connection doesn't end it: a CDX read is retried as above, a capture is
+sampled again in the next round, and an entry still without an answer is `UNCHECKED` while the
+run goes on. If a run ever ends on a 429, its log is the evidence, and pacing that run is a
+handoff of its own.
 
 - **`OK`**: some sample was served at the exact timestamp and reproduced the pin's drift value.
 - **`ARCHIVE-LOST`**: none reproduced, and some sample was served at the exact timestamp with
@@ -1153,7 +1162,8 @@ it: the JSON becomes the `archives` artifact the status page reads, and the log 
   always): on 2026-09-26 the runner's three were two `ARCHIVE-MISSING` and one `OK` from this
   machine (below). An entry that stays `UNCHECKED` from such a machine on the same status week
   after week gets a look by hand. A run that asked Wayback about at least one capture and got no
-  answer about any ends with `WAYBACK UNREACHABLE`.
+  answer about any ends with `WAYBACK UNREACHABLE`; one that `--stop-on-429` ended prints
+  `ENDED: 429 at xr_src_NNNN` after everything else.
 
 The precedence is **5 > 6 > 7 > 0**, the strongest finding first. It inverts the drift check's on
 purpose: a `LOST` rests on answers Wayback gave about that capture, so an outage elsewhere in the

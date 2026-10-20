@@ -2746,9 +2746,13 @@ def _cmd_check_archives(args: argparse.Namespace, sleep_fn: SleepFn) -> int:
         # liveness, and a superseded pin's capture is still what its ledger entry cites.
         targets = sorted((s for s in xw.sources.values() if s.archives), key=lambda s: s.xr_id)
 
+    # With --json, stdout carries the JSON and nothing else, so `archives.yml` can keep it for the
+    # status page; the lines a reader follows go to stderr instead, each as soon as it is final, and
+    # the run's log reads the same either way.
+    log = sys.stderr if args.json else sys.stdout
+
     def show(report: ArchiveReport) -> None:
-        if not args.json:
-            print(_archive_line(report), flush=True)
+        print(_archive_line(report), file=log, flush=True)
 
     reports = check_archives(
         targets,
@@ -2769,14 +2773,13 @@ def _cmd_check_archives(args: argparse.Namespace, sleep_fn: SleepFn) -> int:
     )
     if args.json:
         print(json.dumps([r.model_dump(mode="json") for r in reports], indent=2))
-    else:
-        counts = ", ".join(
-            f"{sum(r.status == status for r in reports)} {label}"
-            for status, label in _ARCHIVE_LABELS.items()
-        )
-        print(f"{len(reports)} attached capture(s): {counts}")
+    counts = ", ".join(
+        f"{sum(r.status == status for r in reports)} {label}"
+        for status, label in _ARCHIVE_LABELS.items()
+    )
+    print(f"{len(reports)} attached capture(s): {counts}", file=log)
     if unreachable:
-        print("WAYBACK UNREACHABLE", file=sys.stderr if args.json else sys.stdout)
+        print("WAYBACK UNREACHABLE", file=log)
     return max(
         (_ARCHIVE_EXIT_CODES[r.status] for r in reports), default=0, key=_ARCHIVE_EXIT_RANK.get
     )

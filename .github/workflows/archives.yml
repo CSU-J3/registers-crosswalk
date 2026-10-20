@@ -19,9 +19,16 @@ name: archives
 #
 # No secrets. The check reads Wayback anonymously and never asks Save Page Now for anything, so
 # the Wayback keys are deliberately absent, and no document is re-fetched, so no API key is
-# needed either. No continue-on-error, for the reason sources-drift gives: a green run that
-# checked nothing would be telling you nothing. A run that asked Wayback about at least one
-# capture and got no answer about any ends its output with WAYBACK UNREACHABLE and exits 7.
+# needed either. A run that asked Wayback about at least one capture and got no answer about any
+# ends its output with WAYBACK UNREACHABLE and exits 7.
+#
+# The verdicts are kept, as the `archives` artifact, for the status page: `pin check` never
+# fetches a capture pin, so its row's verdict is this run's. status-page.yml runs when this one
+# completes and downloads the newest. The check step is `continue-on-error` only so that the
+# artifact is kept whatever it found, a red run's above all; its code is carried to the last step,
+# which exits with it. So this run is still red whenever a capture is lost, missing or unchecked,
+# for the reason sources-drift gives: a green run that checked nothing would be telling you
+# nothing.
 on:
   schedule:
     - cron: "40 12 * * 1"
@@ -47,4 +54,29 @@ jobs:
       - run: pip install -e .
 
       - name: Re-verify every attached capture at its exact timestamp
-        run: python -m registers_crosswalk.pin check --archives
+        # With --json the reports go to stdout, into build/archives.json, and nothing else does;
+        # each line still reaches this log as soon as its verdict is final, on stderr.
+        id: check
+        continue-on-error: true
+        run: |
+          mkdir -p build
+          set +e
+          python -m registers_crosswalk.pin check --archives --json > build/archives.json
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit $code
+
+      - name: Keep the verdicts for the status page
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: archives
+          path: build/archives.json
+          if-no-files-found: warn
+
+      - name: Exit with the archive check's code
+        # `always()`, for the reason status-page.yml gives at its own last step: without it, a
+        # failure above would skip this step and the check's answer would go unread.
+        if: always()
+        run: exit ${{ steps.check.outputs.code }}

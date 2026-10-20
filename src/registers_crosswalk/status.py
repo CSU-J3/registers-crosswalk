@@ -2,13 +2,14 @@
 
 One HTML file that answers "is every pinned document still what we pinned?" and lets a reader open
 each source, its archive copy, and copy its source-links ledger entry. It reads; it never writes
-anything but the one file it is asked to emit, and it never touches the network — the only thing
-that fetches is `pin check`, whose JSON is handed in.
+anything but the one file it is asked to emit, and it never touches the network — the only things
+that fetch are `pin check`, whose JSON is handed in, and `pin check --archives`, whose JSON may be.
 
-Every string on the page comes from `data/`, from a `DriftReport`, or from the approved copy fixed
-in the constants below. Nothing here describes a document in its own words.
+Every string on the page comes from `data/`, from a `DriftReport` or an `ArchiveReport`, or from
+the approved copy fixed in the constants below. Nothing here describes a document in its own words.
 
-CLI: `python -m registers_crosswalk.status [--drift-json PATH] [--out PATH]`.
+CLI: `python -m registers_crosswalk.status [--drift-json PATH] [--archive-json PATH
+[--archive-checked-at WHEN]] [--out PATH]`.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from pathlib import Path
 
 from . import fetchers
 from .models import Node, Source
-from .pin import DriftReport, to_ledger_markdown
+from .pin import ArchiveReport, DriftReport, to_ledger_markdown
 from .registry import DATA_DIR, Crosswalk, superseded_ids, title_adds_anything
 
 # --------------------------------------------------------------------------- fixed copy
@@ -48,6 +49,19 @@ BAND_CAPTURES = (
     "{fixed} pins are read from Wayback captures and were not fetched in this run; the weekly "
     "archive check verifies them."
 )
+# The band once capture pins carry the archive check's verdicts (`--archive-json`). One it verified
+# counts as 1:1 and one it found lost or missing counts against, so with every capture pin counted
+# the band reads BAND_ALL_OK or BAND_SOME_OK. One it could not check, or that its run did not hold,
+# is left out, and the 1:1 is then said of the checked documents.
+BAND_ALL_CHECKED_OK = "All checked documents = 1:1"
+BAND_SOME_CHECKED_OK = "{ok_count} of {n} checked documents = 1:1"
+BAND_ARCHIVE_VERDICTS = "Capture pins carry the archive check's verdicts, from {when} UTC."
+BAND_ARCHIVE_VERDICTS_UNDATED = "Capture pins carry the latest archive check's verdicts."
+BAND_LEFT_OUT_ONE = "1 capture pin has no verdict from it and is left out of the count."
+BAND_LEFT_OUT = "{k} capture pins have no verdict from it and are left out of the count."
+# Nothing counted at all: every report FIXED, and no archive verdict that counts. Its own wording,
+# so that the band never says "= 1:1" over zero documents.
+BAND_NONE_FETCHED = "No pinned document was fetched in this run"
 BAND_UNCHECKED = "Not checked in this build"
 BAND_CHECKED_AT = "Checked {when} UTC, from a GitHub runner."
 BAND_BUILT_LOCALLY = "Built locally, not checked."
@@ -100,6 +114,22 @@ _PILLS: dict[str, tuple[str, str]] = {
     "fetch_failed": ("FETCH FAILED", "grey"),
     "error": ("ERROR", "grey"),
 }
+
+# A capture pin's pill once the archive check's verdict is in hand, in that check's own labels. A
+# lost or missing capture is the copy the ledgers cite no longer holding the pinned text, so it
+# takes the rust of a changed document; a capture the check could not settle stays grey.
+_CAPTURE_PILLS: dict[str, tuple[str, str]] = {
+    "ok": ("OK", "ok"),
+    "lost": ("ARCHIVE-LOST", "drift"),
+    "missing": ("ARCHIVE-MISSING", "drift"),
+    "unchecked": ("UNCHECKED", "grey"),
+    "not_checkable": ("NOT CHECKABLE", "grey"),
+}
+# The verdicts the band counts, for or against; a capture pin with any other is left out.
+_COUNTED = ("ok", "lost", "missing")
+# Which of a capture pin's archive entries speaks for it, if it has more than one: the strongest
+# finding, ranked as the archive check's exit code ranks them.
+_CAPTURE_RANK = {"ok": 0, "not_checkable": 1, "unchecked": 2, "missing": 3, "lost": 4}
 
 _PDF = "application/pdf"
 
@@ -158,18 +188,38 @@ def _successors(sources: Mapping[str, Source]) -> dict[str, str]:
     }
 
 
+def _capture_verdicts(
+    reports: list[DriftReport] | None, archive: list[ArchiveReport]
+) -> dict[str, ArchiveReport]:
+    """Each capture pin's archive verdict, by xr_id: the pins this run's check reported FIXED, as
+    the archive run found their captures. Every other pin's archive entries are not this page's to
+    show; their own check is the drift check."""
+    fixed = {r.xr_id for r in reports or [] if r.status == "fixed"}
+    verdicts: dict[str, ArchiveReport] = {}
+    for entry in archive:
+        held = verdicts.get(entry.xr_id)
+        if entry.xr_id in fixed and (
+            held is None or _CAPTURE_RANK[entry.status] > _CAPTURE_RANK[held.status]
+        ):
+            verdicts[entry.xr_id] = entry
+    return verdicts
+
+
 # --------------------------------------------------------------------------- cells
 
 
-def _check_cell(report: DriftReport | None, superseded: bool) -> str:
+def _check_cell(
+    report: DriftReport | None, superseded: bool, verdict: ArchiveReport | None = None
+) -> str:
     # A superseded pin no run checks makes no claim about the current world, so it carries no
     # verdict at all — which is a different thing from a live pin this run simply did not check,
     # and that one gets an em dash rather than an empty cell. A superseded pin the run DID check
     # (its fetcher declares CHECK_SUPERSEDED, as fecfiling does) shows its verdict like any other:
-    # the band counts that report, so the row has to show it.
+    # the band counts that report, so the row has to show it. A capture pin the archive run
+    # checked shows that run's verdict in place of FIXED.
     if report is None:
         return "" if superseded else '<span class="none">—</span>'
-    label, tone = _PILLS[report.status]
+    label, tone = _PILLS[report.status] if verdict is None else _CAPTURE_PILLS[verdict.status]
     return f'<span class="pill pill-{tone}">{_e(label)}</span>'
 
 
@@ -233,10 +283,15 @@ def _archive_cell(source: Source, report: DriftReport | None) -> str:
     return f'<span class="muted">{_e(ARCHIVE_NONE)}</span>'
 
 
-def _row(source: Source, report: DriftReport | None, superseded_by: str | None) -> str:
+def _row(
+    source: Source,
+    report: DriftReport | None,
+    superseded_by: str | None,
+    verdict: ArchiveReport | None = None,
+) -> str:
     drifted = report is not None and report.status in ("drift", "amended")
     cells = (
-        _check_cell(report, superseded_by is not None),
+        _check_cell(report, superseded_by is not None, verdict),
         _document_cell(source, superseded_by),
         _version_cell(source),
         _archive_cell(source, report),
@@ -253,34 +308,60 @@ def _row(source: Source, report: DriftReport | None, superseded_by: str | None) 
 # --------------------------------------------------------------------------- sections
 
 
-def _band(reports: list[DriftReport] | None, n: int, generated_at: datetime) -> str:
-    captures = ""
+def _band(
+    reports: list[DriftReport] | None,
+    n: int,
+    generated_at: datetime,
+    verdicts: Mapping[str, ArchiveReport] | None = None,
+    archive_checked_at: datetime | None = None,
+) -> str:
+    notes: list[str] = []
     if reports is None:
         state, tone = BAND_UNCHECKED, "grey"
         checked = BAND_BUILT_LOCALLY
     else:
-        ok_count = sum(1 for r in reports if r.status == "ok")
         # A FIXED pin was not fetched: its bytes are a capture's, and whether the capture is still
-        # served is the archive check's answer, which this page does not have. So it counts neither
-        # as 1:1 nor against it, and the band says how many it left out. With none, the band reads
-        # exactly as it did before capture pins existed.
-        fixed = sum(1 for r in reports if r.status == "fixed")
-        fetched = len(reports) - fixed
+        # served is the archive check's answer. Without that answer (`verdicts` None) it counts
+        # neither as 1:1 nor against it, and the band says how many it left out. With it, a capture
+        # pin the archive check verified counts as 1:1, one it found lost or missing counts against,
+        # and the rest are left out. With no capture pins, the band reads exactly as it did before
+        # capture pins existed.
+        fetched = [r for r in reports if r.status != "fixed"]
+        fixed = len(reports) - len(fetched)
+        settled = [v for v in (verdicts or {}).values() if v.status in _COUNTED]
+        counted = len(fetched) + len(settled)
+        ok_count = sum(1 for r in fetched if r.status == "ok")
+        ok_count += sum(1 for v in settled if v.status == "ok")
+        left_out = fixed - len(settled)
         all_ok, some_ok, of = BAND_ALL_OK, BAND_SOME_OK, n
-        if fixed:
-            all_ok, some_ok, of = BAND_ALL_FETCHED_OK, BAND_SOME_FETCHED_OK, fetched
-            captures = BAND_CAPTURE_ONE if fixed == 1 else BAND_CAPTURES.format(fixed=fixed)
-        if ok_count == fetched:
+        if verdicts is None:
+            if fixed:
+                all_ok, some_ok, of = BAND_ALL_FETCHED_OK, BAND_SOME_FETCHED_OK, counted
+                notes.append(BAND_CAPTURE_ONE if fixed == 1 else BAND_CAPTURES.format(fixed=fixed))
+        elif fixed:
+            notes.append(
+                BAND_ARCHIVE_VERDICTS.format(when=f"{archive_checked_at:%a %d %b %Y, %H:%M}")
+                if archive_checked_at is not None
+                else BAND_ARCHIVE_VERDICTS_UNDATED
+            )
+            if left_out:
+                all_ok, some_ok, of = BAND_ALL_CHECKED_OK, BAND_SOME_CHECKED_OK, counted
+                notes.append(
+                    BAND_LEFT_OUT_ONE if left_out == 1 else BAND_LEFT_OUT.format(k=left_out)
+                )
+        if not counted:
+            state, tone = BAND_NONE_FETCHED, "grey"
+        elif ok_count == counted:
             state, tone = all_ok, "ok"
         else:
             state, tone = some_ok.format(ok_count=ok_count, n=of), "drift"
         checked = BAND_CHECKED_AT.format(when=f"{generated_at:%a %d %b %Y, %H:%M}")
     nxt = BAND_NEXT_CHECK.format(when=f"{next_check_after(generated_at):%d %b}")
-    left_out = f"<p>{_e(captures)}</p>" if captures else ""
+    told = "".join(f"<p>{_e(note)}</p>" for note in notes)
     return (
         '<section class="band">'
         f'<p class="state"><span class="dot dot-{tone}"></span>{_e(state)}</p>'
-        f'<div class="band-right"><p>{_e(checked)}</p>{left_out}<p>{_e(nxt)}</p></div>'
+        f'<div class="band-right"><p>{_e(checked)}</p>{told}<p>{_e(nxt)}</p></div>'
         "</section>"
     )
 
@@ -289,9 +370,12 @@ def _table(
     sources: Iterable[Source],
     by_id: Mapping[str, DriftReport],
     successors: Mapping[str, str],
+    verdicts: Mapping[str, ArchiveReport],
 ) -> str:
     head = "".join(f"<th>{_e(col)}</th>" for col in COLUMNS)
-    body = "".join(_row(s, by_id.get(s.xr_id), successors.get(s.xr_id)) for s in sources)
+    body = "".join(
+        _row(s, by_id.get(s.xr_id), successors.get(s.xr_id), verdicts.get(s.xr_id)) for s in sources
+    )
     return f'<table class="pins"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>'
 
 
@@ -345,13 +429,20 @@ def render_html(
     *,
     commit: str | None,
     generated_at: datetime,
+    archive_reports: list[ArchiveReport] | None = None,
+    archive_checked_at: datetime | None = None,
 ) -> str:
-    """The whole page as one string. Pure: it reads `xw` and `reports` and touches nothing else."""
+    """The whole page as one string. Pure: it reads `xw`, `reports` and `archive_reports` and
+    touches nothing else. `archive_reports`, the archive run's, decides capture pins' rows only;
+    None means this build has no archive verdicts, and they show FIXED."""
     generated_at = generated_at.astimezone(UTC)
+    if archive_checked_at is not None:
+        archive_checked_at = archive_checked_at.astimezone(UTC)
     sources = _rows(xw.sources)
     nodes = _actors(xw.nodes)
     by_id = {r.xr_id: r for r in reports or []}
     successors = _successors(xw.sources)
+    verdicts = None if archive_reports is None else _capture_verdicts(reports, archive_reports)
     commit_label = commit or "local"
     counts = COUNTS.format(n=len(sources), m=len(nodes))
     generated = FOOT_GENERATED.format(when=f"{generated_at:%Y-%m-%d %H:%M}", commit=commit_label)
@@ -376,8 +467,8 @@ def render_html(
         f'<div class="head-right"><p>{_e(counts)}</p>'
         f'<p class="mono">{_e(commit_label)}</p></div>'
         "</header>\n"
-        f"{_band(reports, len(sources), generated_at)}\n"
-        f"{_table(sources, by_id, successors)}\n"
+        f"{_band(reports, len(sources), generated_at, verdicts, archive_checked_at)}\n"
+        f"{_table(sources, by_id, successors, verdicts or {})}\n"
         f'<p class="copy-note" id="copy-note">{_e(COPY_NOTE)}</p>\n'
         f'<div class="cards">{_actors_card(nodes)}{_fetchers_card()}</div>\n'
         '<footer class="foot">'
@@ -539,6 +630,31 @@ def _load_reports(path: Path | None) -> list[DriftReport] | None:
     ]
 
 
+def _load_archive_reports(path: Path | None) -> list[ArchiveReport] | None:
+    """The JSON `pin check --archives --json` prints, back into models. None means "no archive
+    verdicts in this build", and so does a file that holds none: it is another job's, handed over
+    as an artifact, and a broken one must not cost the page. Its capture pins show FIXED, and the
+    log says why."""
+    if path is None:
+        return None
+    try:
+        items = json.loads(path.read_text(encoding="utf-8"))
+        return [ArchiveReport.model_validate(item) for item in items]
+    except (OSError, TypeError, ValueError) as exc:
+        print(
+            f"{path} holds no archive verdicts ({type(exc).__name__}: {exc}); capture pins show "
+            "FIXED",
+            file=sys.stderr,
+        )
+        return None
+
+
+def _utc(value: str) -> datetime:
+    """An ISO 8601 time, as `gh` prints a run's; one without a zone is taken as UTC."""
+    moment = datetime.fromisoformat(value)
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="registers_crosswalk.status",
@@ -555,6 +671,20 @@ def main(argv: list[str] | None = None) -> int:
         help="JSON from `pin check --json`; without it the page says it was not checked",
     )
     parser.add_argument(
+        "--archive-json",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="JSON from `pin check --archives --json`; capture pins take their verdicts from it",
+    )
+    parser.add_argument(
+        "--archive-checked-at",
+        type=_utc,
+        default=None,
+        metavar="WHEN",
+        help="when that archive check ran, ISO 8601 (UTC if no zone), for the band",
+    )
+    parser.add_argument(
         "--commit", default=None, metavar="SHA", help="default: $GITHUB_SHA[:7], else 'local'"
     )
     parser.add_argument(
@@ -568,6 +698,8 @@ def main(argv: list[str] | None = None) -> int:
         _load_reports(args.drift_json),
         commit=commit,
         generated_at=datetime.now(UTC),
+        archive_reports=_load_archive_reports(args.archive_json),
+        archive_checked_at=args.archive_checked_at,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(page, encoding="utf-8")

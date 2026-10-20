@@ -11,9 +11,21 @@ from pathlib import Path
 
 import pytest
 
-from registers_crosswalk.pin import DriftReport, DriftStatus, to_ledger_markdown
+from registers_crosswalk.pin import (
+    ArchiveReport,
+    ArchiveStatus,
+    DriftReport,
+    DriftStatus,
+    to_ledger_markdown,
+)
 from registers_crosswalk.registry import Crosswalk
-from registers_crosswalk.status import _PILLS, main, next_check_after, render_html
+from registers_crosswalk.status import (
+    _CAPTURE_PILLS,
+    _PILLS,
+    main,
+    next_check_after,
+    render_html,
+)
 
 GRADE = {"reliability": "A", "credibility": 1}
 FETCHED = "2026-09-18T18:56:07Z"
@@ -160,8 +172,15 @@ def _reports(xw, **statuses):
     return [_report(s, statuses.get(s.xr_id, "ok")) for s in xw.sources.values()]
 
 
-def _page(xw, reports=None, commit="c04befc"):
-    return render_html(xw, reports, commit=commit, generated_at=NOW)
+def _page(xw, reports=None, commit="c04befc", *, archive=None, archive_at=None):
+    return render_html(
+        xw,
+        reports,
+        commit=commit,
+        generated_at=NOW,
+        archive_reports=archive,
+        archive_checked_at=archive_at,
+    )
 
 
 def _row(page: str, xr_id: str) -> str:
@@ -282,6 +301,134 @@ def test_with_no_capture_pins_the_band_reads_exactly_as_before(xw, statuses, sta
         "<p>Checked Sat 19 Sep 2026, 20:11 UTC, from a GitHub runner.</p>"
         "<p>Next check Mon 21 Sep, 12:00 UTC.</p></div></section>"
     )
+
+
+# ----------------------------------------------- capture pins take the archive run's verdicts
+#
+# The pins are the fixture's: xr_src_0001 and xr_src_0002 stand in for capture pins, reported FIXED,
+# because the page knows a capture pin by its FIXED report, whatever its fetcher.
+
+ARCHIVE_AT = datetime(2026, 9, 21, 13, 5, tzinfo=UTC)  # the Monday's archives run
+
+
+def _p(text):
+    """A band line as the page writes it, escaped: its apostrophes reach the HTML as &#x27;."""
+    return f"<p>{html.escape(text, quote=True)}</p>"
+
+
+FROM_THE_ARCHIVE_RUN = _p(
+    "Capture pins carry the archive check's verdicts, from Mon 21 Sep 2026, 13:05 UTC."
+)
+
+
+def _archive_report(source, status="ok"):
+    return ArchiveReport(
+        xr_id=source.xr_id,
+        citation=source.citation,
+        fetcher=source.fetcher,
+        drift_key=source.artifact.drift_key,
+        expected=source.artifact.drift_value,
+        archive_url=f"https://web.archive.org/web/20260919194240/{source.canonical_url}",
+        timestamp="20260919194240",
+        status=status,
+        detail=f"the archive check said {status}",
+        samples=[],
+    )
+
+
+def _archived_page(xw, verdicts, *, at=ARCHIVE_AT):
+    """xr_src_0001 and 0002 reported FIXED, the rest OK; `verdicts` maps an xr_id to the archive
+    run's verdict on it."""
+    reports = _reports(xw, xr_src_0001="fixed", xr_src_0002="fixed")
+    archive = [_archive_report(xw.sources[xr_id], status) for xr_id, status in verdicts.items()]
+    return _page(xw, reports, archive=archive, archive_at=at)
+
+
+def test_capture_pins_the_archive_run_verified_count_as_1_1(xw):
+    page = _archived_page(xw, {"xr_src_0001": "ok", "xr_src_0002": "ok"})
+    for xr_id in ("xr_src_0001", "xr_src_0002"):
+        assert _cell(_row(page, xr_id), "check") == '<span class="pill pill-ok">OK</span>'
+    band = _band_html(page)
+    assert '<span class="dot dot-ok"></span>All pinned documents = 1:1' in band
+    assert FROM_THE_ARCHIVE_RUN in band
+    assert "not fetched in this run" not in band
+
+
+@pytest.mark.parametrize(
+    "status, label", [("lost", "ARCHIVE-LOST"), ("missing", "ARCHIVE-MISSING")]
+)
+def test_a_lost_or_missing_capture_is_red_and_counts_against(xw, status, label):
+    page = _archived_page(xw, {"xr_src_0001": status, "xr_src_0002": "ok"})
+    pill = f'<span class="pill pill-drift">{label}</span>'
+    assert _cell(_row(page, "xr_src_0001"), "check") == pill
+    assert '<span class="dot dot-drift"></span>4 of 5 pinned documents = 1:1' in _band_html(page)
+
+
+def test_a_capture_the_archive_run_could_not_check_is_grey_and_left_out(xw):
+    page = _archived_page(xw, {"xr_src_0001": "unchecked", "xr_src_0002": "ok"})
+    pill = '<span class="pill pill-grey">UNCHECKED</span>'
+    assert _cell(_row(page, "xr_src_0001"), "check") == pill
+    band = _band_html(page)
+    assert '<span class="dot dot-ok"></span>All checked documents = 1:1' in band
+    assert FROM_THE_ARCHIVE_RUN in band
+    assert "<p>1 capture pin has no verdict from it and is left out of the count.</p>" in band
+
+
+def test_a_capture_pin_the_archive_run_did_not_hold_stays_fixed_and_is_left_out(xw):
+    # One pinned after that run, say: the run had nothing to answer for it.
+    page = _archived_page(xw, {"xr_src_0002": "missing"})
+    assert _cell(_row(page, "xr_src_0001"), "check") == '<span class="pill pill-grey">FIXED</span>'
+    band = _band_html(page)
+    assert '<span class="dot dot-drift"></span>3 of 4 checked documents = 1:1' in band
+    assert "<p>1 capture pin has no verdict from it and is left out of the count.</p>" in band
+
+
+def test_only_capture_pins_take_an_archive_verdict(xw):
+    # A fetched pin's own answer is the drift check's; its archive entries are not this page's.
+    page = _archived_page(xw, {"xr_src_0001": "ok", "xr_src_0002": "ok", "xr_src_0005": "lost"})
+    assert _cell(_row(page, "xr_src_0005"), "check") == '<span class="pill pill-ok">OK</span>'
+    assert "All pinned documents = 1:1" in _band_html(page)
+
+
+def test_a_capture_pin_with_two_entries_takes_the_strongest_finding(xw):
+    first, second = xw.sources["xr_src_0001"], xw.sources["xr_src_0002"]
+    archive = [_archive_report(first, "ok"), _archive_report(first, "lost")]
+    archive.append(_archive_report(second, "ok"))
+    reports = _reports(xw, xr_src_0001="fixed", xr_src_0002="fixed")
+    page = _page(xw, reports, archive=archive, archive_at=ARCHIVE_AT)
+    assert "ARCHIVE-LOST" in _cell(_row(page, "xr_src_0001"), "check")
+
+
+def test_without_the_archive_run_capture_pins_show_fixed_as_before(xw):
+    page = _page(xw, _reports(xw, xr_src_0001="fixed"))
+    assert _cell(_row(page, "xr_src_0001"), "check") == '<span class="pill pill-grey">FIXED</span>'
+    assert "verdicts" not in _band_html(page)
+
+
+def test_an_archive_run_with_no_time_given_is_the_latest(xw):
+    page = _archived_page(xw, {"xr_src_0001": "ok", "xr_src_0002": "ok"}, at=None)
+    assert _p("Capture pins carry the latest archive check's verdicts.") in _band_html(page)
+
+
+@pytest.mark.parametrize("archive", [None, []])
+def test_a_run_of_capture_pins_alone_never_reads_1_1_over_nothing(xw, archive):
+    # Every report FIXED, and nothing from the archive run that counts: a grey dot and its own
+    # words, where the band once read "All fetched documents = 1:1" over zero documents.
+    reports = _reports(xw, **{xr_id: "fixed" for xr_id in xw.sources})
+    band = _band_html(_page(xw, reports, archive=archive, archive_at=ARCHIVE_AT))
+    assert '<span class="dot dot-grey"></span>No pinned document was fetched in this run' in band
+    assert "= 1:1" not in band
+
+
+def test_archive_verdicts_without_a_drift_check_show_no_pills(xw):
+    # The verdicts on the page come from a check that ran in this build, or the page shows none.
+    page = _page(xw, None, archive=[_archive_report(xw.sources["xr_src_0001"], "lost")])
+    assert "Not checked in this build" in page
+    assert 'class="pill' not in page
+
+
+def test_every_archive_status_has_a_capture_pill():
+    assert set(ArchiveStatus.__args__) == set(_CAPTURE_PILLS)
 
 
 def test_every_drift_status_has_a_pill(xw):
@@ -537,3 +684,39 @@ def test_cli_reads_a_drift_json(tmp_path):
     page = out.read_text(encoding="utf-8")
     assert "4 of 5 pinned documents = 1:1" in page
     assert "from a GitHub runner" in page
+
+
+def _cli_with_archive(tmp_path, archive, *extra):
+    """The CLI on the fixture, xr_src_0001 reported FIXED, handed the archive run's JSON: `archive`
+    is its text, or makes it from the crosswalk. Returns the page."""
+    for spec in SOURCES:
+        _write_source(tmp_path, spec)
+    xw = Crosswalk(tmp_path)
+    drift = tmp_path / "drift.json"
+    reports = _reports(xw, xr_src_0001="fixed")
+    drift.write_text(json.dumps([r.model_dump(mode="json") for r in reports]), encoding="utf-8")
+    archive_json = tmp_path / "archives.json"
+    archive_json.write_text(archive(xw) if callable(archive) else archive, encoding="utf-8")
+    out = tmp_path / "out" / "index.html"
+    argv = ["--data-dir", str(tmp_path), "--drift-json", str(drift), "--out", str(out)]
+    assert main([*argv, "--archive-json", str(archive_json), *extra]) == 0
+    return out.read_text(encoding="utf-8")
+
+
+def test_cli_reads_an_archive_json_and_when_its_run_was(tmp_path):
+    def lost(xw):
+        report = _archive_report(xw.sources["xr_src_0001"], "lost")
+        return json.dumps([report.model_dump(mode="json")])
+
+    page = _cli_with_archive(tmp_path, lost, "--archive-checked-at", "2026-09-21T13:05:00Z")
+    assert "ARCHIVE-LOST" in _cell(_row(page, "xr_src_0001"), "check")
+    assert "4 of 5 pinned documents = 1:1" in page
+    assert FROM_THE_ARCHIVE_RUN in page
+
+
+@pytest.mark.parametrize("text", ["", "{not json", '{"a": "listing"}', "7"])
+def test_cli_builds_the_page_whatever_the_archive_artifact_holds(tmp_path, capsys, text):
+    # Another job's file, handed over as an artifact: a broken one must not cost the page.
+    page = _cli_with_archive(tmp_path, text)
+    assert _cell(_row(page, "xr_src_0001"), "check") == '<span class="pill pill-grey">FIXED</span>'
+    assert "holds no archive verdicts" in capsys.readouterr().err

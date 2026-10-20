@@ -1120,6 +1120,24 @@ def test_check_archives_json_is_the_reports_and_nothing_else(tmp_path, monkeypat
     assert [s["status"] for s in reports[0]["samples"]] == ["unreachable"] * 4
 
 
+def test_check_archives_json_keeps_the_lines_a_reader_follows_on_stderr(
+    tmp_path, monkeypatch, capsys
+):
+    # archives.yml keeps stdout as the status page's artifact; its log keeps these, as they come.
+    _add_archived_at(tmp_path, AT_1, 1)
+    _weekly(monkeypatch, {AT_1: ["ok"]})
+    capsys.readouterr()
+    assert _check_archives(tmp_path, "--json") == 0
+    captured = capsys.readouterr()
+    assert [r["status"] for r in json.loads(captured.out)] == ["ok"]
+    err = captured.err.splitlines()
+    assert err[0].startswith("OK              xr_src_0001  FEC AO 2023-01")
+    assert err[-1] == (
+        "1 attached capture(s): 1 OK, 0 ARCHIVE-LOST, 0 ARCHIVE-MISSING, 0 UNCHECKED, "
+        "0 NOT CHECKABLE"
+    )
+
+
 def test_check_archives_json_carries_each_samples_answer(tmp_path, monkeypatch, capsys):
     _add_archived_at(tmp_path, AT_3, 1)
     _weekly(monkeypatch, {AT_3: [404, 404, "ok"]})

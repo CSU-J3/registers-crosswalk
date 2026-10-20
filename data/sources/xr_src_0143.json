@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0143",
+  "kind": "source",
+  "citation": "938 F.2d 1327",
+  "title": "United States v. Marion S. Barry, Jr.",
+  "publisher": "Court of Appeals for the D.C. Circuit",
+  "canonical_url": "https://storage.courtlistener.com/harvard_pdf/564940.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "1991-08-29",
+  "artifact": {
+    "sha256": "cbcc15112468e6fb681dbfc3c569823ce4a17c638a205d46ecaf893b165b4509",
+    "byte_length": 1361631,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-20T20:19:33.492185Z",
+    "drift_key": "sha256",
+    "drift_value": "cbcc15112468e6fb681dbfc3c569823ce4a17c638a205d46ecaf893b165b4509"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The Harvard Caselaw Access Project's scan of 938 F.2d 1327 (16 pages, 1327 to 1342), served by CourtListener for cluster 564940. Pinned through manual: courtlistener takes an opinion's download link first, and this one's is bulk.resource.org, a mirror. The indictment, the verdict and the sentence New Gray quotes are on page 1329."
+}

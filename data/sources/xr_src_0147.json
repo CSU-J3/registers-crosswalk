@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0147",
+  "kind": "source",
+  "citation": "Phang v. Blanche, No. 1:26-cv-01417 (D.D.C.), ECF No. 49",
+  "title": "Phang v. Blanche",
+  "publisher": "District Court, District of Columbia",
+  "canonical_url": "https://storage.courtlistener.com/recap/gov.uscourts.dcd.291779/gov.uscourts.dcd.291779.49.0.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2026-09-21",
+  "artifact": {
+    "sha256": "28684d918bb2ff467f6ba91043ca6cdaa49afed18387071fc725da07d752c2cc",
+    "byte_length": 166682,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-24T18:48:02.286887Z",
+    "drift_key": "sha256",
+    "drift_value": "28684d918bb2ff467f6ba91043ca6cdaa49afed18387071fc725da07d752c2cc"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "RECAP copy of ECF No. 49, the Order of 2026-09-21 denying the motion for a partial stay pending appeal (ECF No. 46) and temporarily staying the foreign-language portion of the September 16, 2026 order; PACER original unpinned. Through manual at B2 (decision 1 of 2026-09-26); its sha1, f3adcb4013396352ecfa5e7c998ba359c8834a9c, is the one CourtListener records for recapdocument 494497813. The court's address, https://ecf.dcd.uscourts.gov/cgi-bin/show_public_doc?2026cv1417-49, was not tried: it is under /cgi-bin/, which the court's robots.txt disallows."
+}

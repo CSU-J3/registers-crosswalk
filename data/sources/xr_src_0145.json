@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0145",
+  "kind": "source",
+  "citation": "Phang v. Blanche, No. 1:26-cv-01417 (D.D.C.), ECF No. 42",
+  "title": "Phang v. Blanche",
+  "publisher": "District Court, District of Columbia",
+  "canonical_url": "https://storage.courtlistener.com/pdf/2026/09/16/phang_v._blanche.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2026-09-16",
+  "artifact": {
+    "sha256": "6f8e00da93f586e9ffd738ed86861fed7734f570705051af7fd7da5da216a91a",
+    "byte_length": 180063,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-24T18:47:51.719092Z",
+    "drift_key": "sha256",
+    "drift_value": "6f8e00da93f586e9ffd738ed86861fed7734f570705051af7fd7da5da216a91a"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Memorandum Opinion and Order granting the motion to compel and denying the motion to stay deadlines, ECF No. 42. CourtListener's stored copy of the court's own PDF (opinion 11442694), through manual at B2; its sha1, 3947d75c0ddf14a9ab4c25ae0ca9c3ec6a49bcd0, is the one CourtListener records for the court's file. The court's address, https://ecf.dcd.uscourts.gov/cgi-bin/show_public_doc?2026cv1417-42, is under /cgi-bin/, which the court's robots.txt disallows, so it was not read and stays the unpinned A1. RECAP copy: https://storage.courtlistener.com/recap/gov.uscourts.dcd.291779/gov.uscourts.dcd.291779.42.0.pdf, sha1 9cd270d818a33be9ab0c3253f927972f68e7ee0e."
+}

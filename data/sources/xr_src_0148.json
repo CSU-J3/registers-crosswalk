@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0148",
+  "kind": "source",
+  "citation": "Phang v. Blanche, No. 1:26-cv-01417 (D.D.C.), ECF No. 57",
+  "title": "Phang v. Blanche",
+  "publisher": "District Court, District of Columbia",
+  "canonical_url": "https://storage.courtlistener.com/recap/gov.uscourts.dcd.291779/gov.uscourts.dcd.291779.57.0_1.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2026-10-09",
+  "artifact": {
+    "sha256": "371e343667f52374f5d4bffb917d7f09269169c9a1451e432445aeb491040f59",
+    "byte_length": 109850,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-24T19:02:37.959048Z",
+    "drift_key": "sha256",
+    "drift_value": "371e343667f52374f5d4bffb917d7f09269169c9a1451e432445aeb491040f59"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "RECAP copy of ECF No. 57, the Order of 2026-10-09 addressing the Court's in camera review of Defendant's September 24, 2026 submission; PACER original unpinned. Through manual at B2 (decision 1 of 2026-09-26), FLAGGED: the file served at this address has sha1 330d85ff27285c2578dd978db74d65e7257a87bf and 109,850 bytes, but CourtListener's record for recapdocument 496834497 lists sha1 1a8a630d5d2a598714ee185742438cdce4639e34 beside the same 109,850 bytes and this file path. The file is ECF No. 57 by its own PACER stamps: each of its 4 pages carries the header \"Case 1:26-cv-01417-EGS Document 57 Filed 10/09/26\", numbered Page 1 of 4 to Page 4 of 4. The court's address, https://ecf.dcd.uscourts.gov/cgi-bin/show_public_doc?2026cv1417-57, was not tried: it is under /cgi-bin/, which the court's robots.txt disallows."
+}

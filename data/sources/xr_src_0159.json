@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0159",
+  "kind": "source",
+  "citation": "ORS 188.120",
+  "title": "ORS 188.120 (2025 Edition)",
+  "publisher": "Oregon State Legislature",
+  "canonical_url": "https://www.oregonlegislature.gov/bills_laws/ors/ors188.html",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "ab2c934a310095b5f178616ac35e971cfc10855044255e3a9fb47302cceeceef",
+    "byte_length": 523245,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:17:42.561554Z",
+    "drift_key": "sha256",
+    "drift_value": "ab2c934a310095b5f178616ac35e971cfc10855044255e3a9fb47302cceeceef"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chapter 188 as the Legislature publishes it, 2025 edition. The mirror New Gray read, oregon.public.law, was not used."
+}

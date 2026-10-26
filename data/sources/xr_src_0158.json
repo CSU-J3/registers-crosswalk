@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0158",
+  "kind": "source",
+  "citation": "U.S. Const. amend. XXV, § 1",
+  "title": "U.S. Const. amend. XXV, § 1, The Constitution: Amendments 11-27",
+  "publisher": "National Archives and Records Administration",
+  "canonical_url": "https://www.archives.gov/founding-docs/amendments-11-27",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "e75a8e060d89f69442e6027066500d9ef2ab6c7d42c45898a75a582964249bdf",
+    "byte_length": 57662,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:17:41.719362Z",
+    "drift_key": "sha256",
+    "drift_value": "e75a8e060d89f69442e6027066500d9ef2ab6c7d42c45898a75a582964249bdf"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The National Archives' transcription of Amendments 11-27. Used in place of the Library of Congress's Constitution Annotated page, which answered the register's read of 2026-10-25 with a 403 (a Cloudflare challenge)."
+}

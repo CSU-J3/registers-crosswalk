@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0173",
+  "kind": "source",
+  "citation": "DOJ is quietly investigating Cory Mills",
+  "title": "DOJ is quietly investigating Cory Mills",
+  "publisher": "MS NOW",
+  "canonical_url": "https://www.ms.now/news/doj-investigating-rep-cory-mills",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-21",
+  "published_at": "2026-07-21",
+  "artifact": {
+    "sha256": "972f486dc74ddd355edbe57df4f4b813997388f8c1c1349180dc5eb71215c071",
+    "byte_length": 214347,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:28:24.008384Z",
+    "drift_key": "sha256",
+    "drift_value": "972f486dc74ddd355edbe57df4f4b813997388f8c1c1349180dc5eb71215c071"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260721225223/https://www.ms.now/news/doj-investigating-rep-cory-mills",
+      "captured_at": "2026-07-21T22:52:23Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "NBC News reported the investigation later that day, at 9:46 PM EDT: https://www.nbcnews.com/politics/congress/cory-mills-florida-republican-under-investigation-justice-department-rcna588637"
+}

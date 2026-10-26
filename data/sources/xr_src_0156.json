@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0156",
+  "kind": "source",
+  "citation": "Robinson loses key outside support as RGA suggests it won’t spend any more on race for North Carolina governor",
+  "title": "Robinson loses key outside support as RGA suggests it won’t spend any more on race for North Carolina governor",
+  "publisher": "CNN",
+  "canonical_url": "https://edition.cnn.com/2024/09/23/politics/mark-robinson-support/index.html",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2024-09-23",
+  "published_at": "2024-09-23",
+  "artifact": {
+    "sha256": "7facef39272963dc1a82ad4b668d210855dfee821f93150be63a4c3d9cda4c7d",
+    "byte_length": 2653386,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T18:59:55.430303Z",
+    "drift_key": "sha256",
+    "drift_value": "7facef39272963dc1a82ad4b668d210855dfee821f93150be63a4c3d9cda4c7d"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20240923181924/https://edition.cnn.com/2024/09/23/politics/mark-robinson-support/index.html",
+      "captured_at": "2024-09-23T18:19:24Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Wayback served this capture of CNN's edition.cnn.com address when the www.cnn.com address of the same path, https://www.cnn.com/2024/09/23/politics/mark-robinson-support/index.html, was asked for at 20240923000000 (seen 2026-10-26)."
+}

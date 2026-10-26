@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0157",
+  "kind": "source",
+  "citation": "U.S. Const. art. I, § 2, cl. 4",
+  "title": "U.S. Const. art. I, § 2, cl. 4, The Constitution of the United States: A Transcription",
+  "publisher": "National Archives and Records Administration",
+  "canonical_url": "https://www.archives.gov/founding-docs/constitution-transcript",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "6e1297ddda94f08f594bac4f7f60d497b033b0975df3a55b7b3a287825e5514e",
+    "byte_length": 70555,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:15:26.297468Z",
+    "drift_key": "sha256",
+    "drift_value": "6e1297ddda94f08f594bac4f7f60d497b033b0975df3a55b7b3a287825e5514e"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The National Archives' transcription of the Constitution as inscribed on the parchment. Used in place of the Library of Congress's Constitution Annotated page, which answered the register's read of 2026-10-25 with a 403 (a Cloudflare challenge); its newest Wayback capture is the same challenge."
+}

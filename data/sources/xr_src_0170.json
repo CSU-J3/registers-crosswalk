@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0170",
+  "kind": "source",
+  "citation": "Woman says Eric Swalwell drugged, raped and choked her: 'I thought I died'",
+  "title": "Woman says Eric Swalwell drugged, raped and choked her: 'I thought I died'",
+  "publisher": "NBC News",
+  "canonical_url": "https://www.nbcnews.com/politics/congress/woman-says-eric-swalwell-drugged-raped-choked-thought-died-rcna331693",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-04-14",
+  "published_at": "2026-04-14",
+  "artifact": {
+    "sha256": "5dfbe9592b539d376369634d4c01a54dc204652ebc9acddb507c6cabed0c8757",
+    "byte_length": 411926,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:24:15.267217Z",
+    "drift_key": "sha256",
+    "drift_value": "5dfbe9592b539d376369634d4c01a54dc204652ebc9acddb507c6cabed0c8757"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260414173320/https://www.nbcnews.com/politics/congress/woman-says-eric-swalwell-drugged-raped-choked-thought-died-rcna331693",
+      "captured_at": "2026-04-14T17:33:20Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture holds the first version (April 14, 2026, 1:20 PM EDT). The page was updated at 10:53 PM EDT that day (seen 2026-10-25)."
+}

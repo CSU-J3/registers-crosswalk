@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0164",
+  "kind": "source",
+  "citation": "Ohio Rev. Code 3513.312",
+  "title": "Ohio Rev. Code 3513.312, Withdrawal, disqualification, or death of Congress candidate prior to general election",
+  "publisher": "Ohio Legislative Service Commission",
+  "canonical_url": "https://codes.ohio.gov/ohio-revised-code/section-3513.312",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-09-12",
+  "published_at": null,
+  "artifact": {
+    "sha256": "27b9bf996defe7a4966a2039633868824c2c3b0f8ce642412e0a17f738706518",
+    "byte_length": 17413,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:20:06.237904Z",
+    "drift_key": "sha256",
+    "drift_value": "27b9bf996defe7a4966a2039633868824c2c3b0f8ce642412e0a17f738706518"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260912060107/https://codes.ohio.gov/ohio-revised-code/section-3513.312",
+      "captured_at": "2026-09-12T06:01:07Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Effective October 29, 2018. Taken from its Wayback capture: codes.ohio.gov's robots.txt reads \"User-agent: * Disallow: /\". The capture's section text matches the page as read on 2026-10-25."
+}

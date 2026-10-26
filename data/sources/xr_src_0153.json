@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0153",
+  "kind": "source",
+  "citation": "Democratic Rep. Katie Hill denies relationship with congressional staffer",
+  "title": "Democratic Rep. Katie Hill denies relationship with congressional staffer",
+  "publisher": "Roll Call",
+  "canonical_url": "https://www.rollcall.com/news/democratic-rep-katie-hill-denies-relationship-with-congressional-staffer",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2019-10-23",
+  "published_at": "2019-10-22",
+  "artifact": {
+    "sha256": "7ca03fd36486ca36edd6150dee9c6e82f53b75aef310aec42530d7b7b7a47d41",
+    "byte_length": 60760,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T18:53:43.147255Z",
+    "drift_key": "sha256",
+    "drift_value": "7ca03fd36486ca36edd6150dee9c6e82f53b75aef310aec42530d7b7b7a47d41"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20191023200256/https://www.rollcall.com/news/democratic-rep-katie-hill-denies-relationship-with-congressional-staffer",
+      "captured_at": "2019-10-23T20:02:56Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture records the page's http address. The address now redirects to https://rollcall.com/2019/10/22/democratic-rep-katie-hill-denies-relationship-with-congressional-staffer/ (seen 2026-10-25)."
+}

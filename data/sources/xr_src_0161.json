@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0161",
+  "kind": "source",
+  "citation": "ORS 188.120",
+  "title": "ORS 188.120 (1991 Edition)",
+  "publisher": "Oregon State Legislature",
+  "canonical_url": "https://archives.oregonlegislature.gov/ORS_Archives/1991-Chapter-188.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "bcd3c015302bbf912792909fa2711526c3192391510e7cfad680c6bce8a130ed",
+    "byte_length": 287088,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-26T19:18:01.242501Z",
+    "drift_key": "sha256",
+    "drift_value": "bcd3c015302bbf912792909fa2711526c3192391510e7cfad680c6bce8a130ed"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chapter 188 of the 1991 Edition, as the Legislature's ORS archive holds it: a scan with an OCR text layer."
+}

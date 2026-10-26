@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0154",
+  "kind": "source",
+  "citation": "Freshman Dem Katie Hill denies improper relationship with aide",
+  "title": "Freshman Dem Katie Hill denies improper relationship with aide",
+  "publisher": "Politico",
+  "canonical_url": "https://www.politico.com/news/2019/10/22/katie-hill-denies-improper-relationship-054313",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2019-10-22",
+  "published_at": "2019-10-22",
+  "artifact": {
+    "sha256": "577e19a9dd4411f3db0ab976dc7deca383aee788af1e7767962a7c40352b0f1d",
+    "byte_length": 78063,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T18:55:46.946717Z",
+    "drift_key": "sha256",
+    "drift_value": "577e19a9dd4411f3db0ab976dc7deca383aee788af1e7767962a7c40352b0f1d"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20191022174518/https://www.politico.com/news/2019/10/22/katie-hill-denies-improper-relationship-054313",
+      "captured_at": "2019-10-22T17:45:18Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Not read live: politico.com's robots.txt answered 403 on 2026-10-25."
+}

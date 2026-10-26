@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0151",
+  "kind": "source",
+  "citation": "Radio host alleges Franken forcibly kissed her amid USO tour",
+  "title": "Radio host alleges Franken forcibly kissed her amid USO tour",
+  "publisher": "The Salt Lake Tribune",
+  "canonical_url": "https://www.sltrib.com/news/nation-world/2017/11/16/radio-host-alleges-franken-forcibly-kissed-her-amid-uso-tour/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-11-20",
+  "published_at": "2017-11-16",
+  "artifact": {
+    "sha256": "381e69822334a9f7de8eb23c9f362520469236f89af4d45a88e79df0b0ed67b1",
+    "byte_length": 114484,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T18:49:34.787576Z",
+    "drift_key": "sha256",
+    "drift_value": "381e69822334a9f7de8eb23c9f362520469236f89af4d45a88e79df0b0ed67b1"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171120205314/https://www.sltrib.com/news/nation-world/2017/11/16/radio-host-alleges-franken-forcibly-kissed-her-amid-uso-tour/",
+      "captured_at": "2017-11-20T20:53:14Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "An Associated Press story, as The Salt Lake Tribune ran it. The capture records the page's http address."
+}

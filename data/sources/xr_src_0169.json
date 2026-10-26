@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0169",
+  "kind": "source",
+  "citation": "Report of the Missouri House Special Investigative Committee on Oversight",
+  "title": "Report of the Missouri House Special Investigative Committee on Oversight",
+  "publisher": "Missouri House of Representatives",
+  "canonical_url": "https://documents.house.mo.gov/Billtracking/bills181/commit/rpt1840/Special%20Investigative%20Committee%20on%20Oversight%20Report.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2018-04-11",
+  "artifact": {
+    "sha256": "24b0a6857b15ef18618593f143667c13fa7c13a8947d5b282e971302cdbdffaf",
+    "byte_length": 373991,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-26T19:22:11.433921Z",
+    "drift_key": "sha256",
+    "drift_value": "24b0a6857b15ef18618593f143667c13fa7c13a8947d5b282e971302cdbdffaf"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Dated April 11, 2018 on its cover; 25 pages."
+}

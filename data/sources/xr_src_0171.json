@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0171",
+  "kind": "source",
+  "citation": "New Swalwell accuser says he drugged and raped her in 2018, giving graphic account",
+  "title": "New Swalwell accuser says he drugged and raped her in 2018, giving graphic account",
+  "publisher": "ABC7 Los Angeles",
+  "canonical_url": "https://abc7.com/post/another-woman-accusing-rep-eric-swalwell-sexual-misconduct-speak-beverly-hills-california/18884790/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-04-14",
+  "published_at": "2026-04-14",
+  "artifact": {
+    "sha256": "127daf17c00ba8fc3b51ff7c71358538422ee72116f7590cb0d241c2a3b398b3",
+    "byte_length": 309303,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:26:18.884096Z",
+    "drift_key": "sha256",
+    "drift_value": "127daf17c00ba8fc3b51ff7c71358538422ee72116f7590cb0d241c2a3b398b3"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260414212127/https://abc7.com/post/another-woman-accusing-rep-eric-swalwell-sexual-misconduct-speak-beverly-hills-california/18884790/",
+      "captured_at": "2026-04-14T21:21:27Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "A KGO-TV (ABC7 News Bay Area) story, as ABC7 Los Angeles ran it. The capture holds the version modified at 20:46 UTC on 2026-04-14."
+}

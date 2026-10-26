@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0163",
+  "kind": "source",
+  "citation": "Ohio Rev. Code 3513.31",
+  "title": "Ohio Rev. Code 3513.31, Withdrawal, disqualification, or death of candidate prior to general election",
+  "publisher": "Ohio Legislative Service Commission",
+  "canonical_url": "https://codes.ohio.gov/ohio-revised-code/section-3513.31",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2025-12-15",
+  "published_at": null,
+  "artifact": {
+    "sha256": "8c56170582c6e024dcdc28a24634fb2eb58668637860bb8cf6d4fceba0d688d3",
+    "byte_length": 31301,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:18:02.570242Z",
+    "drift_key": "sha256",
+    "drift_value": "8c56170582c6e024dcdc28a24634fb2eb58668637860bb8cf6d4fceba0d688d3"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 1
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20251215211602/https://codes.ohio.gov/ohio-revised-code/section-3513.31",
+      "captured_at": "2025-12-15T21:16:02Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Effective February 5, 2014. Taken from its Wayback capture: codes.ohio.gov's robots.txt reads \"User-agent: * Disallow: /\". The capture's section text matches the page as read on 2026-10-25."
+}

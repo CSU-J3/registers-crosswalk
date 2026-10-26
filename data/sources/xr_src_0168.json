@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0168",
+  "kind": "source",
+  "citation": "S. Rept. 104-137",
+  "title": "Resolution for Disciplinary Action",
+  "publisher": "U.S. Senate, Select Committee on Ethics",
+  "canonical_url": "https://www.govinfo.gov/content/pkg/CRPT-104srpt137/html/CRPT-104srpt137.htm",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "1995-09-08",
+  "artifact": {
+    "sha256": "05f12dc25cfb1b43f8efa3d3d7ba25cf5a38d310b8d161cc3810ec851ae6775f",
+    "byte_length": 677273,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:22:10.909362Z",
+    "drift_key": "sha256",
+    "drift_value": "05f12dc25cfb1b43f8efa3d3d7ba25cf5a38d310b8d161cc3810ec851ae6775f"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Ordered to be printed September 8, 1995."
+}

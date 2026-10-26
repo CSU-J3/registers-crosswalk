@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0162",
+  "kind": "source",
+  "citation": "La. R.S. 18:1278",
+  "title": "La. R.S. 18:1278, Vacancies; United States senator",
+  "publisher": "Louisiana State Legislature",
+  "canonical_url": "https://www.legis.la.gov/legis/Law.aspx?d=81285",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "5dde87831f4d380ea55132de120c2480f85832452ee9e94f50f9effbabf1a758",
+    "byte_length": 30058,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:18:01.613829Z",
+    "drift_key": "sha256",
+    "drift_value": "5dde87831f4d380ea55132de120c2480f85832452ee9e94f50f9effbabf1a758"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

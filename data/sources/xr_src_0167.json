@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0167",
+  "kind": "source",
+  "citation": "Exclusive: Woman who dated Graham Platner says he sexually assaulted her",
+  "title": "Exclusive: Woman who dated Graham Platner says he sexually assaulted her",
+  "publisher": "Politico",
+  "canonical_url": "https://www.politico.com/news/2026/07/06/graham-platner-sexual-assault-allegation-00987737",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-07-06",
+  "published_at": "2026-07-06",
+  "artifact": {
+    "sha256": "86cc5ea8c47def3c25688eaf7152e6a81decf856c7e9aa89c9923b1517507963",
+    "byte_length": 291532,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:22:09.985975Z",
+    "drift_key": "sha256",
+    "drift_value": "86cc5ea8c47def3c25688eaf7152e6a81decf856c7e9aa89c9923b1517507963"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260706192912/https://www.politico.com/news/2026/07/06/graham-platner-sexual-assault-allegation-00987737",
+      "captured_at": "2026-07-06T19:29:12Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Not read live: politico.com's robots.txt answered 403 on 2026-10-25."
+}

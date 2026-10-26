@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0165",
+  "kind": "source",
+  "citation": "Election Dates",
+  "title": "Election Dates, key election dates for 2026",
+  "publisher": "Florida Department of State, Division of Elections",
+  "canonical_url": "https://dos.fl.gov/elections/for-voters/election-dates/",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "1abac9bb37552a5fd769fca6ee3b5aad6aa109b6c2a4f013043735d2ed13bc69",
+    "byte_length": 30878,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:20:06.636331Z",
+    "drift_key": "sha256",
+    "drift_value": "1abac9bb37552a5fd769fca6ee3b5aad6aa109b6c2a4f013043735d2ed13bc69"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

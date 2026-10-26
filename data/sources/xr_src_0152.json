@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0152",
+  "kind": "source",
+  "citation": "Missouri Gov. Greitens acknowledges affair, but denies blackmail",
+  "title": "Missouri Gov. Greitens acknowledges affair, but denies blackmail",
+  "publisher": "PBS NewsHour",
+  "canonical_url": "https://www.pbs.org/newshour/politics/missouri-gov-greitens-acknowledges-affair-but-denies-blackmail",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2018-01-11",
+  "published_at": "2018-01-11",
+  "artifact": {
+    "sha256": "3fda415e35c217bb9d1c130e5d52ba8e28b8480740b94fb1b91b5ef7b3c72a57",
+    "byte_length": 117290,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T18:51:38.584416Z",
+    "drift_key": "sha256",
+    "drift_value": "3fda415e35c217bb9d1c130e5d52ba8e28b8480740b94fb1b91b5ef7b3c72a57"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20180111202129/https://www.pbs.org/newshour/politics/missouri-gov-greitens-acknowledges-affair-but-denies-blackmail",
+      "captured_at": "2018-01-11T20:21:29Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "An Associated Press story (Summer Ballentine), as PBS NewsHour ran it."
+}

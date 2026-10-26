@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0166",
+  "kind": "source",
+  "citation": "Bookclosing Reports - General/Primary Elections",
+  "title": "Bookclosing Reports - General/Primary Elections, 2016 to 2024",
+  "publisher": "Florida Department of State, Division of Elections",
+  "canonical_url": "https://dos.fl.gov/elections/data-statistics/voter-registration-statistics/bookclosing/bookclosing-reports-regular/",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "9695d1a773f833ec60279f91a4b080f67b4c02a66ec0c55c62e8e4e93488438f",
+    "byte_length": 56603,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:20:21.769401Z",
+    "drift_key": "sha256",
+    "drift_value": "9695d1a773f833ec60279f91a4b080f67b4c02a66ec0c55c62e8e4e93488438f"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

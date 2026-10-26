@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0155",
+  "kind": "source",
+  "citation": "Rep. Max Miller files defamation lawsuit against ex-wife",
+  "title": "Rep. Max Miller files defamation lawsuit against ex-wife",
+  "publisher": "Roll Call",
+  "canonical_url": "https://rollcall.com/2026/05/14/rep-max-miller-files-defamation-lawsuit-against-ex-wife/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-05-14",
+  "published_at": "2026-05-14",
+  "artifact": {
+    "sha256": "0c653988d30a70d783e32c5d764d82445abdff002879b7fd9e7a4a71db35e4dc",
+    "byte_length": 177936,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T18:57:50.736933Z",
+    "drift_key": "sha256",
+    "drift_value": "0c653988d30a70d783e32c5d764d82445abdff002879b7fd9e7a4a71db35e4dc"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260514233830/https://rollcall.com/2026/05/14/rep-max-miller-files-defamation-lawsuit-against-ex-wife/",
+      "captured_at": "2026-05-14T23:38:30Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture holds the version posted May 14, 2026 at 6:14pm. The page was updated May 15, 2026 at 9:26am (seen 2026-10-25)."
+}

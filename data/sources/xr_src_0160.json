@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0160",
+  "kind": "source",
+  "citation": "ORS 188.120",
+  "title": "ORS 188.120 (1995 Edition)",
+  "publisher": "Oregon State Legislature",
+  "canonical_url": "https://archives.oregonlegislature.gov/ORS_Archives/1995-Chapter-188.htm",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "2364d0c774d7f7076ee9d6590362fcf3f5d2acaf0ab4708513f35a41002312be",
+    "byte_length": 321393,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-26T19:17:43.701504Z",
+    "drift_key": "sha256",
+    "drift_value": "2364d0c774d7f7076ee9d6590362fcf3f5d2acaf0ab4708513f35a41002312be"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chapter 188 of the 1995 Edition, as the Legislature's ORS archive holds it."
+}

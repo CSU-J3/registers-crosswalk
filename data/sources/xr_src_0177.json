@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0177",
+  "kind": "source",
+  "citation": "Long-Simmering Story Goes Mainstream",
+  "title": "Long-Simmering Story Goes Mainstream",
+  "publisher": "The Washington Post",
+  "canonical_url": "https://www.washingtonpost.com/wp-srv/politics/special/clinton/stories/media022099.htm",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2000-08-17",
+  "published_at": "1999-02-20",
+  "artifact": {
+    "sha256": "d24d611b0941c439380c4d3d43f361d1a252f592e6998bc75654aa7ec3929807",
+    "byte_length": 15349,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T22:02:23.713857Z",
+    "drift_key": "sha256",
+    "drift_value": "d24d611b0941c439380c4d3d43f361d1a252f592e6998bc75654aa7ec3929807"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20000817211640/https://www.washingtonpost.com/wp-srv/politics/special/clinton/stories/media022099.htm",
+      "captured_at": "2000-08-17T21:16:40Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "A substitute for Fox News Channel's own report of the allegation, which was not located: it names that report but not its date. robots.txt now disallows this page for Anthropic's agents and for every agent it doesn't name, so it was not read live. The capture records the page's http address."
+}

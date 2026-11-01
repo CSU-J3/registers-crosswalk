@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0180",
+  "kind": "source",
+  "citation": "White House denies allegations of 1978 sexual assault by Clinton",
+  "title": "White House denies allegations of 1978 sexual assault by Clinton",
+  "publisher": "CNN",
+  "canonical_url": "https://edition.cnn.com/ALLPOLITICS/stories/1999/02/20/assault.allegation/index.html",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2002-11-15",
+  "published_at": "1999-02-20",
+  "artifact": {
+    "sha256": "157f0e7918bdfc702e59b9ae194d5123096ccb5050d9355e2b1911ee49c43410",
+    "byte_length": 8280,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T22:08:37.154392Z",
+    "drift_key": "sha256",
+    "drift_value": "157f0e7918bdfc702e59b9ae194d5123096ccb5050d9355e2b1911ee49c43410"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20021115185709/https://edition.cnn.com/ALLPOLITICS/stories/1999/02/20/assault.allegation/index.html",
+      "captured_at": "2002-11-15T18:57:09Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "robots.txt now disallows this page for Anthropic's agents, so it was not read live. The capture records the page's http address."
+}

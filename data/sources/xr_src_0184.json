@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0184",
+  "kind": "source",
+  "citation": "Official Election Results for United States Senate",
+  "title": "Official Election Results for United States Senate",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://www.fec.gov/resources/cms-content/documents/2010senate.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "3ddaf6844c75469d782347adedb64c4f59ed22cf96cab48c4351697355b51631",
+    "byte_length": 424984,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-29T22:15:10.834368Z",
+    "drift_key": "sha256",
+    "drift_value": "3ddaf6844c75469d782347adedb64c4f59ed22cf96cab48c4351697355b51631"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Its running head reads 2010 U.S. SENATE RESULTS."
+}

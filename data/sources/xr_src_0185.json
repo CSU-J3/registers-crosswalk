@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0185",
+  "kind": "source",
+  "citation": "South Carolina Governor Says He Was 'Unfaithful'",
+  "title": "South Carolina Governor Says He Was 'Unfaithful'",
+  "publisher": "NPR",
+  "canonical_url": "https://www.npr.org/2009/06/24/105850521/south-carolina-governor-says-he-was-unfaithful",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2023-01-02",
+  "published_at": "2009-06-24",
+  "artifact": {
+    "sha256": "dff92646efb605b212bf3371c22322c53b633d8a95e5ba0ce7fd3e5674869fee",
+    "byte_length": 82881,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T22:17:00.395503Z",
+    "drift_key": "sha256",
+    "drift_value": "dff92646efb605b212bf3371c22322c53b633d8a95e5ba0ce7fd3e5674869fee"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20230102190340/https://www.npr.org/2009/06/24/105850521/south-carolina-governor-says-he-was-unfaithful",
+      "captured_at": "2023-01-02T19:03:40Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "robots.txt now disallows this page for Anthropic's agents, so it was not read live."
+}

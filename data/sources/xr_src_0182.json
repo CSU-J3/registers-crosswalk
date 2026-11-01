@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0182",
+  "kind": "source",
+  "citation": "Senator's Number on 'Madam' Phone List",
+  "title": "Senator's Number on 'Madam' Phone List",
+  "publisher": "The Washington Post",
+  "canonical_url": "https://www.washingtonpost.com/wp-dyn/content/article/2007/07/09/AR2007070902030.html",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2008-10-06",
+  "published_at": "2007-07-10",
+  "artifact": {
+    "sha256": "36cb608f72bcc5cc9a7f13039fb94471b274fc2ec0259a8e681a513c4980ebd7",
+    "byte_length": 106442,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T22:12:49.632147Z",
+    "drift_key": "sha256",
+    "drift_value": "36cb608f72bcc5cc9a7f13039fb94471b274fc2ec0259a8e681a513c4980ebd7"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20081006054714/https://www.washingtonpost.com/wp-dyn/content/article/2007/07/09/AR2007070902030.html",
+      "captured_at": "2008-10-06T05:47:14Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The address carries 2007/07/09; the page prints Tuesday, July 10, 2007; Page A03. robots.txt now disallows this page for Anthropic's agents and for every agent it doesn't name, so it was not read live. The capture records the page's http address."
+}

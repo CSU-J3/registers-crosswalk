@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0176",
+  "kind": "source",
+  "citation": "A Tough Call for the Nation’s Editors",
+  "title": "A Tough Call for the Nation’s Editors",
+  "publisher": "American Journalism Review",
+  "canonical_url": "https://www.ajr.org/Article.asp?id=3302",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2003-11-06",
+  "published_at": null,
+  "artifact": {
+    "sha256": "c9079560b058201792ffd9be93eb442344e336ecce86365b621c2db2bd0c2dc1",
+    "byte_length": 22319,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T22:00:19.358963Z",
+    "drift_key": "sha256",
+    "drift_value": "c9079560b058201792ffd9be93eb442344e336ecce86365b621c2db2bd0c2dc1"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20031106145042/https://www.ajr.org/Article.asp?id=3302",
+      "captured_at": "2003-11-06T14:50:42Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "From AJR, April 1999. The capture records the page's http address. The article is now served at https://ajrarchive.org/Article.asp?id=3302, of which Wayback holds no capture (seen 2026-10-29)."
+}

@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0190",
+  "kind": "source",
+  "citation": "S.C. Const. art. IV, § 4",
+  "title": "S.C. Const. art. IV, § 4, Article IV: Executive Department",
+  "publisher": "South Carolina General Assembly",
+  "canonical_url": "https://www.scstatehouse.gov/scconstitution/A04.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "58f5aadaacf9aa12ba59bd697500fd454271893712230d5b8c7f77757ea815a6",
+    "byte_length": 118307,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-29T22:23:47.360885Z",
+    "drift_key": "sha256",
+    "drift_value": "58f5aadaacf9aa12ba59bd697500fd454271893712230d5b8c7f77757ea815a6"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0188",
+  "kind": "source",
+  "citation": "Gov. Mark Sanford Censured By South Carolina Republicans",
+  "title": "Gov. Mark Sanford Censured By South Carolina Republicans",
+  "publisher": "NPR",
+  "canonical_url": "https://www.npr.org/sections/thetwo-way/2009/07/gov_mark_sanford_censured_by_s.html",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2025-12-06",
+  "published_at": "2009-07-07",
+  "artifact": {
+    "sha256": "3e92b9d56652e410327ff22f22254ee04a25664083e0c0e4c006d518fac09672",
+    "byte_length": 65097,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T22:23:16.088687Z",
+    "drift_key": "sha256",
+    "drift_value": "3e92b9d56652e410327ff22f22254ee04a25664083e0c0e4c006d518fac09672"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20251206050043/https://www.npr.org/sections/thetwo-way/2009/07/gov_mark_sanford_censured_by_s.html",
+      "captured_at": "2025-12-06T05:00:43Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "A substitute for CBS News's \"S.C. Republicans Censure Sanford\" (2009-07-07), of whose address Wayback holds no capture (seen 2026-10-28). It quotes Reuters. robots.txt now disallows this page for Anthropic's agents, so it was not read live."
+}

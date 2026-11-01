@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0181",
+  "kind": "source",
+  "citation": "Clinton Accuser's Story Aired",
+  "title": "Clinton Accuser's Story Aired",
+  "publisher": "The Washington Post",
+  "canonical_url": "https://www.washingtonpost.com/wp-srv/politics/special/clinton/stories/broaddrick022599.htm",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2000-08-19",
+  "published_at": "1999-02-25",
+  "artifact": {
+    "sha256": "bd2aa8ee25e422908289a48bff9cdaf2a7faabc71941a16699eb1cadcd95f82b",
+    "byte_length": 15601,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T22:10:41.457383Z",
+    "drift_key": "sha256",
+    "drift_value": "bd2aa8ee25e422908289a48bff9cdaf2a7faabc71941a16699eb1cadcd95f82b"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20000819174743/https://www.washingtonpost.com/wp-srv/politics/special/clinton/stories/broaddrick022599.htm",
+      "captured_at": "2000-08-19T17:47:43Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "robots.txt now disallows this page for Anthropic's agents and for every agent it doesn't name, so it was not read live. The capture records the page's http address."
+}

@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0174",
+  "kind": "source",
+  "citation": "141 Cong. Rec. S12797 (daily ed. Sept. 7, 1995)",
+  "title": "Announcement of Intent to Resign from the Senate",
+  "publisher": "U.S. Congress",
+  "canonical_url": "https://www.govinfo.gov/content/pkg/CREC-1995-09-07/pdf/CREC-1995-09-07-pt1-PgS12796.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "1995-09-07",
+  "artifact": {
+    "sha256": "86127b335504916fee87a027bdc4528e82d4d25b60673f9a9c81ef820b14eb41",
+    "byte_length": 189257,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-10-29T21:58:02.974216Z",
+    "drift_key": "sha256",
+    "drift_value": "86127b335504916fee87a027bdc4528e82d4d25b60673f9a9c81ef820b14eb41"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The granule govinfo's link service gives for page S12797 (https://www.govinfo.gov/link/crec/141/S/12797, seen 2026-10-28): pages S12796 to S12802."
+}

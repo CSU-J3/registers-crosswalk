@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0175",
+  "kind": "source",
+  "citation": "The ugliest story yet",
+  "title": "The ugliest story yet",
+  "publisher": "Salon",
+  "canonical_url": "https://www.salon.com/1999/02/20/cov_20news_2/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2014-01-09",
+  "published_at": "1999-02-20",
+  "artifact": {
+    "sha256": "dbf549ebac14db5d7c2ed091badd66d2a695dfff26e10fbf3ba13a6f0ef1d256",
+    "byte_length": 188389,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T21:58:04.990718Z",
+    "drift_key": "sha256",
+    "drift_value": "dbf549ebac14db5d7c2ed091badd66d2a695dfff26e10fbf3ba13a6f0ef1d256"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20140109010001/https://www.salon.com/1999/02/20/cov_20news_2/",
+      "captured_at": "2014-01-09T01:00:01Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture records the address with a trailing slash, to which the address without it redirects (seen 2026-10-28)."
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0179",
+  "kind": "source",
+  "citation": "Another Clinton Accuser Goes Public",
+  "title": "Another Clinton Accuser Goes Public",
+  "publisher": "The Washington Post",
+  "canonical_url": "https://www.washingtonpost.com/wp-srv/politics/special/clinton/stories/janedoe022099.htm",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2000-08-17",
+  "published_at": "1999-02-20",
+  "artifact": {
+    "sha256": "9be623916bff779dae5f585506fe28bb5bdc16961f27a80af8538cf1a5399cdf",
+    "byte_length": 23329,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T22:06:32.758406Z",
+    "drift_key": "sha256",
+    "drift_value": "9be623916bff779dae5f585506fe28bb5bdc16961f27a80af8538cf1a5399cdf"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20000817211644/https://www.washingtonpost.com/wp-srv/politics/special/clinton/stories/janedoe022099.htm",
+      "captured_at": "2000-08-17T21:16:44Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "robots.txt now disallows this page for Anthropic's agents and for every agent it doesn't name, so it was not read live. The capture records the page's http address."
+}

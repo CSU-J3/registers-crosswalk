@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0186",
+  "kind": "source",
+  "citation": "S.C. governor tries to get back to business",
+  "title": "S.C. governor tries to get back to business",
+  "publisher": "NBC News",
+  "canonical_url": "https://www.nbcnews.com/id/wbna31562906",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-09-13",
+  "published_at": "2009-06-26",
+  "artifact": {
+    "sha256": "4fff52ee3cb0f0219bb8adacd91794b11ad936e57a63dbff4a8b6b1ffba7b99c",
+    "byte_length": 283007,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T22:19:05.565007Z",
+    "drift_key": "sha256",
+    "drift_value": "4fff52ee3cb0f0219bb8adacd91794b11ad936e57a63dbff4a8b6b1ffba7b99c"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260913050105/https://www.nbcnews.com/id/wbna31562906",
+      "captured_at": "2026-09-13T05:01:05Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "An Associated Press story, as NBC News ran it. robots.txt now disallows this page for Anthropic's agents, so it was not read live."
+}

@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0189",
+  "kind": "source",
+  "citation": "S.C. H. 4219 (2009-2010)",
+  "title": "S.C. H. 4219 (2009-2010), Censure resolution of Governor Sanford",
+  "publisher": "South Carolina General Assembly",
+  "canonical_url": "https://www.scstatehouse.gov/sess118_2009-2010/bills/4219.htm",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": null,
+  "artifact": {
+    "sha256": "95d5807d41ee850532e37899778207cd83ddf098089279f2227e3b6f0b7231c7",
+    "byte_length": 7432,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T22:23:32.038455Z",
+    "drift_key": "sha256",
+    "drift_value": "95d5807d41ee850532e37899778207cd83ddf098089279f2227e3b6f0b7231c7"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": null
+}

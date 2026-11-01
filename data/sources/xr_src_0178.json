@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0178",
+  "kind": "source",
+  "citation": "Clinton Told Jones Team He Had No Willey Notes",
+  "title": "Clinton Told Jones Team He Had No Willey Notes",
+  "publisher": "The Washington Post",
+  "canonical_url": "https://www.washingtonpost.com/wp-srv/politics/special/clinton/stories/jones032998.htm",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2016-04-06",
+  "published_at": "1998-03-29",
+  "artifact": {
+    "sha256": "ff6f2a4f04ded906d55a6eaf6705e7c5233c828f1d48bccd47ec43cae7be0a6e",
+    "byte_length": 21351,
+    "media_type": "text/html",
+    "fetched_at": "2026-10-29T22:04:28.337650Z",
+    "drift_key": "sha256",
+    "drift_value": "ff6f2a4f04ded906d55a6eaf6705e7c5233c828f1d48bccd47ec43cae7be0a6e"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20160406093721/https://www.washingtonpost.com/wp-srv/politics/special/clinton/stories/jones032998.htm",
+      "captured_at": "2016-04-06T09:37:21Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "robots.txt now disallows this page for Anthropic's agents and for every agent it doesn't name, so it was not read live. The capture records the page's http address."
+}

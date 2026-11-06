@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0214",
+  "kind": "source",
+  "citation": "Democratic lawmaker: Conyers should resign after 'credible' and 'repulsive' allegations",
+  "title": "Democratic lawmaker: Conyers should resign after 'credible' and 'repulsive' allegations",
+  "publisher": "CNN",
+  "canonical_url": "https://www.cnn.com/2017/11/22/politics/democratic-lawmaker-john-conyers-resign/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-11-23",
+  "published_at": "2017-11-22",
+  "artifact": {
+    "sha256": "7d8514f66190683da5acf8fd7d94d0294cf1e5a29a562fb3b31a5da328e6daca",
+    "byte_length": 144125,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T21:05:37.131499Z",
+    "drift_key": "sha256",
+    "drift_value": "7d8514f66190683da5acf8fd7d94d0294cf1e5a29a562fb3b31a5da328e6daca"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171123001554/https://www.cnn.com/2017/11/22/politics/democratic-lawmaker-john-conyers-resign/",
+      "captured_at": "2017-11-23T00:15:54Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture, of 00:15:54 UTC on 2017-11-23, prints Updated 6:13 PM ET, Wed November 22, 2017 (23:13 UTC). The first ask for it, at 19:12:22 UTC on 2026-11-05, got no connection; it was asked once more by stop G6 a. robots.txt now disallows this page for five of Anthropic's agents, so it was not read live. The capture records the page's http address."
+}

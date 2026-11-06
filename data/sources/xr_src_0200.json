@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0200",
+  "kind": "source",
+  "citation": "Tim Murphy to Resign Oct. 21 After Affair Revelations",
+  "title": "Tim Murphy to Resign Oct. 21 After Affair Revelations",
+  "publisher": "Roll Call",
+  "canonical_url": "https://www.rollcall.com/2017/10/05/tim-murphy-to-resign-oct-21-after-affair-revelations/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2020-10-27",
+  "published_at": "2017-10-05",
+  "artifact": {
+    "sha256": "621611644bc6e962a5b18532bd077c20143025dea57235002eb10d5ece4d6fd8",
+    "byte_length": 153557,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:15:35.940383Z",
+    "drift_key": "sha256",
+    "drift_value": "621611644bc6e962a5b18532bd077c20143025dea57235002eb10d5ece4d6fd8"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20201027102427/https://www.rollcall.com/2017/10/05/tim-murphy-to-resign-oct-21-after-affair-revelations/",
+      "captured_at": "2020-10-27T10:24:27Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture Wayback holds nearest after the story's date is of 2020-10-27, a later version at the page's current address; the page prints Posted October 5, 2017 at 4:31pm (20:31 UTC). robots.txt now disallows this page for one of Anthropic's agents (anthropic-ai), so it was not read live."
+}

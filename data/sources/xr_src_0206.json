@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0206",
+  "kind": "source",
+  "citation": "Alabama 2017 Senate Victory Committee (C00658906), FEC Form 1, Statement of Organization, amended, filed November 10, 2017",
+  "title": "Statement of Organization (amended)",
+  "publisher": "Federal Election Commission",
+  "canonical_url": "https://docquery.fec.gov/pdf/532/201711109086621532/201711109086621532.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2017-11-10",
+  "artifact": {
+    "sha256": "c48ff0dc69b42c9339e1d15a2812d8749ce80cc5b47a680b4b45cff849b3b3a2",
+    "byte_length": 163889,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-11-06T20:52:58.363999Z",
+    "drift_key": "sha256",
+    "drift_value": "c48ff0dc69b42c9339e1d15a2812d8749ce80cc5b47a680b4b45cff849b3b3a2"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The joint fundraising committee's amended Statement of Organization, filed electronically 11/10/2017 11:31, image 201711109086621532, listing the Moore campaign, the Alabama Republican Party and the Republican National Committee as participants and no longer the NRSC."
+}

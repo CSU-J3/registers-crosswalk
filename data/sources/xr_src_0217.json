@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0217",
+  "kind": "source",
+  "citation": "163 Cong. Rec. H9648 (daily ed. Dec. 5, 2017)",
+  "title": "Resignation from the House of Representatives",
+  "publisher": "U.S. Congress",
+  "canonical_url": "https://www.govinfo.gov/content/pkg/CREC-2017-12-05/pdf/CREC-2017-12-05-pt1-PgH9648-3.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2017-12-05",
+  "artifact": {
+    "sha256": "30ba1615fc5bd452754b6272ecdb56b5ddb27bd6bdd2441f924e150157883a79",
+    "byte_length": 264299,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-11-06T21:09:45.342301Z",
+    "drift_key": "sha256",
+    "drift_value": "30ba1615fc5bd452754b6272ecdb56b5ddb27bd6bdd2441f924e150157883a79"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The granule govinfo's link service gives for page H9648 (https://www.govinfo.gov/link/crec/163/H/9648, seen 2026-11-05): the PDF of pages H9648 to H9653. The item's own HTML granule is not among the page's numbered granules the service exposes, so the PDF stands (key F9 a). The resignation, laid before the House by the Speaker pro tempore, is on its first page: the Member's letters to the Speaker and to the Governor of Michigan, effective today."
+}

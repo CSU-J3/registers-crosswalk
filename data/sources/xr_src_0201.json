@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0201",
+  "kind": "source",
+  "citation": "GOP Rep. Murphy resigning after reports of affair, Ryan says",
+  "title": "GOP Rep. Murphy resigning after reports of affair, Ryan says",
+  "publisher": "PBS NewsHour",
+  "canonical_url": "https://www.pbs.org/newshour/politics/gop-rep-murphy-resigning-reports-affair-ryan-says",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-10-19",
+  "published_at": "2017-10-05",
+  "artifact": {
+    "sha256": "d60afe9a38830095275ad4d0ecf6131fa6b33c59b49046ab6f7bd216e89bd0c9",
+    "byte_length": 99034,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:17:40.732967Z",
+    "drift_key": "sha256",
+    "drift_value": "d60afe9a38830095275ad4d0ecf6131fa6b33c59b49046ab6f7bd216e89bd0c9"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171019132330/https://www.pbs.org/newshour/politics/gop-rep-murphy-resigning-reports-affair-ryan-says",
+      "captured_at": "2017-10-19T13:23:30Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "An Associated Press story, as PBS NewsHour ran it; the AP's own copy was not found. The capture is of 2017-10-19 and prints 4:26 PM EDT on October 5, 2017 (20:26 UTC). Two live reads on 2026-11-05 matched each other; the live page labels the time EST. The text does not quote the Speaker's statement verbatim."
+}

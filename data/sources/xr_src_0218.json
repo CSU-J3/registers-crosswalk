@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0218",
+  "kind": "source",
+  "citation": "163 Cong. Rec. H9630 (daily ed. Dec. 5, 2017)",
+  "title": "Retirement of Dean of the United States Congress",
+  "publisher": "U.S. Congress",
+  "canonical_url": "https://www.govinfo.gov/content/pkg/CREC-2017-12-05/html/CREC-2017-12-05-pt1-PgH9630.htm",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2017-12-05",
+  "artifact": {
+    "sha256": "1411ab1dd5b89e581fe7147434926ff4c1184abca14647eeb1b9e587e833aaa0",
+    "byte_length": 6507,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T21:10:00.460701Z",
+    "drift_key": "sha256",
+    "drift_value": "1411ab1dd5b89e581fe7147434926ff4c1184abca14647eeb1b9e587e833aaa0"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Two reads on 2026-11-05 matched byte for byte (6,507 B)."
+}

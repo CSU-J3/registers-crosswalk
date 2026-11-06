@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0198",
+  "kind": "source",
+  "citation": "Report: Rep. Tim Murphy Urged Abortion in Affair",
+  "title": "Report: Rep. Tim Murphy Urged Abortion in Affair",
+  "publisher": "Roll Call",
+  "canonical_url": "https://www.rollcall.com/2017/10/03/report-rep-tim-murphy-urged-abortion-in-affair/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2020-10-21",
+  "published_at": "2017-10-03",
+  "artifact": {
+    "sha256": "c59e77c756314c1ea2937667417d3b582c0727bd0fd0c445e7803ccccd7c0613",
+    "byte_length": 154120,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:11:23.645156Z",
+    "drift_key": "sha256",
+    "drift_value": "c59e77c756314c1ea2937667417d3b582c0727bd0fd0c445e7803ccccd7c0613"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20201021023856/https://www.rollcall.com/2017/10/03/report-rep-tim-murphy-urged-abortion-in-affair/",
+      "captured_at": "2020-10-21T02:38:56Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture Wayback holds nearest after the story's date is of 2020-10-21, a later version at the page's current address; the page prints Posted October 3, 2017 at 5:16pm (21:16 UTC). robots.txt now disallows this page for one of Anthropic's agents (anthropic-ai), so it was not read live. The Pittsburgh Post-Gazette's own report of 10-03, which this story credits, is not pinned: its address carries private individuals' names."
+}

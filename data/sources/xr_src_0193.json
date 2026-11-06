@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0193",
+  "kind": "source",
+  "citation": "Exclusive: 2 women accused Herman Cain of inappropriate behavior",
+  "title": "Exclusive: 2 women accused Herman Cain of inappropriate behavior",
+  "publisher": "Politico",
+  "canonical_url": "https://www.politico.com/news/stories/1011/67194.html",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2011-10-31",
+  "published_at": "2011-10-31",
+  "artifact": {
+    "sha256": "14fd3493480ff91a5d9b71bae47958491f67382b129a8d0accda80c34d5acf97",
+    "byte_length": 106301,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:00:48.259152Z",
+    "drift_key": "sha256",
+    "drift_value": "14fd3493480ff91a5d9b71bae47958491f67382b129a8d0accda80c34d5acf97"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20111031135004/https://www.politico.com/news/stories/1011/67194.html",
+      "captured_at": "2011-10-31T13:50:04Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture, of 13:50:04 UTC on 2011-10-31, is the one Wayback served for 2011-10-30 at the story's address as published; it prints 10/31/11 8:38 AM EDT (12:38 UTC) and this headline, which the request gives as Herman Cain accused by two women of inappropriate behavior. The story carries no stamp of 10-30: its only stamp is that of 10-31, and its metadata gives the same morning (publish_date Mon, 31 Oct 2011 08:38:36, labeled EST); the readers' comments under it begin Oct. 30, 2011 - 8:05 PM, labeled EST. The CSM carry of the AP's story (xr_src_0194) puts Politico's report on Sunday, 10-30. Not read live: politico.com's robots.txt answered 403 on 2026-11-05; the story's current address was not read. The capture records the page's http address."
+}

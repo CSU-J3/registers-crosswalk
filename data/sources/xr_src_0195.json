@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0195",
+  "kind": "source",
+  "citation": "Allen West says Cain has become a distraction in the race",
+  "title": "Allen West says Cain has become a distraction in the race",
+  "publisher": "theGrio",
+  "canonical_url": "https://thegrio.com/2011/12/01/allen-west-says-cain-has-become-a-distraction-in-the-race/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2012-05-24",
+  "published_at": "2011-12-01",
+  "artifact": {
+    "sha256": "8baeb3c134551a696b1c683ee843913ff8cded45d315e92a6537cd513ff8ed06",
+    "byte_length": 84466,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:05:05.745218Z",
+    "drift_key": "sha256",
+    "drift_value": "8baeb3c134551a696b1c683ee843913ff8cded45d315e92a6537cd513ff8ed06"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20120524160335/https://thegrio.com/2011/12/01/allen-west-says-cain-has-become-a-distraction-in-the-race/",
+      "captured_at": "2012-05-24T16:03:35Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture Wayback holds nearest after the story's date is of 2012-05-24, a later version at the page's current address; the page prints December 1, 2011 at 3:21 PM. robots.txt now disallows this page for Anthropic's agents, so it was not read live. The capture records the page's http address."
+}

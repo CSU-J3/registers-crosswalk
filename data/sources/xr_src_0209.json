@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0209",
+  "kind": "source",
+  "citation": "RNC Reverses Course, Backs Roy Moore After Pulling Support",
+  "title": "RNC Reverses Course, Backs Roy Moore After Pulling Support",
+  "publisher": "Roll Call",
+  "canonical_url": "https://www.rollcall.com/2017/12/04/rnc-reverses-course-backs-roy-moore-after-pulling-support/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2020-10-22",
+  "published_at": "2017-12-04",
+  "artifact": {
+    "sha256": "8ff52e7f4428b2a40edee063273c63834f89b12fb9e342550cca94d7371554d2",
+    "byte_length": 148302,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:58:59.984595Z",
+    "drift_key": "sha256",
+    "drift_value": "8ff52e7f4428b2a40edee063273c63834f89b12fb9e342550cca94d7371554d2"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20201022184613/https://www.rollcall.com/2017/12/04/rnc-reverses-course-backs-roy-moore-after-pulling-support/",
+      "captured_at": "2020-10-22T18:46:13Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture Wayback holds nearest after the story's date is of 2020-10-22, a later version at the page's current address; the page prints Posted December 4, 2017 at 9:37pm (02:37 UTC on 12-05). robots.txt now disallows this page for one of Anthropic's agents (anthropic-ai), so it was not read live. A located report of the national party's resumption of its support. NBC News reported it at 10:49 pm ET that day (03:49 UTC on 12-05; its capture of 06:44:01 UTC on 12-05 is not pinned: the earlier report is the pin)."
+}

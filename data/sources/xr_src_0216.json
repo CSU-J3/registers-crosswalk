@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0216",
+  "kind": "source",
+  "citation": "Pelosi Calls on Conyers to Resign",
+  "title": "Pelosi Calls on Conyers to Resign",
+  "publisher": "Roll Call",
+  "canonical_url": "https://www.rollcall.com/2017/11/30/pelosi-calls-on-conyers-to-resign/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2020-10-26",
+  "published_at": "2017-11-30",
+  "artifact": {
+    "sha256": "c45f44eb0f574e7956fc92555cd39a17c929166ea2957ad933edd1fc6fa2057c",
+    "byte_length": 163343,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T21:09:44.717116Z",
+    "drift_key": "sha256",
+    "drift_value": "c45f44eb0f574e7956fc92555cd39a17c929166ea2957ad933edd1fc6fa2057c"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20201026133840/https://www.rollcall.com/2017/11/30/pelosi-calls-on-conyers-to-resign/",
+      "captured_at": "2020-10-26T13:38:40Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture Wayback holds nearest after the story's date is of 2020-10-26, a later version at the page's current address; the page prints Posted November 30, 2017 at 11:17am (16:17 UTC), with an update line at 1:33 p.m. (18:33 UTC). robots.txt now disallows this page for one of Anthropic's agents (anthropic-ai), so it was not read live."
+}

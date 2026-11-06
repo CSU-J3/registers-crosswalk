@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0194",
+  "kind": "source",
+  "citation": "Herman Cain denies report of sexual harassment",
+  "title": "Herman Cain denies report of sexual harassment",
+  "publisher": "The Christian Science Monitor",
+  "canonical_url": "https://www.csmonitor.com/USA/Latest-News-Wires/2011/1031/Herman-Cain-denies-report-of-sexual-harassment",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2011-10-31",
+  "published_at": "2011-10-31",
+  "artifact": {
+    "sha256": "98b8436b6e32eeb79a982f67921df072631c47a80ec90abe926f98c188a7e07e",
+    "byte_length": 75920,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:02:53.471100Z",
+    "drift_key": "sha256",
+    "drift_value": "98b8436b6e32eeb79a982f67921df072631c47a80ec90abe926f98c188a7e07e"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20111031173108/https://www.csmonitor.com/USA/Latest-News-Wires/2011/1031/Herman-Cain-denies-report-of-sexual-harassment",
+      "captured_at": "2011-10-31T17:31:08Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "An Associated Press story, as The Christian Science Monitor ran it on its wire page; the AP's own copy was not found (apnews.com is refused to the search tool). The page prints October 31, 2011. Its text has the campaign disputing Politico's report in a statement to the AP on Sunday, which puts the report on 10-30; Politico's own capture (xr_src_0193) carries no stamp of that day. robots.txt now disallows this page for Anthropic's agents, so it was not read live. The capture records the page's http address."
+}

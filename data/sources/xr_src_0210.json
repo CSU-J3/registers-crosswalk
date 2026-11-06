@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0210",
+  "kind": "source",
+  "citation": "Canvass of Results for the Special General Election held on December 12, 2017",
+  "title": "Canvass of Results for the Special General Election held on December 12, 2017",
+  "publisher": "Alabama Secretary of State",
+  "canonical_url": "https://www.sos.alabama.gov/sites/default/files/voter-pdfs/2017%20Official%20General%20Election%20Results%20with%20Write-In%20Appendix%20-%202017-12-28.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2017-12-28",
+  "artifact": {
+    "sha256": "873707574dbf16859b1fee1b83a26d20a05bbdfb24d6462d05d8a0a5abac80c1",
+    "byte_length": 4567762,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-11-06T20:59:15.740025Z",
+    "drift_key": "sha256",
+    "drift_value": "873707574dbf16859b1fee1b83a26d20a05bbdfb24d6462d05d8a0a5abac80c1"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The State Canvassing Board's certification of the results for United States Senator (Doug Jones (D) 673,896; Roy Moore (R) 651,972; write-in 22,852), signed on the 28th day of December 2017, with the write-in appendix by county: a scanned document of 430 pages with a text layer."
+}

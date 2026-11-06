@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0211",
+  "kind": "source",
+  "citation": "Ala. Code § 17-6-21",
+  "title": "Ala. Code § 17-6-21, Contents; amendments; withdrawal of name",
+  "publisher": "Alabama Legislature",
+  "canonical_url": "https://alisondb.legislature.state.al.us/alison/codeofalabama/1975/17-6-21.htm",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-11-10",
+  "published_at": null,
+  "artifact": {
+    "sha256": "22d7506466d6e1e0d6286c35fa55fb182534b32e73dc8ebe4c55c1c7727ea355",
+    "byte_length": 3288,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T21:01:06.799686Z",
+    "drift_key": "sha256",
+    "drift_value": "22d7506466d6e1e0d6286c35fa55fb182534b32e73dc8ebe4c55c1c7727ea355"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171110033425/https://alisondb.legislature.state.al.us/alison/codeofalabama/1975/17-6-21.htm",
+      "captured_at": "2017-11-10T03:34:25Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The Legislature's page for the section on its former host, as Wayback captured it at 03:34:25 UTC on 2017-11-10, the capture served nearest 2017-11-09: subsections (b) and (c) set 76 days, and the history line ends Act 2014-6, p. 21, §1. Recorded under the lower-case path it was captured at; the request gives /alison/CodeOfAlabama/ (stop G7 a). Graded B2 under F11 a: the Legislature's current page was not located. No live read: the plan reads the former host through Wayback only. The capture records the page's http address."
+}

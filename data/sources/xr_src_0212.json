@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0212",
+  "kind": "source",
+  "citation": "She Said That A Powerful Congressman Harassed Her. Here's Why You Didn't Hear Her Story.",
+  "title": "She Said That A Powerful Congressman Harassed Her. Here's Why You Didn't Hear Her Story.",
+  "publisher": "BuzzFeed News",
+  "canonical_url": "https://www.buzzfeed.com/paulmcleod/she-complained-that-a-powerful-congressman-harassed-her",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-11-21",
+  "published_at": "2017-11-20",
+  "artifact": {
+    "sha256": "52dc3c62cc732729955150f0561e5025d6ef41d399cc6da16f4c73bb984b7345",
+    "byte_length": 370294,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T21:03:12.468267Z",
+    "drift_key": "sha256",
+    "drift_value": "52dc3c62cc732729955150f0561e5025d6ef41d399cc6da16f4c73bb984b7345"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171121033009/https://www.buzzfeed.com/paulmcleod/she-complained-that-a-powerful-congressman-harassed-her",
+      "captured_at": "2017-11-21T03:30:09Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture, of 03:30:09 UTC on 2017-11-21, prints Posted on November 21, 2017, 02:45 GMT (9:45 p.m. EST on 11-20); the publication date is that stamp's Eastern date, as xr_src_0102's is. The address is the story's as published, at buzzfeed.com; the request says it now redirects to buzzfeednews.com, which was not read: robots.txt now disallows this page for Anthropic's agents, so it was not read live."
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0199",
+  "kind": "source",
+  "citation": "Anti-abortion congressman urged woman get an abortion, text messages suggest",
+  "title": "Anti-abortion congressman urged woman get an abortion, text messages suggest",
+  "publisher": "CNN",
+  "canonical_url": "https://www.cnn.com/2017/10/03/politics/tim-murphy-abortion/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-10-04",
+  "published_at": "2017-10-03",
+  "artifact": {
+    "sha256": "a6c37ab61276db3ea43f34da86e7d598716995cd3b5ffa5136ccdc28059cbb44",
+    "byte_length": 120393,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:13:29.726253Z",
+    "drift_key": "sha256",
+    "drift_value": "a6c37ab61276db3ea43f34da86e7d598716995cd3b5ffa5136ccdc28059cbb44"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171004015026/https://www.cnn.com/2017/10/03/politics/tim-murphy-abortion/",
+      "captured_at": "2017-10-04T01:50:26Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture, of 01:50:26 UTC on 2017-10-04, prints Updated 6:33 PM ET, Tue October 3, 2017 (22:33 UTC) and credits the Pittsburgh Post-Gazette. robots.txt now disallows this page for five of Anthropic's agents, so it was not read live. The capture records the page's http address."
+}

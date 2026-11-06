@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0219",
+  "kind": "source",
+  "citation": "Allen West on Herman Cain: Time to Move On",
+  "title": "Allen West on Herman Cain: Time to Move On",
+  "publisher": "Washington Examiner",
+  "canonical_url": "https://www.washingtonexaminer.com/news/941/allen-west-on-herman-cain-time-to-move-on/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2025-11-08",
+  "published_at": "2011-11-30",
+  "artifact": {
+    "sha256": "e5d1d03e20c4eb0c2e3156923b542c0d94979558809ac594d748b989679c7fee",
+    "byte_length": 395753,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T21:11:49.258509Z",
+    "drift_key": "sha256",
+    "drift_value": "e5d1d03e20c4eb0c2e3156923b542c0d94979558809ac594d748b989679c7fee"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20251108211615/https://www.washingtonexaminer.com/news/941/allen-west-on-herman-cain-time-to-move-on/",
+      "captured_at": "2025-11-08T21:16:15Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "A substitute, pinned only on the author's go: a located report of Rep. West's remarks, which Talking Points Memo's page dates to Wednesday 2011-11-30 but Wayback does not hold. The capture, of 21:16:15 UTC on 2025-11-08, a later version at the page's current address, prints By John McCormack, November 30, 2011 5:59 pm, with no zone (its metadata gives 2011-11-30T17:59:00+00:00), and says West tells radio station WMAL, without a day. Read by Wayback only."
+}

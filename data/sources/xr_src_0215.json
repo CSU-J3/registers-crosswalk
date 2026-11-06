@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0215",
+  "kind": "source",
+  "citation": "First House Dem calls on Conyers to resign",
+  "title": "First House Dem calls on Conyers to resign",
+  "publisher": "The Hill",
+  "canonical_url": "https://thehill.com/homenews/house/361617-dem-rep-calls-on-conyers-to-resign-amid-sexual-misconduct-allegations",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-11-24",
+  "published_at": "2017-11-22",
+  "artifact": {
+    "sha256": "9e4590356eb9c5cafc6cf7250d1b665bd4141eed830e3cee646a4bb84f4eb582",
+    "byte_length": 99695,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T21:07:40.783160Z",
+    "drift_key": "sha256",
+    "drift_value": "9e4590356eb9c5cafc6cf7250d1b665bd4141eed830e3cee646a4bb84f4eb582"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171124195121/https://thehill.com/homenews/house/361617-dem-rep-calls-on-conyers-to-resign-amid-sexual-misconduct-allegations",
+      "captured_at": "2017-11-24T19:51:21Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "A located copy: the capture, of 19:51:21 UTC on 2017-11-24, prints By Brett Samuels, 11/22/17 05:10 PM EST (22:10 UTC). robots.txt now disallows this page for Anthropic's agents, so it was not read live. The capture records the page's http address."
+}

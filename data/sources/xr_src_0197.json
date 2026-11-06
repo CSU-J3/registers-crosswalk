@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0197",
+  "kind": "source",
+  "citation": "Rep. Tim Murphy Admits to Affair With 'Personal Friend'",
+  "title": "Rep. Tim Murphy Admits to Affair With 'Personal Friend'",
+  "publisher": "Roll Call",
+  "canonical_url": "https://www.rollcall.com/2017/09/06/rep-tim-murphy-admits-to-affair-with-personal-friend/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2020-08-04",
+  "published_at": "2017-09-06",
+  "artifact": {
+    "sha256": "227fde20ae2d0bd4b59a057e2a56f6359e68a3aa4d9b46b35fd074597245b406",
+    "byte_length": 142737,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:09:17.335422Z",
+    "drift_key": "sha256",
+    "drift_value": "227fde20ae2d0bd4b59a057e2a56f6359e68a3aa4d9b46b35fd074597245b406"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20200804150048/https://www.rollcall.com/2017/09/06/rep-tim-murphy-admits-to-affair-with-personal-friend/",
+      "captured_at": "2020-08-04T15:00:48Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture Wayback holds nearest after the story's date is of 2020-08-04, a later version at the page's current address; the page prints Posted September 6, 2017 at 11:06pm (03:06 UTC on 09-07). robots.txt now disallows this page for one of Anthropic's agents (anthropic-ai), so it was not read live."
+}

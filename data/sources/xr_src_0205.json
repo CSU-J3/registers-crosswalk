@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0205",
+  "kind": "source",
+  "citation": "NRSC Cuts Ties With Roy Moore Fundraising Committee",
+  "title": "NRSC Cuts Ties With Roy Moore Fundraising Committee",
+  "publisher": "Roll Call",
+  "canonical_url": "https://www.rollcall.com/2017/11/10/nrsc-cuts-ties-with-roy-moore-fundraising-committee/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2021-01-28",
+  "published_at": "2017-11-10",
+  "artifact": {
+    "sha256": "7ccd94eceb7e799a0700ff04ed22eb8aa0d3e38a5eeb8d0a5056616094cacbd0",
+    "byte_length": 150262,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:52:42.660007Z",
+    "drift_key": "sha256",
+    "drift_value": "7ccd94eceb7e799a0700ff04ed22eb8aa0d3e38a5eeb8d0a5056616094cacbd0"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20210128153215/https://www.rollcall.com/2017/11/10/nrsc-cuts-ties-with-roy-moore-fundraising-committee/",
+      "captured_at": "2021-01-28T15:32:15Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture Wayback holds nearest after the story's date is of 2021-01-28, a later version at the page's current address; the page prints Posted November 10, 2017 at 1:36pm (18:36 UTC). robots.txt now disallows this page for one of Anthropic's agents (anthropic-ai), so it was not read live."
+}

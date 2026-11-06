@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0202",
+  "kind": "source",
+  "citation": "163 Cong. Rec. H8047 (daily ed. Oct. 23, 2017)",
+  "title": "Announcement by the Speaker Pro Tempore",
+  "publisher": "U.S. Congress",
+  "canonical_url": "https://www.govinfo.gov/content/pkg/CREC-2017-10-23/pdf/CREC-2017-10-23-pt1-PgH8047-10.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2017-10-23",
+  "artifact": {
+    "sha256": "39851511d16633b6fa897c755976f71837bda7c80d8b6a28da7b2dec30b02545",
+    "byte_length": 239496,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-11-06T20:17:56.422045Z",
+    "drift_key": "sha256",
+    "drift_value": "39851511d16633b6fa897c755976f71837bda7c80d8b6a28da7b2dec30b02545"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Flagged: not the resignation letter. The granule govinfo's link service gives for page H8047 (https://www.govinfo.gov/link/crec/163/H/8047, seen 2026-11-05), pages H8047 to H8048: the Speaker pro tempore's announcement under clause 5(d) of rule XX that, in light of the resignation of the gentleman from Pennsylvania, the whole number of the House is 433. The letter's own entry is not in this day's House proceedings, nor those of 10-24, 10-25 or 10-16 (stop G2)."
+}

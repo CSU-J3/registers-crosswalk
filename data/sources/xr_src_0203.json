@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0203",
+  "kind": "source",
+  "citation": "Woman says Roy Moore initiated sexual encounter when she was 14, he was 32",
+  "title": "Woman says Roy Moore initiated sexual encounter when she was 14, he was 32",
+  "publisher": "The Washington Post",
+  "canonical_url": "https://www.washingtonpost.com/investigations/woman-says-roy-moore-initiated-sexual-encounter-when-she-was-14-he-was-32/2017/11/09/1f495878-c293-11e7-afe9-4f60b5a6c4a0_story.html",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-11-09",
+  "published_at": "2017-11-09",
+  "artifact": {
+    "sha256": "3e8da05b8ed8311c52ac6051057be6b1f5b39faae5c3cd958a82da96dac5161c",
+    "byte_length": 145217,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:48:34.228789Z",
+    "drift_key": "sha256",
+    "drift_value": "3e8da05b8ed8311c52ac6051057be6b1f5b39faae5c3cd958a82da96dac5161c"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171109182525/https://www.washingtonpost.com/investigations/woman-says-roy-moore-initiated-sexual-encounter-when-she-was-14-he-was-32/2017/11/09/1f495878-c293-11e7-afe9-4f60b5a6c4a0_story.html",
+      "captured_at": "2017-11-09T18:25:25Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture is of 18:25 UTC on 2017-11-09 and prints 12:52 p.m. (EST, 17:52 UTC). Wayback did not serve its 18:07:12 UTC capture of that day on 2026-11-06: two exact reads of it were served this capture. This capture differs from that one, as the register read it on 2026-11-05, in two copy edits: \"his rivals in the Republican primary\" became \"his rival in the Republican primary\", and the singer's name \"Eddie Rabbit\" became \"Eddie Rabbitt\". robots.txt now disallows this page for Anthropic's agents, so it was not read live."
+}

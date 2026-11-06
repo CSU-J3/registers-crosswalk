@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0220",
+  "kind": "source",
+  "citation": "The Ed Show for Wednesday, November 30, 2011",
+  "title": "The Ed Show for Wednesday, November 30, 2011",
+  "publisher": "NBC News",
+  "canonical_url": "https://www.nbcnews.com/id/wbna45510203",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2021-09-21",
+  "published_at": "2011-12-01",
+  "artifact": {
+    "sha256": "f870c92a480d2a13f1621c43fa3cfd43fc42e7a8c490843f6965fa3087b7e255",
+    "byte_length": 258139,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T21:13:53.799109Z",
+    "drift_key": "sha256",
+    "drift_value": "f870c92a480d2a13f1621c43fa3cfd43fc42e7a8c490843f6965fa3087b7e255"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20210921033743/https://www.nbcnews.com/id/wbna45510203",
+      "captured_at": "2021-09-21T03:37:43Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "A substitute, pinned only on the author's go: the transcript of that night's program, in which the host quotes Rep. West's remarks in a radio interview and his later tweet, without a day for the interview. The capture, of 03:37:43 UTC on 2021-09-21, a later version, prints Dec. 1, 2011, 4:43 PM UTC. robots.txt now disallows this page for five of Anthropic's agents, so it was not read live."
+}

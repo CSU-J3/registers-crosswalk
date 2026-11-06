@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0207",
+  "kind": "source",
+  "citation": "McConnell says Roy Moore ‘should step aside’",
+  "title": "McConnell says Roy Moore ‘should step aside’",
+  "publisher": "PBS NewsHour",
+  "canonical_url": "https://www.pbs.org/newshour/politics/mcconnell-says-roy-moore-should-step-aside",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-11-14",
+  "published_at": "2017-11-13",
+  "artifact": {
+    "sha256": "9cba5ca2b94bbb087e60cd947fd1100755dd816bd5b49832ce293051f13a0423",
+    "byte_length": 111232,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:54:49.130658Z",
+    "drift_key": "sha256",
+    "drift_value": "9cba5ca2b94bbb087e60cd947fd1100755dd816bd5b49832ce293051f13a0423"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171114045429/https://www.pbs.org/newshour/politics/mcconnell-says-roy-moore-should-step-aside",
+      "captured_at": "2017-11-14T04:54:29Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "An Associated Press story (Alan Fram and Bruce Schreiner), as PBS NewsHour ran it; the AP's own copy was not found. The capture is of 2017-11-14 and prints 11:48 AM EST on Nov 13, 2017 (16:48 UTC), updated 1:20 PM EST (18:20 UTC). Two live reads on 2026-11-05 matched each other."
+}

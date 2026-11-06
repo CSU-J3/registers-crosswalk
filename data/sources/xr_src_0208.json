@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0208",
+  "kind": "source",
+  "citation": "RNC withdraws from fundraising agreement with Roy Moore campaign",
+  "title": "RNC withdraws from fundraising agreement with Roy Moore campaign",
+  "publisher": "CNN",
+  "canonical_url": "https://www.cnn.com/2017/11/14/politics/rnc-roy-moore-campaign/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-11-15",
+  "published_at": "2017-11-14",
+  "artifact": {
+    "sha256": "0d397e5da3aa7e2c2ce56d535e0afaf923347665dabf7cb2923bf8fa17b58578",
+    "byte_length": 208625,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:56:56.203051Z",
+    "drift_key": "sha256",
+    "drift_value": "0d397e5da3aa7e2c2ce56d535e0afaf923347665dabf7cb2923bf8fa17b58578"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171115021546/https://www.cnn.com/2017/11/14/politics/rnc-roy-moore-campaign/",
+      "captured_at": "2017-11-15T02:15:46Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture, of 02:15:46 UTC on 2017-11-15, prints Updated 7:12 PM ET, Tue November 14, 2017 (00:12 UTC on 11-15). robots.txt now disallows this page for five of Anthropic's agents, so it was not read live. The capture records the page's http address."
+}

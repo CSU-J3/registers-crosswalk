@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0204",
+  "kind": "source",
+  "citation": "GOP lawmakers ask Roy Moore to step aside if sexual allegations are true",
+  "title": "GOP lawmakers ask Roy Moore to step aside if sexual allegations are true",
+  "publisher": "CNN",
+  "canonical_url": "https://www.cnn.com/2017/11/09/politics/roy-moore-sexual-encounter-alabama/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-11-09",
+  "published_at": "2017-11-09",
+  "artifact": {
+    "sha256": "96c7f61f8d1cd89ebb4ee38f65deb08079bf2c9fecff46d2937407f6d23f0fdc",
+    "byte_length": 171527,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:50:38.099737Z",
+    "drift_key": "sha256",
+    "drift_value": "96c7f61f8d1cd89ebb4ee38f65deb08079bf2c9fecff46d2937407f6d23f0fdc"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171109235054/https://www.cnn.com/2017/11/09/politics/roy-moore-sexual-encounter-alabama/",
+      "captured_at": "2017-11-09T23:50:54Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture, of 23:50:54 UTC on 2017-11-09, prints Updated 5:14 PM ET, Thu November 9, 2017 (22:14 UTC) and carries Sen. McCain's statement and the Majority Leader's conditional one. The Associated Press's story of that day was not found in an outlet-of-record carry that prints the AP's credit; the substitutes listed for it were not read, since this capture carries the statement. robots.txt now disallows this page for five of Anthropic's agents, so it was not read live. The capture records the page's http address."
+}

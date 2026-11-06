@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0196",
+  "kind": "source",
+  "citation": "Herman Cain Suspends Bid for GOP Presidential Nomination",
+  "title": "Herman Cain Suspends Bid for GOP Presidential Nomination",
+  "publisher": "PBS NewsHour",
+  "canonical_url": "https://www.pbs.org/newshour/politics/herman-cain-suspends-presidential-campaign",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2020-07-03",
+  "published_at": "2011-12-03",
+  "artifact": {
+    "sha256": "805df79f9c621771e9d47966a84b8f1051a9b3209d454eeed835cb9151ad25d4",
+    "byte_length": 145210,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T20:07:12.743141Z",
+    "drift_key": "sha256",
+    "drift_value": "805df79f9c621771e9d47966a84b8f1051a9b3209d454eeed835cb9151ad25d4"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20200703155515/https://www.pbs.org/newshour/politics/herman-cain-suspends-presidential-campaign",
+      "captured_at": "2020-07-03T15:55:15Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture Wayback holds nearest after the story's date is of 2020-07-03, a later version at the page's current address; the page prints 2:45 PM with an EDT label on December 3, 2011, when EST was in force (19:45 UTC). Two live reads on 2026-11-05 matched each other and carry the quoted sentences; the live page labels the time EST."
+}

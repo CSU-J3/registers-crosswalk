@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0213",
+  "kind": "source",
+  "citation": "Statement of the Chairwoman and Ranking Member of the Committee on Ethics Regarding Representative John Conyers, Jr.",
+  "title": "Statement of the Chairwoman and Ranking Member of the Committee on Ethics Regarding Representative John Conyers, Jr.",
+  "publisher": "U.S. House of Representatives, Committee on Ethics",
+  "canonical_url": "https://ethics.house.gov/press-releases/statement-chairwoman-and-ranking-member-committee-ethics-regarding-representative-jo-1/",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2017-11-21",
+  "artifact": {
+    "sha256": "f4505fa4a7d58c3d323d49826cae375d7bd39dcbc1901a66e4d54829c36369e2",
+    "byte_length": 65126,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-06T21:05:29.308174Z",
+    "drift_key": "sha256",
+    "drift_value": "f4505fa4a7d58c3d323d49826cae375d7bd39dcbc1901a66e4d54829c36369e2"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Pinned from the reads of 2026-11-06. The register's two reads of 2026-11-05 matched each other byte for byte; the first mint read of 2026-11-06 differed from them in markup only (the theme's asset version string in six places and two WordPress nonces, at the same 65,126 bytes), a read 60 s later matched it, and the mint read matched both. Its visible text is the same as the 2026-11-05 reads'. The page's metadata gives datePublished 2017-11-21T20:44:24+00:00 and a last modification of 2024-01-17."
+}

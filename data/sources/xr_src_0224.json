@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0224",
+  "kind": "source",
+  "citation": "Arizona Rep. Trent Franks Now Resigning Immediately",
+  "title": "Arizona Rep. Trent Franks Now Resigning Immediately",
+  "publisher": "Roll Call",
+  "canonical_url": "https://www.rollcall.com/2017/12/08/arizona-rep-trent-franks-now-resigning-immediately/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2020-02-08",
+  "published_at": "2017-12-08",
+  "artifact": {
+    "sha256": "62686ac8da79511a4ed26a222d1de401b5adc5868a417d35aeefca31c24a0573",
+    "byte_length": 140854,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-14T21:25:59.921948Z",
+    "drift_key": "sha256",
+    "drift_value": "62686ac8da79511a4ed26a222d1de401b5adc5868a417d35aeefca31c24a0573"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20200208210932/https://www.rollcall.com/2017/12/08/arizona-rep-trent-franks-now-resigning-immediately/",
+      "captured_at": "2020-02-08T21:09:32Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture Wayback holds nearest after the story's date is of 2020-02-08, a later version; the page prints Posted December 8, 2017 at 3:41pm (20:41 UTC), updated 4:30 p.m. (21:30 UTC). Read by capture only: rollcall.com's robots.txt disallows the site for Anthropic's agents."
+}

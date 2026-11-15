@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0237",
+  "kind": "source",
+  "citation": "Florida judge grants protective order against US Rep. Cory Mills at request of ex-girlfriend",
+  "title": "Florida judge grants protective order against US Rep. Cory Mills at request of ex-girlfriend",
+  "publisher": "The Daily Record",
+  "canonical_url": "https://thedailyrecord.com/maryland-family-law/2025/10/22/florida-judge-grants-protective-order-against-us-rep-cory-mills-at-request-of-ex-girlfriend/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2025-10-24",
+  "published_at": "2025-10-22",
+  "artifact": {
+    "sha256": "e2f51341fa672ed4c6fb733af651aab05a0c223107b92b4c2001d48d5982cf70",
+    "byte_length": 87401,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-14T21:44:36.172075Z",
+    "drift_key": "sha256",
+    "drift_value": "e2f51341fa672ed4c6fb733af651aab05a0c223107b92b4c2001d48d5982cf70"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20251024144821/https://thedailyrecord.com/maryland-family-law/2025/10/22/florida-judge-grants-protective-order-against-us-rep-cory-mills-at-request-of-ex-girlfriend/",
+      "captured_at": "2025-10-24T14:48:21Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "A substitute for ABC News's report, of which Wayback holds no capture: an Associated Press story, as The Daily Record ran it, printed By: Associated Press, October 22, 2025, 9:38 am (13:38 UTC), datelined LAKE CITY, Florida; it says the order was issued Tuesday. The capture is of 2025-10-24. The AP's own copy was not sought."
+}

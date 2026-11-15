@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0222",
+  "kind": "source",
+  "citation": "Statement from the Office of the Speaker",
+  "title": "Statement from the Office of the Speaker",
+  "publisher": "Office of the Speaker of the House",
+  "canonical_url": "https://www.speaker.gov/press-release/statement-office-speaker",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-12-08",
+  "published_at": "2017-12-07",
+  "artifact": {
+    "sha256": "98851e19aea080af129ea8c68ff21e71487a759c31250102099d64c66128abfc",
+    "byte_length": 55643,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-14T21:23:56.261062Z",
+    "drift_key": "sha256",
+    "drift_value": "98851e19aea080af129ea8c68ff21e71487a759c31250102099d64c66128abfc"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171208055148/https://www.speaker.gov/press-release/statement-office-speaker",
+      "captured_at": "2017-12-08T05:51:48Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture, of 05:51:48 UTC on 2017-12-08, prints December 7, 2017. It was found through a capture of speaker.gov's front page of 05:37:20 UTC on 2017-12-08, whose link of that name it is; no request was sent to speaker.gov. Graded B2: no sentence of it is repeated in this run's pinned bytes."
+}

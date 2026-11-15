@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0223",
+  "kind": "source",
+  "citation": "Statement of the Chairwoman and Ranking Member of the Committee on Ethics Regarding Representative Trent Franks",
+  "title": "Statement of the Chairwoman and Ranking Member of the Committee on Ethics Regarding Representative Trent Franks",
+  "publisher": "U.S. House of Representatives, Committee on Ethics",
+  "canonical_url": "https://ethics.house.gov/press-releases/statement-chairwoman-and-ranking-member-committee-ethics-regarding-representative-4/",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2017-12-07",
+  "artifact": {
+    "sha256": "28156035f950650e1724c5119d85b6b413cb3963cae7bc803629a328748545f4",
+    "byte_length": 65121,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-14T21:25:57.373454Z",
+    "drift_key": "sha256",
+    "drift_value": "28156035f950650e1724c5119d85b6b413cb3963cae7bc803629a328748545f4"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Pinned from the reads of 2026-11-14: the register's three reads, at 21:23:57, 21:24:57 and 21:25:57 UTC, matched byte for byte; they differ from the reads of 2026-11-13 only in the site's theme asset version string and two nonces. The page prints Dec 07, 2017."
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0231",
+  "kind": "source",
+  "citation": "Rep. Katie Hill resigns amid allegations of improper relationships with staffers",
+  "title": "Rep. Katie Hill resigns amid allegations of improper relationships with staffers",
+  "publisher": "Roll Call",
+  "canonical_url": "https://www.rollcall.com/2019/10/27/rep-katie-hill-resigns-amid-allegations-of-improper-relationships-with-staffers/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2020-05-06",
+  "published_at": "2019-10-27",
+  "artifact": {
+    "sha256": "16badf39480f916aef74543e2e3d3c526eb816eff6fcd288c944cf292dae00b1",
+    "byte_length": 158467,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-14T21:38:24.140460Z",
+    "drift_key": "sha256",
+    "drift_value": "16badf39480f916aef74543e2e3d3c526eb816eff6fcd288c944cf292dae00b1"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20200506135945/https://www.rollcall.com/2019/10/27/rep-katie-hill-resigns-amid-allegations-of-improper-relationships-with-staffers/",
+      "captured_at": "2020-05-06T13:59:45Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture Wayback holds nearest after the story's date is of 2020-05-06, a later version; the page prints Posted October 27, 2019 at 7:12pm (23:12 UTC). Read by capture only: rollcall.com's robots.txt disallows the site for Anthropic's agents."
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0236",
+  "kind": "source",
+  "citation": "Florida Rep. Cory Mills loses primary as Wasserman Schultz, Moskowitz prevail",
+  "title": "Florida Rep. Cory Mills loses primary as Wasserman Schultz, Moskowitz prevail",
+  "publisher": "Roll Call",
+  "canonical_url": "https://rollcall.com/2026/08/18/florida-rep-cory-mills-loses-primary-as-wasserman-schultz-moskowitz-prevail/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-08-19",
+  "published_at": "2026-08-18",
+  "artifact": {
+    "sha256": "9fd78808931671be3e9b96bbce224a3d3b3df3b032b3446c231a220c64fc55bd",
+    "byte_length": 207195,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-14T21:42:31.919692Z",
+    "drift_key": "sha256",
+    "drift_value": "9fd78808931671be3e9b96bbce224a3d3b3df3b032b3446c231a220c64fc55bd"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260819043502/https://rollcall.com/2026/08/18/florida-rep-cory-mills-loses-primary-as-wasserman-schultz-moskowitz-prevail/",
+      "captured_at": "2026-08-19T04:35:02Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture, of 04:35:02 UTC on 2026-08-19, prints Posted August 18, 2026 at 11:20pm (03:20 UTC on 2026-08-19). Read by capture only: rollcall.com's robots.txt disallows the site for Anthropic's agents."
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0229",
+  "kind": "source",
+  "citation": "WATCH: Missouri Gov. Eric Greitens resigns amid widening investigations",
+  "title": "WATCH: Missouri Gov. Eric Greitens resigns amid widening investigations",
+  "publisher": "PBS NewsHour",
+  "canonical_url": "https://www.pbs.org/newshour/politics/watch-missouri-gov-eric-greitens-resigns-amid-extramarital-affair-scandal",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2018-05-29",
+  "published_at": "2018-05-29",
+  "artifact": {
+    "sha256": "6b32d407dd3393caa26d4055ea9a0bcfbbfa8b108bd72754313f2e8c90733c95",
+    "byte_length": 122146,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-14T21:36:20.266138Z",
+    "drift_key": "sha256",
+    "drift_value": "6b32d407dd3393caa26d4055ea9a0bcfbbfa8b108bd72754313f2e8c90733c95"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20180529223609/https://www.pbs.org/newshour/politics/watch-missouri-gov-eric-greitens-resigns-amid-extramarital-affair-scandal",
+      "captured_at": "2018-05-29T22:36:09Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "An Associated Press story, as PBS NewsHour ran it. The capture, of 22:36:09 UTC on 2018-05-29, prints May 29, 2018 5:38 PM EDT (21:38 UTC), updated 6:25 PM EDT (22:25 UTC). www.pbs.org's robots.txt answered 403 when read, so the page was read by capture only."
+}

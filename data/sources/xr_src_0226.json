@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0226",
+  "kind": "source",
+  "citation": "Rep. Pat Meehan removed from Ethics Committee after report he settled sexual misconduct complaint",
+  "title": "Rep. Pat Meehan removed from Ethics Committee after report he settled sexual misconduct complaint",
+  "publisher": "CNN",
+  "canonical_url": "https://www.cnn.com/2018/01/20/politics/meehan-sexual-misconduct-allegations/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2018-01-21",
+  "published_at": "2018-01-20",
+  "artifact": {
+    "sha256": "67bbbb13f29f546e224b718e11ea73d82117c371b99bfa870df22f6263ed3d5d",
+    "byte_length": 130115,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-14T21:30:07.681222Z",
+    "drift_key": "sha256",
+    "drift_value": "67bbbb13f29f546e224b718e11ea73d82117c371b99bfa870df22f6263ed3d5d"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20180121025102/https://www.cnn.com/2018/01/20/politics/meehan-sexual-misconduct-allegations/",
+      "captured_at": "2018-01-21T02:51:02Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture, of 02:51:02 UTC on 2018-01-21, prints Updated 7:03 PM ET, Sat January 20, 2018 (00:03 UTC on 2018-01-21). Wayback served it for the address without its closing slash; it is recorded under the address captured. The capture records the page's http address. Read by capture only: www.cnn.com's robots.txt disallows the site for Anthropic's agents."
+}

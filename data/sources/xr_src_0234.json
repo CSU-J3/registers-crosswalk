@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0234",
+  "kind": "source",
+  "citation": "Statement of the Chairman and Ranking Member of the Committee on Ethics Regarding Representative Cory Mills",
+  "title": "Statement of the Chairman and Ranking Member of the Committee on Ethics Regarding Representative Cory Mills",
+  "publisher": "U.S. House of Representatives, Committee on Ethics",
+  "canonical_url": "https://ethics.house.gov/wp-content/uploads/2025/03/Press-Release-3.27.25.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2025-03-27",
+  "artifact": {
+    "sha256": "8be38f47a4d64eae1c6d7550d4e7a7f81790c8246846b80c922e145f9d047da1",
+    "byte_length": 201331,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-11-14T21:40:28.390142Z",
+    "drift_key": "sha256",
+    "drift_value": "8be38f47a4d64eae1c6d7550d4e7a7f81790c8246846b80c922e145f9d047da1"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "FOR RELEASE: Upon Receipt March 27, 2025; one page. Its spans were machine-checked against the text layer, read with the page's content streams joined."
+}

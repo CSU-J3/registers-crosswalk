@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0228",
+  "kind": "source",
+  "citation": "Missouri Republican legislators call on embattled GOP governor to resign",
+  "title": "Missouri Republican legislators call on embattled GOP governor to resign",
+  "publisher": "CNN",
+  "canonical_url": "https://www.cnn.com/2018/01/16/politics/missouri-republicans-eric-greitens-calls-to-resign/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2018-01-17",
+  "published_at": "2018-01-16",
+  "artifact": {
+    "sha256": "c1642847ce83bf8a24d060a0fbb6c07967e4559927fcf7b8cc9f653399c8d964",
+    "byte_length": 141797,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-14T21:34:16.676583Z",
+    "drift_key": "sha256",
+    "drift_value": "c1642847ce83bf8a24d060a0fbb6c07967e4559927fcf7b8cc9f653399c8d964"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20180117014802/https://www.cnn.com/2018/01/16/politics/missouri-republicans-eric-greitens-calls-to-resign/",
+      "captured_at": "2018-01-17T01:48:02Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture, of 01:48:02 UTC on 2018-01-17, prints Updated 7:21 PM ET, Tue January 16, 2018 (00:21 UTC on 2018-01-17). Wayback served it for the address without its closing slash; it is recorded under the address captured. The capture records the page's http address. Read by capture only: www.cnn.com's robots.txt disallows the site for Anthropic's agents."
+}

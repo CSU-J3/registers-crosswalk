@@ -1,0 +1,30 @@
+{
+  "xr_id": "xr_src_0232",
+  "kind": "source",
+  "citation": "165 Cong. Rec. H8727 (daily ed. Nov. 5, 2019)",
+  "title": "Resignation from the House of Representatives",
+  "publisher": "U.S. Congress",
+  "canonical_url": "https://www.govinfo.gov/content/pkg/CREC-2019-11-05/pdf/CREC-2019-11-05-house.pdf",
+  "fetcher": "manual",
+  "fetcher_verified": true,
+  "verified_at": "2026-09-17",
+  "point_in_time": null,
+  "published_at": "2019-11-05",
+  "artifact": {
+    "sha256": "208acfcab41e1abfa709fc6604bfbcc0b989b863808e6ef7be04f7503ed7c3ec",
+    "byte_length": 316212,
+    "media_type": "application/pdf",
+    "fetched_at": "2026-11-14T21:38:24.841174Z",
+    "drift_key": "sha256",
+    "drift_value": "208acfcab41e1abfa709fc6604bfbcc0b989b863808e6ef7be04f7503ed7c3ec"
+  },
+  "grade": {
+    "reliability": "A",
+    "credibility": 1
+  },
+  "archives": [],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The day's House section as govinfo serves it, pages H8727 to H8730 (one read, on 2026-11-14 at 01:28:59 UTC, the fourth request of the day loop). The resignation, laid before the House, is on its first page: the Member's letter to the Speaker, dated November 1, 2019, giving notice of the resignation effective November 3, 2019. The letter's own granule was not asked: the granule govinfo's link service gives for page H8727 (https://www.govinfo.gov/link/crec/165/H/8727, seen 2026-11-14) is the Speaker pro tempore's announcement of the whole number of the House."
+}

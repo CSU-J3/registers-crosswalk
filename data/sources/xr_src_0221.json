@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0221",
+  "kind": "source",
+  "citation": "Rep. Trent Franks to resign, acknowledging ethics probe into a 'discussion of surrogacy' with previous female subordinates",
+  "title": "Rep. Trent Franks to resign, acknowledging ethics probe into a 'discussion of surrogacy' with previous female subordinates",
+  "publisher": "The Washington Post",
+  "canonical_url": "https://www.washingtonpost.com/politics/rep-trent-franks-of-arizona-is-expected-to-resign/2017/12/07/479d156a-db9f-11e7-b859-fb0995360725_story.html",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-12-08",
+  "published_at": "2017-12-07",
+  "artifact": {
+    "sha256": "c6b9900377115223f608db72e0127de40177a376b889267bae12c020cdf30171",
+    "byte_length": 121429,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-14T21:21:52.333964Z",
+    "drift_key": "sha256",
+    "drift_value": "c6b9900377115223f608db72e0127de40177a376b889267bae12c020cdf30171"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171208002205/https://www.washingtonpost.com/politics/rep-trent-franks-of-arizona-is-expected-to-resign/2017/12/07/479d156a-db9f-11e7-b859-fb0995360725_story.html",
+      "captured_at": "2017-12-08T00:22:05Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "The capture, of 00:22:05 UTC on 2017-12-08, is the first Wayback holds and the story's first version: it prints By Mike DeBonis, December 7 at 6:30 PM (23:30 UTC), one byline. Read by capture only: www.washingtonpost.com's robots.txt disallows the site for Anthropic's agents."
+}

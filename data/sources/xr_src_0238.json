@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0238",
+  "kind": "source",
+  "citation": "Cory Mills slapped with restraining order after Florida judge sides with accuser",
+  "title": "Cory Mills slapped with restraining order after Florida judge sides with accuser",
+  "publisher": "Politico",
+  "canonical_url": "https://www.politico.com/news/2025/10/14/cory-mills-restraining-order-florida-00608307",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2025-10-15",
+  "published_at": "2025-10-14",
+  "artifact": {
+    "sha256": "75ccad0e3a5d09b6111f2c89849545d0022d81cc47f5517b596c79b50ef2c642",
+    "byte_length": 258452,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-17T19:26:04.648447Z",
+    "drift_key": "sha256",
+    "drift_value": "75ccad0e3a5d09b6111f2c89849545d0022d81cc47f5517b596c79b50ef2c642"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20251015023918/https://www.politico.com/news/2025/10/14/cory-mills-restraining-order-florida-00608307",
+      "captured_at": "2025-10-15T02:39:18Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of the order (Politico, NBC News, ABC News) as the first that Wayback holds and that passes the read-only check; the other two were not read. The capture, of 02:39:18 UTC on 2025-10-15, is the one Wayback served for 2025-10-14 at the story's address; it prints 10/14/2025 05:20 PM EDT (21:20 UTC), datelined TALLAHASSEE, Florida, and quotes the court's judgment that it \"does not find [Mills'] testimony concerning the intimate videos to be truthful\". It puts the order on Tuesday, which its print date makes 2025-10-14. Its address was found in Yahoo's carry of the story, which credits Politico. Not read live: politico.com's robots.txt answered 403 on 2026-11-05."
+}

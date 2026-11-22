@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0242",
+  "kind": "source",
+  "citation": "NY attorney general resigns after allegations of physical abuse",
+  "title": "NY attorney general resigns after allegations of physical abuse",
+  "publisher": "The Hill",
+  "canonical_url": "https://thehill.com/homenews/state-watch/386633-new-york-ag-resigns-after-allegations-of-physical-abuse",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2018-05-08",
+  "published_at": "2018-05-07",
+  "artifact": {
+    "sha256": "294ef50b35dafd2ef6c8e8ee67df98d70e38bb94df291a9e98d96bcf1f14c305",
+    "byte_length": 107134,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T22:46:19.352104Z",
+    "drift_key": "sha256",
+    "drift_value": "294ef50b35dafd2ef6c8e8ee67df98d70e38bb94df291a9e98d96bcf1f14c305"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20180508054413/https://thehill.com/homenews/state-watch/386633-new-york-ag-resigns-after-allegations-of-physical-abuse",
+      "captured_at": "2018-05-08T05:44:13Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of the resignation (The Hill, The Washington Post's story in The Gazette's copy, UPI) as the first that Wayback holds and that passes the read-only check; the other two were not read. A located copy: the capture, of 05:44:13 UTC on 2018-05-08, prints By Brett Samuels - 05/07/18 09:52 PM EDT (01:52 UTC on 2018-05-08). It reports that the attorney general \"resigned Monday night\", 2018-05-07, his resignation \"effective at close of business on Tuesday\", 2018-05-08, \"almost exactly three hours\" after The New Yorker published its report \"shortly before 7 p.m.\" Wayback served it for the address without its closing slash; it is recorded under the address captured. The capture records the page's http address. robots.txt now disallows this page for Anthropic's agents, so it was not read live."
+}

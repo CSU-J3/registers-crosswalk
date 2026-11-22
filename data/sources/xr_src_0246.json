@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0246",
+  "kind": "source",
+  "citation": "Two Florida House Republicans Endorse Challenger to Embattled Rep. Cory Mills",
+  "title": "Two Florida House Republicans Endorse Challenger to Embattled Rep. Cory Mills",
+  "publisher": "Mediaite",
+  "canonical_url": "https://www.mediaite.com/politics/two-florida-house-republicans-endorse-challenger-to-embattled-rep-cory-mills/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-08-06",
+  "published_at": "2026-08-05",
+  "artifact": {
+    "sha256": "3316ba0e1b8dcee0d92804354c901dbc158a362fd99cef479902188db1b553ec",
+    "byte_length": 114946,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T22:54:34.923564Z",
+    "drift_key": "sha256",
+    "drift_value": "3316ba0e1b8dcee0d92804354c901dbc158a362fd99cef479902188db1b553ec"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260806183757/https://www.mediaite.com/politics/two-florida-house-republicans-endorse-challenger-to-embattled-rep-cory-mills/",
+      "captured_at": "2026-08-06T18:37:57Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of the endorsements (Politico, the Washington Examiner, Mediaite) as the first that Wayback holds and that passes the read-only check: four searches did not locate Politico's address (a fifth, filtered to politico.com, was refused by the search tool), and Wayback holds no capture of the Washington Examiner's shortlink. The capture, of 18:37:57 UTC on 2026-08-06, prints Sarah Rumpf, Aug 5th, 2026, 4:48 pm (20:48 UTC). It reports that \"On Wednesday, former TV journalist Ryan Elijah scored major endorsements from two of Mills' congressional colleagues in his primary challenge for Florida's seventh congressional district, Reps. Mike Haridopolos (R-FL) and Anna Paulina Luna (R-FL)\", Wednesday being 2026-08-05. Read by capture only."
+}

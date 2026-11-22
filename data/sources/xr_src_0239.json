@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0239",
+  "kind": "source",
+  "citation": "Gov. Herbert, Rep. Chaffetz won't support Trump following 'despicable' comments",
+  "title": "Gov. Herbert, Rep. Chaffetz won't support Trump following 'despicable' comments",
+  "publisher": "Deseret News",
+  "canonical_url": "https://www.deseret.com/2016/10/7/20597868/gov-herbert-rep-chaffetz-won-t-support-trump-following-despicable-comments",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2021-05-04",
+  "published_at": "2016-10-07",
+  "artifact": {
+    "sha256": "a3e32d86344547c88bebc1dd21549a1130a9c1b03fb565b151e73aacf526921c",
+    "byte_length": 165040,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T22:40:07.575398Z",
+    "drift_key": "sha256",
+    "drift_value": "a3e32d86344547c88bebc1dd21549a1130a9c1b03fb565b151e73aacf526921c"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20210504115649/https://www.deseret.com/2016/10/7/20597868/gov-herbert-rep-chaffetz-won-t-support-trump-following-despicable-comments",
+      "captured_at": "2021-05-04T11:56:49Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of Utah's Republicans withdrawing support (the Deseret News, CBS News, KSL.com's copy of the AP's running file) as the first that Wayback holds and that passes the read-only check; the other two were not read. The capture, of 11:56:49 UTC on 2021-05-04, is a later copy: Wayback holds nothing of this address before it. It prints Oct 7, 2016, 7:50pm MDT (01:50 UTC on 2016-10-08), datelined SALT LAKE CITY, and reports that \"Gov. Gary Herbert withdrew his support for Donald Trump on Friday\", which its print date makes 2016-10-07; it also reports Rep. Chaffetz's withdrawal and Sen. Lee's call on Trump to \"step aside\". Wayback served it when the address New Gray gave, with a closing slash, was asked; it is recorded under the address captured, without the slash. Read by capture only."
+}

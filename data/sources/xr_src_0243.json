@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0243",
+  "kind": "source",
+  "citation": "House Ethics probe adds to Rep. Matt Gaetz’s woes",
+  "title": "House Ethics probe adds to Rep. Matt Gaetz’s woes",
+  "publisher": "Roll Call",
+  "canonical_url": "https://rollcall.com/2021/04/09/house-ethics-probe-adds-to-rep-matt-gaetzs-woes/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2021-04-09",
+  "published_at": "2021-04-09",
+  "artifact": {
+    "sha256": "558ebf7495b6f268d8ff07ea425698496728d408626924ace50daff0a2accfae",
+    "byte_length": 176010,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T22:48:23.652456Z",
+    "drift_key": "sha256",
+    "drift_value": "558ebf7495b6f268d8ff07ea425698496728d408626924ace50daff0a2accfae"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20210409230332/https://rollcall.com/2021/04/09/house-ethics-probe-adds-to-rep-matt-gaetzs-woes/",
+      "captured_at": "2021-04-09T23:03:32Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of the inquiry (Roll Call, UPI, NPR) as the first that Wayback holds and that passes the read-only check; the other two were not read. The capture, of 23:03:32 UTC on 2021-04-09, prints Posted April 9, 2021 at 5:08pm (21:08 UTC). It reports that \"on Thursday one of his GOP colleagues, Illinois Rep. Adam Kinzinger, called for his resignation\", 2021-04-08, and that \"The Ethics Committee issued a statement Friday\", 2021-04-09. Read by capture only: rollcall.com's robots.txt disallows the site for Anthropic's agents."
+}

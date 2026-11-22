@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0244",
+  "kind": "source",
+  "citation": "Herschel Walker denies in ‘strongest possible terms’ report he paid for abortion",
+  "title": "Herschel Walker denies in ‘strongest possible terms’ report he paid for abortion",
+  "publisher": "CNN",
+  "canonical_url": "https://www.cnn.com/2022/10/03/politics/herschel-walker-abortion",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2022-10-04",
+  "published_at": "2022-10-03",
+  "artifact": {
+    "sha256": "aa08db913d425bfe6a8af0ef57e2743073ce3b1fbe32721fd17d0f3fe4bc9dd0",
+    "byte_length": 1503278,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T22:50:27.528722Z",
+    "drift_key": "sha256",
+    "drift_value": "aa08db913d425bfe6a8af0ef57e2743073ce3b1fbe32721fd17d0f3fe4bc9dd0"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20221004034015/https://www.cnn.com/2022/10/03/politics/herschel-walker-abortion",
+      "captured_at": "2022-10-04T03:40:15Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of the allegation (CNN, the AP's story in a daily's carry, GBH's copy of the AP) as the first that Wayback holds and that passes the read-only check; the other two were not read. A located copy: the capture, of 03:40:15 UTC on 2022-10-04, prints By Eric Bradner, CNN, Updated 11:10 PM EDT, Mon October 3, 2022 (03:10 UTC on 2022-10-04): October 3 in Eastern time, October 4 in UTC. It prints no first-publication time. It reports that \"Walker's denial came shortly after the Daily Beast reported he had paid for a woman's abortion\". Read by capture only: www.cnn.com's robots.txt disallows the site for Anthropic's agents."
+}

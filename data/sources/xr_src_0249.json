@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0249",
+  "kind": "source",
+  "citation": "Top Republican legislative leaders call on Greitens to resign",
+  "title": "Top Republican legislative leaders call on Greitens to resign",
+  "publisher": "St. Louis Public Radio",
+  "canonical_url": "https://www.stlpr.org/government-politics-issues/2018-04-17/top-republican-legislative-leaders-call-on-greitens-to-resign",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2023-11-30",
+  "published_at": "2018-04-17",
+  "artifact": {
+    "sha256": "02a9a2d1759d1c0024247d4a751ad59b17c92cd5545eba1026999418d9a87595",
+    "byte_length": 208326,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T23:00:46.955825Z",
+    "drift_key": "sha256",
+    "drift_value": "02a9a2d1759d1c0024247d4a751ad59b17c92cd5545eba1026999418d9a87595"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20231130173935/https://www.stlpr.org/government-politics-issues/2018-04-17/top-republican-legislative-leaders-call-on-greitens-to-resign",
+      "captured_at": "2023-11-30T17:39:35Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of the leaders' call (the AP's story in the Concord Monitor's copy, St. Louis Public Radio, The News Tribune) as the first that Wayback holds and that passes the read-only check: Wayback holds no capture of the Concord Monitor's address; The News Tribune's was not read. The capture, of 17:39:35 UTC on 2023-11-30, is a later copy; it prints By Marshall Griffin, Published April 17, 2018 at 11:15 PM CDT (04:15 UTC on 2018-04-18). It reports that \"Both House Speaker Todd Richardson, R-Poplar Bluff, and Senate President Pro-tem Ron Richard, R-Joplin, say it's time for Greitens to step down\", and dates the House leaders' written statement Tuesday, 2018-04-17. Read by capture only."
+}

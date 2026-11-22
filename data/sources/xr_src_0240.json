@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0240",
+  "kind": "source",
+  "citation": "In Minnesota, Franken feels heat _ but no broad call to quit",
+  "title": "In Minnesota, Franken feels heat _ but no broad call to quit",
+  "publisher": "The Washington Times",
+  "canonical_url": "https://www.washingtontimes.com/news/2017/nov/17/in-minnesota-franken-feels-heat-_-but-no-broad-cal/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-11-17",
+  "published_at": "2017-11-17",
+  "artifact": {
+    "sha256": "deb6c2539d385951e7fe294fe8e86ebd5cdf0d619dbeb5b7929f94bce5ad021a",
+    "byte_length": 104423,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T22:42:11.479783Z",
+    "drift_key": "sha256",
+    "drift_value": "deb6c2539d385951e7fe294fe8e86ebd5cdf0d619dbeb5b7929f94bce5ad021a"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171117214017/https://www.washingtontimes.com/news/2017/nov/17/in-minnesota-franken-feels-heat-_-but-no-broad-cal/",
+      "captured_at": "2017-11-17T21:40:17Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of the Minnesota reaction (the AP's story in a daily's carry, Minnesota Lawyer's copy of it, Fox News) as the first that Wayback holds and that passes the read-only check; the other two were not read. An Associated Press story, as The Washington Times ran it: By KYLE POTTER - Associated Press, datelined ST. PAUL, Minn. (AP). The capture, of 21:40:17 UTC on 2017-11-17, prints Friday, November 17, 2017, with no time. It reports that State Auditor Otto and state Rep. Murphy \"said Franken should lead by example and step down\". It gives their statements no day of their own: they are named as the exceptions to the other Democrats who \"said the same\" as Gov. Dayton, who spoke \"on Thursday\", 2017-11-16; the print date bounds their statements at 2017-11-17. Its address was found by search. Read by capture only."
+}

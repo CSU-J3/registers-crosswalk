@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0250",
+  "kind": "source",
+  "citation": "House Ethics Committee opens investigation into domestic abuse allegations against Ohio Rep. Max Miller",
+  "title": "House Ethics Committee opens investigation into domestic abuse allegations against Ohio Rep. Max Miller",
+  "publisher": "PBS News",
+  "canonical_url": "https://www.pbs.org/newshour/politics/house-ethics-committee-opens-investigation-into-domestic-abuse-allegations-against-ohio-rep-max-miller",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-08-05",
+  "published_at": "2026-08-04",
+  "artifact": {
+    "sha256": "c045d63e3008cb32048aa38b2826098e8e8a67a9b0bab12a3851aa1dab65c3db",
+    "byte_length": 260136,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T23:02:50.980025Z",
+    "drift_key": "sha256",
+    "drift_value": "c045d63e3008cb32048aa38b2826098e8e8a67a9b0bab12a3851aa1dab65c3db"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260805040111/https://www.pbs.org/newshour/politics/house-ethics-committee-opens-investigation-into-domestic-abuse-allegations-against-ohio-rep-max-miller",
+      "captured_at": "2026-08-05T04:01:11Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from the two copies of the AP's story New Gray located for the row, added under ruling 3 on your word (PBS NewsHour's, The Atlanta Journal-Constitution's), as the first that Wayback holds and that passes the read-only check; the other was not read. An Associated Press story, as PBS News ran it: By Thomas Beaumont and Julie Carr Smyth, Associated Press. The capture, of 04:01:11 UTC on 2026-08-05, prints Aug 4, 2026 5:32 PM EDT (21:32 UTC). It reports that Miller \"faced a Wednesday deadline to decide whether to stay in his race for reelection\", the Wednesday after its print date being 2026-08-05, and that the House Ethics Committee \"said Tuesday it had opened an investigation\", 2026-08-04. www.pbs.org's robots.txt answered 403 when read, so the page was read by capture only."
+}

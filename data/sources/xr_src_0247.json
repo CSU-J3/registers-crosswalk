@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0247",
+  "kind": "source",
+  "citation": "Sen. Bernie Moreno says former son-in-law Max Miller should not serve in the House",
+  "title": "Sen. Bernie Moreno says former son-in-law Max Miller should not serve in the House",
+  "publisher": "PBS News",
+  "canonical_url": "https://www.pbs.org/newshour/politics/sen-bernie-moreno-says-former-son-in-law-max-miller-should-not-serve-in-the-house",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-08-03",
+  "published_at": "2026-08-02",
+  "artifact": {
+    "sha256": "ffaadf279e1982e1277913e9a93194f41e174de82b4f509bec6ab3ec2c6971fb",
+    "byte_length": 260348,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T22:56:38.983572Z",
+    "drift_key": "sha256",
+    "drift_value": "ffaadf279e1982e1277913e9a93194f41e174de82b4f509bec6ab3ec2c6971fb"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260803032652/https://www.pbs.org/newshour/politics/sen-bernie-moreno-says-former-son-in-law-max-miller-should-not-serve-in-the-house",
+      "captured_at": "2026-08-03T03:26:52Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from the row's ranked list, extended under ruling 3 on your word (the Las Vegas Sun's copy of the AP, Bloomberg Government, NOTUS; then PBS NewsHour's copy of the AP, Fortune's copy, UPI), as the first that Wayback holds and that passes the read-only check: the Las Vegas Sun's copy prints no AP credit, and Wayback holds no capture of Bloomberg Government's or NOTUS's address; Fortune's and UPI's were not read. An Associated Press story, as PBS News ran it: By Mary Clare Jalonick and Julie Carr Smyth, Associated Press, datelined WASHINGTON (AP). The capture, of 03:26:52 UTC on 2026-08-03, prints Published on Aug 2, 2026 12:15 PM EDT (16:15 UTC), updated 6:32 PM EDT (22:32 UTC). It reports that Sen. Bernie Moreno \"said his former son-in-law, U.S. Rep. Max Miller, should not be serving in the House\", quotes his post, \"He should not serve in the House of Representatives.\", and dates his statement Sunday, 2026-08-02. www.pbs.org's robots.txt answered 403 when read, so the page was read by capture only."
+}

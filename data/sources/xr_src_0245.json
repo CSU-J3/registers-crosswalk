@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0245",
+  "kind": "source",
+  "citation": "Democrats withdraw endorsements of Eric Swalwell and demand he end bid for California governor",
+  "title": "Democrats withdraw endorsements of Eric Swalwell and demand he end bid for California governor",
+  "publisher": "CNN",
+  "canonical_url": "https://edition.cnn.com/2026/04/10/politics/democrats-withdraw-endorsements-of-eric-swalwell-and-demand-he-end-bid-for-california-governor",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-04-11",
+  "published_at": "2026-04-10",
+  "artifact": {
+    "sha256": "c473cf06da4c5becad445dc677a9acf508a4056b90ecc97a6c392c73f5d4f415",
+    "byte_length": 3739255,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T22:52:31.208658Z",
+    "drift_key": "sha256",
+    "drift_value": "c473cf06da4c5becad445dc677a9acf508a4056b90ecc97a6c392c73f5d4f415"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260411030413/https://edition.cnn.com/2026/04/10/politics/democrats-withdraw-endorsements-of-eric-swalwell-and-demand-he-end-bid-for-california-governor",
+      "captured_at": "2026-04-11T03:04:13Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of the withdrawals (CNN, the AP's story in News4JAX's copy, Reuters) as the first that Wayback holds and that passes the read-only check; the other two were not read. A located copy: the capture, of 03:04:13 UTC on 2026-04-11, prints By Eric Bradner, PUBLISHED Apr 10, 2026, 7:25 PM ET (23:25 UTC), Updated 10:31 PM ET (02:31 UTC on 2026-04-11). It reports that \"California Sen. Adam Schiff and Arizona Sen. Ruben Gallego, both longtime allies, said they were withdrawing their endorsements\" and that House Democratic Leader Hakeem Jeffries \"called on him to drop out\", on Friday, 2026-04-10. Wayback served this capture of CNN's edition.cnn.com address when the www.cnn.com address of the same path was asked for at 20260411000000; it is recorded under the address captured. Read by capture only."
+}

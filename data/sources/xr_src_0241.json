@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0241",
+  "kind": "source",
+  "citation": "Senate ethics panel opens preliminary inquiry into Franken over sexual misconduct allegations",
+  "title": "Senate ethics panel opens preliminary inquiry into Franken over sexual misconduct allegations",
+  "publisher": "PBS NewsHour",
+  "canonical_url": "https://www.pbs.org/newshour/politics/senate-ethics-panel-opens-preliminary-inquiry-into-franken-over-sexual-misconduct-allegations",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-12-01",
+  "published_at": "2017-11-30",
+  "artifact": {
+    "sha256": "dbe2dcd4b963e75d9aca7b152189eea4f77c5cd297bdb1343c17ceec99e91ed7",
+    "byte_length": 110449,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T22:44:15.596119Z",
+    "drift_key": "sha256",
+    "drift_value": "dbe2dcd4b963e75d9aca7b152189eea4f77c5cd297bdb1343c17ceec99e91ed7"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171201101024/https://www.pbs.org/newshour/politics/senate-ethics-panel-opens-preliminary-inquiry-into-franken-over-sexual-misconduct-allegations",
+      "captured_at": "2017-12-01T10:10:24Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of the Senate Ethics Committee's inquiry (PBS NewsHour's copy of the AP, Roll Call, the Committee's own release) as the first that Wayback holds and that passes the read-only check, read by eye; the other two were not read. An Associated Press story, as PBS NewsHour ran it: By Richard Lardner and Juliet Linderman, Associated Press. The capture, of 10:10:24 UTC on 2017-12-01, holds a later write-through led by the House Democrats' call on Rep. Conyers. It prints Nov 30, 2017 6:24 PM EST (23:24 UTC), datelined WASHINGTON, and reports that \"Senators on the bipartisan ethics panel say in a statement that they are aware of the allegations and are opening the inquiry into Franken's alleged misconduct.\" No sentence dates the statement; its day is the print date, 2017-11-30. www.pbs.org's robots.txt answered 403 when read, so the page was read by capture only."
+}

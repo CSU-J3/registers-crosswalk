@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0248",
+  "kind": "source",
+  "citation": "GOP Rep. Max Miller loses re-election in Ohio following abuse allegations from his ex-wife",
+  "title": "GOP Rep. Max Miller loses re-election in Ohio following abuse allegations from his ex-wife",
+  "publisher": "NBC News",
+  "canonical_url": "https://www.nbcnews.com/politics/2026-election/brian-poindexter-win-max-miller-house-election-ohio-abuse-allegations-rcna603372",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-11-04",
+  "published_at": "2026-11-04",
+  "artifact": {
+    "sha256": "9dd83642e7381e591b56d68249e1f32f2c2ebb90a01a041ac15b4b76338c7901",
+    "byte_length": 482176,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-20T22:58:42.879532Z",
+    "drift_key": "sha256",
+    "drift_value": "9dd83642e7381e591b56d68249e1f32f2c2ebb90a01a041ac15b4b76338c7901"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20261104102457/https://www.nbcnews.com/politics/2026-election/brian-poindexter-win-max-miller-house-election-ohio-abuse-allegations-rcna603372",
+      "captured_at": "2026-11-04T10:24:57Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of the result (NBC News, Scripps News's story in News 5 Cleveland's copy, The Hill) as the first that Wayback holds and that passes the read-only check; the other two were not read. A located copy: the capture, of 10:24:57 UTC on 2026-11-04, prints Nov. 4, 2026, 12:28 AM EST (05:28 UTC), By Ben Kamisar, after midnight Eastern on election night. It reports that \"Ohio Democrat Brian Poindexter has defeated Republican Rep. Max Miller, NBC News projects\": the call is NBC News's own. robots.txt now disallows this page for Anthropic's agents, so it was not read live."
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0253",
+  "kind": "source",
+  "citation": "Kavanaugh, accuser to testify on sex assault allegation",
+  "title": "Kavanaugh, accuser to testify on sex assault allegation",
+  "publisher": "UPI",
+  "canonical_url": "https://www.upi.com/Top_News/US/2018/09/17/Kavanaugh-accuser-to-testify-on-sex-assault-allegation/2031537190803/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2018-09-18",
+  "published_at": "2018-09-17",
+  "artifact": {
+    "sha256": "4c63030f2349c119edd54ec06062aaa5eb1491334b05a68fc43a32cf1a279a10",
+    "byte_length": 118929,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-24T19:15:37.257915Z",
+    "drift_key": "sha256",
+    "drift_value": "4c63030f2349c119edd54ec06062aaa5eb1491334b05a68fc43a32cf1a279a10"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20180918014331/https://www.upi.com/Top_News/US/2018/09/17/Kavanaugh-accuser-to-testify-on-sex-assault-allegation/2031537190803/",
+      "captured_at": "2018-09-18T01:43:31Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three (UPI, NPR, the Senate Judiciary Committee's own release) as the first that Wayback holds and that passes the read-only check; NPR's was not read, and the committee's release is withheld, its title and address naming the accuser. The capture, of 01:43:31 UTC on 2018-09-18, prints Updated Sept. 17, 2018 at 7:05 PM with no zone, taken as EDT (23:05 UTC on 2018-09-17), under a later headline than the address first carried. Datelined Sept. 17 (UPI), it reports that \"The Senate judiciary committee on Monday scheduled a public hearing regarding allegations of sexual assault against Supreme Court nominee Brett Kavanaugh\", 2018-09-17, the hearing to take place Sept. 24, \"delaying the vote on Kavanaugh's nomination\". The accuser is given by role. Read by capture only."
+}

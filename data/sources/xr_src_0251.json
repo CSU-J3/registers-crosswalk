@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0251",
+  "kind": "source",
+  "citation": "Al Franken To Resign, Democratic Official Says",
+  "title": "Al Franken To Resign, Democratic Official Says",
+  "publisher": "NPR",
+  "canonical_url": "https://www.npr.org/2017/12/06/568832606/franken-under-pressure-as-group-democratic-senators-call-for-him-to-resign",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2017-12-06",
+  "published_at": "2017-12-06",
+  "artifact": {
+    "sha256": "3ce31aae3d4f8f96b5a4cf4a24ae279ad9cb7eb3ebc86c4a0e47569ea5e67f9e",
+    "byte_length": 101566,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-24T19:11:29.816243Z",
+    "drift_key": "sha256",
+    "drift_value": "3ce31aae3d4f8f96b5a4cf4a24ae279ad9cb7eb3ebc86c4a0e47569ea5e67f9e"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20171206233550/https://www.npr.org/2017/12/06/568832606/franken-under-pressure-as-group-democratic-senators-call-for-him-to-resign",
+      "captured_at": "2017-12-06T23:35:50Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of Sen. Schumer's call (NPR, Roll Call, MPR News) as the first that Wayback holds and that passes, read by eye on the author's word; the other two were not read. The capture, of 23:35:50 UTC on 2017-12-06, shows the story under a later headline than its first, as New Gray said it would, and says \"Updated at 6:18 p.m. ET\". It prints December 6, 2017 12:21 PM ET (17:21 UTC on 2017-12-06) and carries Sen. Schumer's statement that Sen. Franken \"should step down immediately\". It gives the day of his call loosely: the chamber's top Democrats \"called Wednesday\" for Franken to step down, 2017-12-06, and Schumer is named among the senators who joined. Read by capture only."
+}

@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0254",
+  "kind": "source",
+  "citation": "Republican Sen. Jon Husted of Ohio says Rep. Max Miller should leave House and end fall campaign",
+  "title": "Republican Sen. Jon Husted of Ohio says Rep. Max Miller should leave House and end fall campaign",
+  "publisher": "The Washington Times",
+  "canonical_url": "https://www.washingtontimes.com/news/2026/aug/6/jon-husted-ohio-says-rep-max-miller-leave-house-end-fall-campaign/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-10-11",
+  "published_at": "2026-08-06",
+  "artifact": {
+    "sha256": "ccf3ae800e028c6032ad7783a78e859592f7a853e08c76d6dc860d117663688f",
+    "byte_length": 264983,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-24T19:17:40.975309Z",
+    "drift_key": "sha256",
+    "drift_value": "ccf3ae800e028c6032ad7783a78e859592f7a853e08c76d6dc860d117663688f"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20261011220141/https://www.washingtontimes.com/news/2026/aug/6/jon-husted-ohio-says-rep-max-miller-leave-house-end-fall-campaign/",
+      "captured_at": "2026-10-11T22:01:41Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three copies of the AP's story (The Washington Times' carry, The Atlanta Journal-Constitution's, WTOP's) as the first that Wayback holds and that passes the read-only check; the other two were not read. An Associated Press story, as The Washington Times ran it: By Julie Carr Smyth - Associated Press - Thursday, August 6, 2026, datelined COLUMBUS, Ohio. The capture, of 22:01:41 UTC on 2026-10-11, is a later copy and the only one Wayback holds of this address; the page prints August 6, 2026, with no time. It reports that \"Republican Sen. Jon Husted of Ohio called on Rep. Max Miller Thursday to resign his House seat and abandon his fall reelection bid\", 2026-08-06; that Sen. Tim Sheehy also urged Miller on Thursday to \"step aside and seek help\"; and that Sen. Bernie Moreno \"never specifically urged Miller to resign\". Miller's former wife and their child are given by role. Read by capture only."
+}

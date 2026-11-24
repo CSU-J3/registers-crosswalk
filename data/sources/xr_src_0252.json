@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0252",
+  "kind": "source",
+  "citation": "Republican party officials asked vendors to halt work on Trump's \"Victory\" project",
+  "title": "Republican party officials asked vendors to halt work on Trump's \"Victory\" project",
+  "publisher": "Quartz",
+  "canonical_url": "https://qz.com/804596/republican-party-officials-ask-vendors-to-halt-mail-and-other-work-on-victory-project-for-trump/",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2016-10-10",
+  "published_at": "2016-10-08",
+  "artifact": {
+    "sha256": "b25f2626982e6c31cc820bb069d1c749fb640096be91085c37eb7ae79127c3e7",
+    "byte_length": 42675,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-24T19:13:33.577638Z",
+    "drift_key": "sha256",
+    "drift_value": "b25f2626982e6c31cc820bb069d1c749fb640096be91085c37eb7ae79127c3e7"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20161010172110/https://qz.com/804596/republican-party-officials-ask-vendors-to-halt-mail-and-other-work-on-victory-project-for-trump/",
+      "captured_at": "2016-10-10T17:21:10Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of the Republican National Committee's halt (Politico, Quartz, Talking Points Memo) as the first that Wayback holds and that passes the read-only check; Politico's report was not located by two searches, and Talking Points Memo's was not read. Quartz's account of Politico's report: the capture, of 17:21:10 UTC on 2016-10-10, is Wayback's first of the story. It prints October 08, 2016, with no time, and reports that the Republican National Committee \"on Saturday emailed vendors working on mailing and printing for the project asking them to stop, at least temporarily, according to an email Politico obtained from the RNC\", which its print date makes 2016-10-08, quoting the email: \"Please put a hold/stop on all mail projects right now\". Wayback served it for the address with a closing slash; it is recorded under the address captured. The capture records the page's http address. Read by capture only."
+}

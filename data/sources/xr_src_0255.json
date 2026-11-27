@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0255",
+  "kind": "source",
+  "citation": "Rep. Eric Swalwell of California says he will resign from Congress after sexual assault allegations",
+  "title": "Rep. Eric Swalwell of California says he will resign from Congress after sexual assault allegations",
+  "publisher": "PBS News",
+  "canonical_url": "https://www.pbs.org/newshour/politics/rep-eric-swalwell-of-california-says-he-will-resign-from-congress-after-sexual-assault-allegations",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-04-13",
+  "published_at": "2026-04-13",
+  "artifact": {
+    "sha256": "e86d7e5d977f892f0917fe366dbe12b14a53f3af8b24bb450fa11b37723d1e9a",
+    "byte_length": 283991,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-27T05:40:54.388216Z",
+    "drift_key": "sha256",
+    "drift_value": "e86d7e5d977f892f0917fe366dbe12b14a53f3af8b24bb450fa11b37723d1e9a"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260413232940/https://www.pbs.org/newshour/politics/rep-eric-swalwell-of-california-says-he-will-resign-from-congress-after-sexual-assault-allegations",
+      "captured_at": "2026-04-13T23:29:40Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of Rep. Swalwell's announcement (PBS NewsHour's copy of the AP, Axios, OPB's copy of NPR) as the first that Wayback holds and that passes the read-only check; the other two were not read. An Associated Press story, as PBS News ran it: By Kevin Freking, Lisa Mascaro and Joey Cappelletti, Associated Press, datelined WASHINGTON. The capture, of 23:29:40 UTC on 2026-04-13, is Wayback's first of the story; the page prints Apr 13, 2026 5:50 PM EDT (21:50 UTC). It reports that \"Democratic Rep. Eric Swalwell of California announced Monday he will resign from Congress following multiple sexual assault allegations\", the Monday of its print date being 2026-04-13, and that the announcement \"came one day after Swalwell suspended his campaign for California governor\". Read by capture only."
+}

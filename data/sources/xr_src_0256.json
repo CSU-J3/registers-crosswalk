@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0256",
+  "kind": "source",
+  "citation": "Republican Rep. Tony Gonzales of Texas says he will retire after admitting to affair with staffer",
+  "title": "Republican Rep. Tony Gonzales of Texas says he will retire after admitting to affair with staffer",
+  "publisher": "PBS News",
+  "canonical_url": "https://www.pbs.org/newshour/politics/republican-rep-tony-gonzales-of-texas-says-he-will-retire-after-admitting-to-affair-with-staffer",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2026-04-13",
+  "published_at": "2026-04-13",
+  "artifact": {
+    "sha256": "347cffcb6993173df1e244ccbb84c9073622037e60b21a6ae4557ff1b0c005f6",
+    "byte_length": 278083,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-27T05:42:58.130565Z",
+    "drift_key": "sha256",
+    "drift_value": "347cffcb6993173df1e244ccbb84c9073622037e60b21a6ae4557ff1b0c005f6"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20260413235720/https://www.pbs.org/newshour/politics/republican-rep-tony-gonzales-of-texas-says-he-will-retire-after-admitting-to-affair-with-staffer",
+      "captured_at": "2026-04-13T23:57:20Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports of Rep. Gonzales's announcement (PBS NewsHour's copy of the AP, The Texas Tribune, Bloomberg Government) as the first that Wayback holds and that passes the read-only check; the other two were not read. An Associated Press story, as PBS News ran it: By Kevin Freking, Associated Press, datelined WASHINGTON. The capture, of 23:57:20 UTC on 2026-04-13, is Wayback's first of the story; the page prints Apr 13, 2026 7:30 PM EDT (23:30 UTC). It reports that \"Republican Rep. Tony Gonzales of Texas said Monday he will retire from Congress amid bipartisan calls to expel him\", the Monday of its print date being 2026-04-13, and quotes him: \"When Congress returns tomorrow, I will file my retirement from office\". The version served tells of his announcement only, not of his filing. Read by capture only."
+}

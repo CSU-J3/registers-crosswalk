@@ -1,0 +1,36 @@
+{
+  "xr_id": "xr_src_0257",
+  "kind": "source",
+  "citation": "Rep. Pat Meehan will have to step aside, Republican insiders say",
+  "title": "Rep. Pat Meehan will have to step aside, Republican insiders say",
+  "publisher": "The Philadelphia Inquirer",
+  "canonical_url": "https://www.inquirer.com/philly/news/politics/pat-meehan-sexual-harassment-cant-win-reelection-some-republicans-say-20180125.html",
+  "fetcher": "wayback",
+  "fetcher_verified": true,
+  "verified_at": "2026-10-04",
+  "point_in_time": "2019-07-29",
+  "published_at": "2018-01-25",
+  "artifact": {
+    "sha256": "0a5d7867d3920a9667b3d2a03196f5d8f0310a69745e7942482286800c27e575",
+    "byte_length": 149176,
+    "media_type": "text/html",
+    "fetched_at": "2026-11-27T05:45:01.560667Z",
+    "drift_key": "sha256",
+    "drift_value": "0a5d7867d3920a9667b3d2a03196f5d8f0310a69745e7942482286800c27e575"
+  },
+  "grade": {
+    "reliability": "B",
+    "credibility": 2
+  },
+  "archives": [
+    {
+      "service": "wayback",
+      "url": "https://web.archive.org/web/20190729004837/https://www.inquirer.com/philly/news/politics/pat-meehan-sexual-harassment-cant-win-reelection-some-republicans-say-20180125.html",
+      "captured_at": "2019-07-29T00:48:37Z"
+    }
+  ],
+  "cited_in": [],
+  "supersedes": null,
+  "merged_into": null,
+  "notes": "Chosen from New Gray's ranked list of three reports (the Inquirer's report of 2018-01-25 that Republicans expected Rep. Meehan to leave the race, to locate; the Inquirer's report of his announcement; NBC News's) as the first that Wayback holds and that passes, its decisive sentence read by eye on the author's words; the other two were not read. Located by one search query; its address carries the day, 20180125. By Jonathan Tamari. The capture, of 00:48:37 UTC on 2019-07-29, is a later copy and Wayback's first of this address; the page prints Posted: January 25, 2018 - 1:09 PM, with no zone (taken as Eastern, 18:09 UTC). It reports, before his announcement, that Pennsylvania Republicans \"increasingly believe\" that he \"will not be able to run for reelection this fall\", according to interviews with a half-dozen party officials and insiders, and that one, \"who has been in touch with Meehan's congressional aides\", said that \"a departure is all but certain\"; that he \"had not made a decision as of Thursday morning\", 2018-01-25; and that Republican political leaders in Washington and Pennsylvania \"have not commented on his future\". It names no leader or party committee demanding that he leave the race: unnamed Republicans only, the row's answer. Read by capture only."
+}
